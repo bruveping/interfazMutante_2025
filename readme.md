@@ -4,4 +4,5 @@ con css
 con java script
 y con librerías simpáticas como p5
 
-https://bruveping.github.io/interfazMutante_2025/paginaNegra/para_Navegar_con_el_celu/
+(para navegar con el celu)[https://bruveping.github.io/interfazMutante_2025/para_Navegar_con_el_celu/]
+
