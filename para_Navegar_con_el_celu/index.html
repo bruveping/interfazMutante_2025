@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Geolocalización en Tiempo Real</title>
-    <link rel="icon" type="image/x-icon" href="favicon.ico">
+    <link rel="icon" type="image/png" href="favicon.png">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
     <style>
@@ -15,70 +15,30 @@
         }
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             height: 100vh;
             display: flex;
             flex-direction: column;
+            overflow: hidden;
         }
         .header {
-            background: rgba(255, 255, 255, 0.95);
-            padding: 20px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            text-align: center;
+            background: rgba(255, 255, 255, 0.98);
+            padding: 12px 15px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+            z-index: 1000;
         }
         h1 {
             color: #333;
-            font-size: 24px;
-            margin-bottom: 10px;
-        }
-        .info-panel {
-            display: flex;
-            justify-content: center;
-            gap: 20px;
-            flex-wrap: wrap;
-            margin-top: 10px;
-        }
-        .info-item {
-            background: #f8f9fa;
-            padding: 10px 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-        }
-        .info-label {
-            font-size: 12px;
-            color: #666;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-        .info-value {
-            font-size: 16px;
-            font-weight: bold;
-            color: #667eea;
-            margin-top: 5px;
+            font-size: 18px;
+            margin: 0;
         }
         #map {
             flex: 1;
             width: 100%;
         }
-        .status {
-            padding: 10px 20px;
-            text-align: center;
-            font-size: 14px;
-            background: #ffc107;
-            color: #000;
-        }
-        .status.success {
-            background: #4caf50;
-            color: white;
-        }
-        .status.error {
-            background: #f44336;
-            color: white;
-        }
         .controls {
-            position: absolute;
-            top: 100px;
-            right: 10px;
+            position: fixed;
+            bottom: 20px;
+            right: 15px;
             z-index: 1000;
             display: flex;
             flex-direction: column;
@@ -86,31 +46,154 @@
         }
         .btn {
             background: white;
-            border: 2px solid #667eea;
-            padding: 12px 20px;
-            border-radius: 8px;
+            border: none;
+            padding: 14px 18px;
+            border-radius: 50px;
             cursor: pointer;
-            font-size: 14px;
-            font-weight: bold;
-            color: #667eea;
+            font-size: 24px;
             transition: all 0.3s;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-        }
-        .btn:hover {
-            background: #667eea;
-            color: white;
-            transform: translateY(-2px);
-            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+            width: 56px;
+            height: 56px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
         .btn:active {
+            transform: scale(0.95);
+        }
+        .status {
+            position: fixed;
+            top: 60px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 13px;
+            background: rgba(255, 193, 7, 0.95);
+            color: #000;
+            z-index: 1000;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            max-width: 90%;
+            text-align: center;
+        }
+        .status.success {
+            background: rgba(76, 175, 80, 0.95);
+            color: white;
+        }
+        .status.error {
+            background: rgba(244, 67, 54, 0.95);
+            color: white;
+        }
+        .info-modal {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: white;
+            border-radius: 20px 20px 0 0;
+            box-shadow: 0 -4px 20px rgba(0,0,0,0.3);
+            z-index: 2000;
+            transform: translateY(100%);
+            transition: transform 0.3s ease;
+            max-height: 70vh;
+            overflow-y: auto;
+        }
+        .info-modal.show {
             transform: translateY(0);
+        }
+        .modal-header {
+            padding: 20px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .modal-header h2 {
+            font-size: 20px;
+            color: #333;
+            margin: 0;
+        }
+        .close-btn {
+            background: none;
+            border: none;
+            font-size: 28px;
+            color: #999;
+            cursor: pointer;
+            padding: 0;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-content {
+            padding: 20px;
+        }
+        .info-item {
+            margin-bottom: 20px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        .info-item:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+            padding-bottom: 0;
+        }
+        .info-label {
+            font-size: 12px;
+            color: #999;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 5px;
+        }
+        .info-value {
+            font-size: 18px;
+            font-weight: bold;
+            color: #667eea;
+            word-break: break-all;
+        }
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 1999;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s;
+        }
+        .overlay.show {
+            opacity: 1;
+            pointer-events: all;
         }
     </style>
 </head>
 <body>
     <div class="header">
         <h1>📍 Mi Ubicación en Tiempo Real</h1>
-        <div class="info-panel">
+    </div>
+    
+    <div class="status" id="status">Solicitando permiso de ubicación...</div>
+    
+    <div id="map"></div>
+
+    <div class="controls">
+        <button class="btn" id="infoBtn" title="Ver datos">ℹ️</button>
+        <button class="btn" id="centerBtn" title="Centrar">🎯</button>
+        <button class="btn" id="toggleTracking" title="Pausar">⏸️</button>
+    </div>
+
+    <div class="overlay" id="overlay"></div>
+    
+    <div class="info-modal" id="infoModal">
+        <div class="modal-header">
+            <h2>📊 Datos de Ubicación</h2>
+            <button class="close-btn" id="closeModal">×</button>
+        </div>
+        <div class="modal-content">
             <div class="info-item">
                 <div class="info-label">Latitud</div>
                 <div class="info-value" id="lat">--</div>
@@ -124,20 +207,19 @@
                 <div class="info-value" id="accuracy">--</div>
             </div>
             <div class="info-item">
+                <div class="info-label">Altitud</div>
+                <div class="info-value" id="altitude">--</div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">Velocidad</div>
+                <div class="info-value" id="speed">--</div>
+            </div>
+            <div class="info-item">
                 <div class="info-label">Última actualización</div>
                 <div class="info-value" id="timestamp">--</div>
             </div>
         </div>
     </div>
-    
-    <div class="status" id="status">Solicitando permiso de ubicación...</div>
-    
-    <div class="controls">
-        <button class="btn" id="centerBtn">Centrar Mapa</button>
-        <button class="btn" id="toggleTracking">Pausar Seguimiento</button>
-    </div>
-    
-    <div id="map"></div>
 
     <script>
         let map;
@@ -145,6 +227,7 @@
         let circle;
         let watchId;
         let isTracking = true;
+        let statusTimeout;
 
         // Inicializar el mapa
         map = L.map('map').setView([0, 0], 2);
@@ -163,19 +246,35 @@
             iconAnchor: [10, 10]
         });
 
-        function updateStatus(message, type = '') {
+        function updateStatus(message, type = '', duration = 3000) {
             const statusEl = document.getElementById('status');
             statusEl.textContent = message;
             statusEl.className = 'status ' + type;
+            statusEl.style.display = 'block';
+            
+            clearTimeout(statusTimeout);
+            statusTimeout = setTimeout(() => {
+                statusEl.style.display = 'none';
+            }, duration);
         }
 
-        function updateInfo(lat, lng, accuracy) {
+        function updateInfo(position) {
+            const lat = position.coords.latitude;
+            const lng = position.coords.longitude;
+            const accuracy = position.coords.accuracy;
+            
             document.getElementById('lat').textContent = lat.toFixed(6);
             document.getElementById('lng').textContent = lng.toFixed(6);
-            document.getElementById('accuracy').textContent = accuracy.toFixed(0) + ' m';
+            document.getElementById('accuracy').textContent = accuracy.toFixed(0) + ' metros';
+            
+            const altitude = position.coords.altitude;
+            document.getElementById('altitude').textContent = altitude ? altitude.toFixed(0) + ' m' : 'No disponible';
+            
+            const speed = position.coords.speed;
+            document.getElementById('speed').textContent = speed ? (speed * 3.6).toFixed(1) + ' km/h' : 'No disponible';
             
             const now = new Date();
-            document.getElementById('timestamp').textContent = now.toLocaleTimeString('es-AR');
+            document.getElementById('timestamp').textContent = now.toLocaleString('es-AR');
         }
 
         function onLocationFound(position) {
@@ -184,8 +283,8 @@
             const accuracy = position.coords.accuracy;
 
             // Actualizar información
-            updateInfo(lat, lng, accuracy);
-            updateStatus('Ubicación actualizada correctamente', 'success');
+            updateInfo(position);
+            updateStatus('✓ Ubicación actualizada', 'success', 2000);
 
             // Si es la primera vez, centrar el mapa
             if (!marker) {
@@ -216,7 +315,7 @@
         }
 
         function onLocationError(error) {
-            let message = 'Error al obtener ubicación: ';
+            let message = 'Error: ';
             switch(error.code) {
                 case error.PERMISSION_DENIED:
                     message += 'Permiso denegado';
@@ -225,12 +324,12 @@
                     message += 'Ubicación no disponible';
                     break;
                 case error.TIMEOUT:
-                    message += 'Tiempo de espera agotado';
+                    message += 'Tiempo agotado';
                     break;
                 default:
                     message += 'Error desconocido';
             }
-            updateStatus(message, 'error');
+            updateStatus(message, 'error', 5000);
         }
 
         // Iniciar seguimiento de ubicación
@@ -245,13 +344,27 @@
                 }
             );
         } else {
-            updateStatus('Geolocalización no soportada por este navegador', 'error');
+            updateStatus('Geolocalización no soportada', 'error', 5000);
         }
+
+        // Modal de información
+        const infoModal = document.getElementById('infoModal');
+        const overlay = document.getElementById('overlay');
+        
+        function toggleModal() {
+            infoModal.classList.toggle('show');
+            overlay.classList.toggle('show');
+        }
+
+        document.getElementById('infoBtn').addEventListener('click', toggleModal);
+        document.getElementById('closeModal').addEventListener('click', toggleModal);
+        overlay.addEventListener('click', toggleModal);
 
         // Botón para centrar el mapa
         document.getElementById('centerBtn').addEventListener('click', () => {
             if (marker) {
                 map.setView(marker.getLatLng(), 16);
+                updateStatus('🎯 Mapa centrado', '', 1500);
             }
         });
 
@@ -259,8 +372,9 @@
         document.getElementById('toggleTracking').addEventListener('click', function() {
             if (isTracking) {
                 navigator.geolocation.clearWatch(watchId);
-                this.textContent = 'Reanudar Seguimiento';
-                updateStatus('Seguimiento pausado', '');
+                this.textContent = '▶️';
+                this.title = 'Reanudar';
+                updateStatus('⏸️ Seguimiento pausado', '', 2000);
                 isTracking = false;
             } else {
                 watchId = navigator.geolocation.watchPosition(
@@ -272,7 +386,9 @@
                         timeout: 5000
                     }
                 );
-                this.textContent = 'Pausar Seguimiento';
+                this.textContent = '⏸️';
+                this.title = 'Pausar';
+                updateStatus('▶️ Seguimiento reanudado', 'success', 2000);
                 isTracking = true;
             }
         });
