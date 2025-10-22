@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Geolocalización en Tiempo Real</title>
+    <link rel="icon" type="image/x-icon" href="favicon.ico">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        h1 {
+            color: #333;
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+        .info-panel {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            flex-wrap: wrap;
+            margin-top: 10px;
+        }
+        .info-item {
+            background: #f8f9fa;
+            padding: 10px 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .info-label {
+            font-size: 12px;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .info-value {
+            font-size: 16px;
+            font-weight: bold;
+            color: #667eea;
+            margin-top: 5px;
+        }
+        #map {
+            flex: 1;
+            width: 100%;
+        }
+        .status {
+            padding: 10px 20px;
+            text-align: center;
+            font-size: 14px;
+            background: #ffc107;
+            color: #000;
+        }
+        .status.success {
+            background: #4caf50;
+            color: white;
+        }
+        .status.error {
+            background: #f44336;
+            color: white;
+        }
+        .controls {
+            position: absolute;
+            top: 100px;
+            right: 10px;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .btn {
+            background: white;
+            border: 2px solid #667eea;
+            padding: 12px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            color: #667eea;
+            transition: all 0.3s;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+        .btn:hover {
+            background: #667eea;
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+        }
+        .btn:active {
+            transform: translateY(0);
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📍 Mi Ubicación en Tiempo Real</h1>
+        <div class="info-panel">
+            <div class="info-item">
+                <div class="info-label">Latitud</div>
+                <div class="info-value" id="lat">--</div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">Longitud</div>
+                <div class="info-value" id="lng">--</div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">Precisión</div>
+                <div class="info-value" id="accuracy">--</div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">Última actualización</div>
+                <div class="info-value" id="timestamp">--</div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="status" id="status">Solicitando permiso de ubicación...</div>
+    
+    <div class="controls">
+        <button class="btn" id="centerBtn">Centrar Mapa</button>
+        <button class="btn" id="toggleTracking">Pausar Seguimiento</button>
+    </div>
+    
+    <div id="map"></div>
+
+    <script>
+        let map;
+        let marker;
+        let circle;
+        let watchId;
+        let isTracking = true;
+
+        // Inicializar el mapa
+        map = L.map('map').setView([0, 0], 2);
+
+        // Añadir capa de tiles (OpenStreetMap)
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors',
+            maxZoom: 19
+        }).addTo(map);
+
+        // Icono personalizado para el marcador
+        const customIcon = L.divIcon({
+            className: 'custom-marker',
+            html: '<div style="background: #667eea; width: 20px; height: 20px; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 10px rgba(0,0,0,0.5);"></div>',
+            iconSize: [20, 20],
+            iconAnchor: [10, 10]
+        });
+
+        function updateStatus(message, type = '') {
+            const statusEl = document.getElementById('status');
+            statusEl.textContent = message;
+            statusEl.className = 'status ' + type;
+        }
+
+        function updateInfo(lat, lng, accuracy) {
+            document.getElementById('lat').textContent = lat.toFixed(6);
+            document.getElementById('lng').textContent = lng.toFixed(6);
+            document.getElementById('accuracy').textContent = accuracy.toFixed(0) + ' m';
+            
+            const now = new Date();
+            document.getElementById('timestamp').textContent = now.toLocaleTimeString('es-AR');
+        }
+
+        function onLocationFound(position) {
+            const lat = position.coords.latitude;
+            const lng = position.coords.longitude;
+            const accuracy = position.coords.accuracy;
+
+            // Actualizar información
+            updateInfo(lat, lng, accuracy);
+            updateStatus('Ubicación actualizada correctamente', 'success');
+
+            // Si es la primera vez, centrar el mapa
+            if (!marker) {
+                map.setView([lat, lng], 16);
+            }
+
+            // Actualizar o crear marcador
+            if (marker) {
+                marker.setLatLng([lat, lng]);
+            } else {
+                marker = L.marker([lat, lng], { icon: customIcon }).addTo(map);
+                marker.bindPopup('<b>Tu ubicación</b>').openPopup();
+            }
+
+            // Actualizar o crear círculo de precisión
+            if (circle) {
+                circle.setLatLng([lat, lng]);
+                circle.setRadius(accuracy);
+            } else {
+                circle = L.circle([lat, lng], {
+                    radius: accuracy,
+                    color: '#667eea',
+                    fillColor: '#667eea',
+                    fillOpacity: 0.2,
+                    weight: 2
+                }).addTo(map);
+            }
+        }
+
+        function onLocationError(error) {
+            let message = 'Error al obtener ubicación: ';
+            switch(error.code) {
+                case error.PERMISSION_DENIED:
+                    message += 'Permiso denegado';
+                    break;
+                case error.POSITION_UNAVAILABLE:
+                    message += 'Ubicación no disponible';
+                    break;
+                case error.TIMEOUT:
+                    message += 'Tiempo de espera agotado';
+                    break;
+                default:
+                    message += 'Error desconocido';
+            }
+            updateStatus(message, 'error');
+        }
+
+        // Iniciar seguimiento de ubicación
+        if ('geolocation' in navigator) {
+            watchId = navigator.geolocation.watchPosition(
+                onLocationFound,
+                onLocationError,
+                {
+                    enableHighAccuracy: true,
+                    maximumAge: 0,
+                    timeout: 5000
+                }
+            );
+        } else {
+            updateStatus('Geolocalización no soportada por este navegador', 'error');
+        }
+
+        // Botón para centrar el mapa
+        document.getElementById('centerBtn').addEventListener('click', () => {
+            if (marker) {
+                map.setView(marker.getLatLng(), 16);
+            }
+        });
+
+        // Botón para pausar/reanudar seguimiento
+        document.getElementById('toggleTracking').addEventListener('click', function() {
+            if (isTracking) {
+                navigator.geolocation.clearWatch(watchId);
+                this.textContent = 'Reanudar Seguimiento';
+                updateStatus('Seguimiento pausado', '');
+                isTracking = false;
+            } else {
+                watchId = navigator.geolocation.watchPosition(
+                    onLocationFound,
+                    onLocationError,
+                    {
+                        enableHighAccuracy: true,
+                        maximumAge: 0,
+                        timeout: 5000
+                    }
+                );
+                this.textContent = 'Pausar Seguimiento';
+                isTracking = true;
+            }
+        });
+    </script>
+</body>
+</html>
