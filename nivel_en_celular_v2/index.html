@@ -286,12 +286,22 @@
                 body.classList.add('vertical-mode');
                 canvas.style.borderRadius = '15px'; // Asegura bordes cuadrados/redondeados
                 
-                // atan2(x, y) es el ángulo entre el eje Y y el punto (x, y)
-                // En modo vertical, X es la inclinación lateral (roll), Y es la inclinación hacia adelante/atrás (pitch)
-                // Para colgar cuadros, nos interesa la inclinación lateral (roll), que es acc.x
-                // Math.atan2(x, z) calcula el ángulo respecto al eje Z (vertical) en el plano XZ.
-                // Si el teléfono está en vertical, Z es la gravedad y X es la inclinación lateral.
-                currentAngleDeg = Math.atan2(rawX, rawZ) * (180 / Math.PI);
+                // --- CAMBIO DE LÓGICA ---
+                // Queremos medir el 'roll' (inclinación lateral) cuando el teléfono está
+                // en vertical contra una pared.
+                // En esta orientación, la gravedad está en el eje Y.
+                // El eje X mide la inclinación lateral.
+                // Usamos atan2(rawX, rawY) para obtener el ángulo en ese plano.
+                // rawY es negativo cuando está de pie, así que sumamos 180
+                // para que 0° sea "arriba".
+                currentAngleDeg = (Math.atan2(rawX, rawY) * (180 / Math.PI)) + 180;
+        
+                // Si el ángulo es > 180, réstale 360 para mantenerlo en el rango -180 a 180
+                if (currentAngleDeg > 180) {
+                    currentAngleDeg -= 360;
+                }
+                // --- FIN DE CAMBIO DE LÓGICA ---
+
 
                 // Aplicar calibración para modo vertical
                 currentAngleDeg -= calibrationOffsetAngle_vertical;
@@ -571,7 +581,13 @@
         calibrateBtn.addEventListener('click', () => {
             if (isVerticalMode) {
                 // Calibrar el ángulo actual como el nuevo "cero" para el modo vertical
-                const currentAngle = Math.atan2(lastRawX, lastRawZ) * (180 / Math.PI);
+                // --- CAMBIO DE LÓGICA ---
+                // Usamos el mismo cálculo que en drawLevel
+                let currentAngle = (Math.atan2(lastRawX, lastRawY) * (180 / Math.PI)) + 180;
+                if (currentAngle > 180) {
+                    currentAngle -= 360;
+                }
+                // --- FIN DE CAMBIO DE LÓGICA ---
                 calibrationOffsetAngle_vertical = currentAngle;
                 statusDisplay.textContent = '✓ Calibrado Vertical';
             } else {
@@ -600,3 +616,4 @@
     </script>
 </body>
 </html>
+
