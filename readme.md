@@ -5,5 +5,7 @@ con java script
 y con librerías simpáticas como p5
 
 [página para navegar con el celu y el gps](https://bruveping.github.io/interfazMutante_2025/para_Navegar_con_el_celu/)
+nivel_en_el_celular [nivel_en_el_celular](https://bruveping.github.io/interfazMutante_2025/nivel_en_el_celular)
+
 
 
