@@ -286,15 +286,12 @@
                 body.classList.add('vertical-mode');
                 canvas.style.borderRadius = '15px'; // Asegura bordes cuadrados/redondeados
                 
-                // --- CAMBIO DE LÓGICA ---
-                // Queremos medir el 'roll' (inclinación lateral) cuando el teléfono está
-                // en vertical contra una pared.
-                // En esta orientación, la gravedad está en el eje Y.
-                // El eje X mide la inclinación lateral.
-                // Usamos atan2(rawX, rawY) para obtener el ángulo en ese plano.
-                // rawY es negativo cuando está de pie, así que sumamos 180
-                // para que 0° sea "arriba".
-                currentAngleDeg = (Math.atan2(rawX, rawY) * (180 / Math.PI)) + 180;
+                // --- CAMBIO DE LÓGICA (PARA MODO HORIZONTAL/LANDSCAPE) ---
+                // El usuario quiere usar el teléfono "en largo" (horizontal).
+                // En esta orientación, la gravedad está en el eje X.
+                // La inclinación lateral (roll) que queremos medir está en el eje Y.
+                // Por lo tanto, usamos atan2(rawY, rawX).
+                currentAngleDeg = (Math.atan2(rawY, rawX) * (180 / Math.PI)) + 180;
         
                 // Si el ángulo es > 180, réstale 360 para mantenerlo en el rango -180 a 180
                 if (currentAngleDeg > 180) {
@@ -581,9 +578,9 @@
         calibrateBtn.addEventListener('click', () => {
             if (isVerticalMode) {
                 // Calibrar el ángulo actual como el nuevo "cero" para el modo vertical
-                // --- CAMBIO DE LÓGICA ---
+                // --- CAMBIO DE LÓGICA (PARA MODO HORIZONTAL/LANDSCAPE) ---
                 // Usamos el mismo cálculo que en drawLevel
-                let currentAngle = (Math.atan2(lastRawX, lastRawY) * (180 / Math.PI)) + 180;
+                let currentAngle = (Math.atan2(lastRawY, lastRawX) * (180 / Math.PI)) + 180;
                 if (currentAngle > 180) {
                     currentAngle -= 360;
                 }
@@ -616,4 +613,5 @@
     </script>
 </body>
 </html>
+
 
