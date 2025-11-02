@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Afinador de Instrumentos Pro</title>
+    <title>Afinador de Instrumentos Pro (v2)</title>
     <!-- Carga de Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
@@ -60,10 +60,12 @@
             height: 80px;
             background-color: white;
             position: absolute;
-            left: 50%;
+            left: 50%; /* Controlado por JS */
             top: 50%;
-            transform: translate(-50%, -50%);
-            transition: transform 0.1s linear, background-color 0.1s linear;
+            /* MEJORA: La aguja ahora se centra a sí misma con transform */
+            transform: translate(-50%, -50%); 
+            /* MEJORA: Se añade 'left' a la transición para un movimiento suave */
+            transition: transform 0.1s linear, background-color 0.1s linear, left 0.1s linear;
             border-radius: 2px;
             box-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
         }
@@ -104,6 +106,7 @@
         .in-tune-needle {
             background-color: #4ade80 !important; /* green-400 */
             box-shadow: 0 0 20px #4ade80;
+            /* MEJORA: Se simplifica el transform, el movimiento es por 'left' */
             transform: translate(-50%, -50%) scaleY(1.1) !important;
         }
     </style>
@@ -179,6 +182,10 @@
             let a4Freq = 440; // Frecuencia de A4, ajustable
             let animationFrameId = null;
 
+            // --- MEJORA 4: Persistencia de UI ---
+            let lastNoteTime = 0;
+            const persistenceThreshold = 500; // ms para mantener la nota en pantalla
+
             // --- Configuración de Controles ---
             a4Slider.addEventListener('input', (e) => {
                 a4Freq = parseFloat(e.target.value);
@@ -199,27 +206,20 @@
             // --- Función principal para iniciar el afinador ---
             async function startTuner() {
                 try {
-                    // 1. Solicitar acceso al micrófono
                     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                    
-                    // 2. Configurar el Contexto de Audio
                     audioContext = new (window.AudioContext || window.webkitAudioContext)();
                     sampleRate = audioContext.sampleRate;
                     mediaStreamSource = audioContext.createMediaStreamSource(stream);
                     
-                    // 3. Configurar el Analizador
                     analyser = audioContext.createAnalyser();
-                    analyser.fftSize = 2048; // Tamaño de la FFT, bueno para detección de pitch
+                    analyser.fftSize = 2048; 
                     buffer = new Float32Array(analyser.fftSize);
                     
-                    // Conectar el nodo
                     mediaStreamSource.connect(analyser);
 
-                    // 4. Ocultar pantalla de inicio y mostrar afinador
                     startScreen.classList.add('hidden');
                     tunerApp.classList.remove('hidden');
                     
-                    // 5. Iniciar el bucle de detección
                     updatePitch();
 
                 } catch (err) {
@@ -231,32 +231,37 @@
             // --- Bucle de Detección de Tono ---
             function updatePitch() {
                 analyser.getFloatTimeDomainData(buffer);
-                
-                // Algoritmo de Autocorrelación (YIN simplificado) para encontrar la frecuencia
                 const frequency = findFundamentalFrequency(buffer, sampleRate);
 
                 if (frequency > 0) {
                     // Si se detecta una frecuencia, actualizar la UI
                     const noteData = getNoteData(frequency);
                     updateUI(noteData);
+                    lastNoteTime = performance.now(); // MEJORA 4: Actualizar timestamp
                 } else {
-                    // Si no hay sonido claro, mostrar estado "neutro"
-                    resetUI();
+                    // MEJORA 4: Solo reiniciar si ha pasado el tiempo de persistencia
+                    if (performance.now() - lastNoteTime > persistenceThreshold) {
+                        resetUI();
+                    }
                 }
 
-                // Continuar el bucle
                 animationFrameId = requestAnimationFrame(updatePitch);
             }
 
-            // --- Algoritmo de Detección de Frecuencia (Autocorrelación) ---
+            // --- MEJORA 1: Algoritmo de Detección de Frecuencia (Autocorrelación) ---
             function findFundamentalFrequency(buffer, sampleRate) {
                 const bufferSize = buffer.length;
-                const minPeriod = Math.floor(sampleRate / 2000); // Frecuencia max (2000 Hz)
-                const maxPeriod = Math.floor(sampleRate / 20);   // Frecuencia min (20 Hz)
-                const threshold = 0.1; // Umbral de claridad de la nota
+                // Rangos de frecuencia más realistas y seguros para el buffer
+                const minFreq = 30; // ~B0
+                const maxFreq = 2000; // ~C7
+                const minPeriod = Math.floor(sampleRate / maxFreq);
+                // Asegurar que maxPeriod no exceda el tamaño del buffer
+                const maxPeriod = Math.min(Math.floor(sampleRate / minFreq), bufferSize - 1);
                 
+                const threshold = 0.2; // Umbral de claridad de la nota (un poco más estricto)
+                
+                let minDiff = Infinity;
                 let bestPeriod = 0;
-                let minCorrelation = 1;
                 let rms = 0;
 
                 // Calcular RMS (volumen) para ignorar el silencio
@@ -271,28 +276,24 @@
 
                 // Iterar sobre los posibles períodos (lags)
                 for (let period = minPeriod; period <= maxPeriod; period++) {
-                    let correlation = 0;
+                    let diff = 0;
                     for (let i = 0; i < bufferSize - period; i++) {
-                        const diff = buffer[i] - buffer[i + period];
-                        correlation += diff * diff;
+                        const d = buffer[i] - buffer[i + period];
+                        diff += d * d;
                     }
-                    correlation = Math.sqrt(correlation / (bufferSize - period));
+                    const avgDiff = Math.sqrt(diff / (bufferSize - period));
+                    const normalizedDiff = avgDiff / (rms + 0.001); // Normalizar
 
-                    // Normalizar la correlación
-                    const normalizedCorrelation = correlation / (rms + 0.001); 
-                    
-                    if (normalizedCorrelation < minCorrelation) {
-                        minCorrelation = normalizedCorrelation;
+                    // CORRECCIÓN: Encontrar el mínimo ABSOLUTO en todo el rango
+                    // (La versión anterior se detenía prematuramente)
+                    if (normalizedDiff < minDiff) {
+                        minDiff = normalizedDiff;
                         bestPeriod = period;
-                    }
-                    
-                    // Optimización: si encontramos un buen mínimo, usarlo
-                    if (minCorrelation < threshold) {
-                        break;
                     }
                 }
                 
-                if (minCorrelation < threshold && bestPeriod > 0) {
+                // Solo aceptar la nota si el mejor período es suficientemente claro
+                if (minDiff < threshold && bestPeriod > 0) {
                     return sampleRate / bestPeriod;
                 }
                 
@@ -301,14 +302,12 @@
 
             // --- Conversión de Frecuencia a Nota ---
             function getNoteData(frequency) {
-                // Fórmula para convertir frecuencia a número de nota MIDI
                 const midiNum = 12 * (Math.log2(frequency / a4Freq)) + 69;
                 const noteIndex = Math.round(midiNum) % 12;
                 
                 const noteName = NOTE_NAMES[noteIndex];
                 const octave = Math.floor(Math.round(midiNum) / 12) - 1;
                 
-                // Calcular la desviación en "cents" (100 cents = 1 semitono)
                 const cents = (midiNum - Math.round(midiNum)) * 100;
                 
                 return {
@@ -323,29 +322,32 @@
                 const { noteName, octave, cents } = noteData;
 
                 // 1. Actualizar texto
-                noteDisplay.textContent = noteName;
+                // MEJORA 2: Mostrar la octava
+                noteDisplay.textContent = noteName + octave;
                 centsDisplay.textContent = `${cents >= 0 ? '+' : ''}${cents.toFixed(0)} cents`;
 
                 // 2. Mover la aguja
-                // Mapear cents (-50 a +50) a un % de translación (-100% a +100%)
-                // Usamos un rango más amplio (ej. -150 a 150) para que la aguja se mueva más
-                const translation = Math.max(-150, Math.min(150, cents * 3));
-                needle.style.transform = `translate(-50%, -50%) translateX(${translation}%)`;
+                // MEJORA 3: Mover la aguja usando 'left' para mayor sensibilidad
+                // Mapear cents (-50 a +50) a un % de 'left' (0% a 100%)
+                const leftPercentage = 50 + (cents * 1.0); // 1.0x = 50 cents es 100% del borde
+                const clampedLeft = Math.max(0, Math.min(100, leftPercentage));
                 
+                needle.style.left = `${clampedLeft}%`;
+                // El transform solo centra la aguja en su nueva posición
+                needle.style.transform = `translate(-50%, -50%)`;
+
                 // 3. Cambiar color si está afinado
-                // Rango de afinación "perfecta" (ej. +/- 5 cents)
-                if (Math.abs(cents) < 5) {
+                if (Math.abs(cents) < 5) { // Rango de afinación "perfecta"
                     noteDisplay.classList.add('in-tune');
                     needle.classList.add('in-tune-needle');
                 } else {
                     noteDisplay.classList.remove('in-tune');
                     needle.classList.remove('in-tune-needle');
                     
-                    // Colorear según bemol o sostenido
                     if (cents < 0) {
-                        noteDisplay.style.color = '#f8b400'; // Un amarillo/naranja para bemol
+                        noteDisplay.style.color = '#f8b400'; // Naranja para bemol
                     } else {
-                        noteDisplay.style.color = '#ef4444'; // red-500 para sostenido
+                        noteDisplay.style.color = '#ef4444'; // Rojo para sostenido
                     }
                 }
             }
@@ -357,10 +359,13 @@
                 noteDisplay.classList.remove('in-tune');
                 centsDisplay.innerHTML = '&nbsp;';
                 
-                needle.style.transform = 'translate(-50%, -50%) translateX(0)';
+                // MEJORA 3: Reiniciar la posición 'left' de la aguja
+                needle.style.left = '50%';
+                needle.style.transform = 'translate(-50%, -50%)';
                 needle.classList.remove('in-tune-needle');
             }
         });
     </script>
 </body>
 </html>
+
