@@ -8,7 +8,8 @@ y con librerías simpáticas como p5
 
 nivel_en_el_celular [nivel_en_el_celular](https://bruveping.github.io/interfazMutante_2025/nivel_en_el_celular)
 
-nivel_en_el_celular v2 [nivel_en_el_celular v2 ](https://bruveping.github.io/interfazMutante_2025/nivel_en_celular_v2)
+nivel_en_el_celular v2 [nivel_en_el_celular v2 ](https://bruveping.github.io/interfazMutante_2025/nivel_en_celular_v2) Funciona muy bien!!!
+
 
 
 
