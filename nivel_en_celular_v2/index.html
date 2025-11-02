@@ -2,10 +2,10 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <!-- CORRECCIÓN: Faltaba el atributo 'content' en la etiqueta viewport -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nivel Digital (Ojo de Buey)</title>
+    <title>Nivel Digital con Modos</title>
     <style>
+        /* Estilos globales y reseteo */
         * {
             margin: 0;
             padding: 0;
@@ -14,9 +14,8 @@
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); /* Fondo degradado */
             min-height: 100vh;
-            /* Aseguramos que el contenido no se desborde en pantallas pequeñas */
             overflow: auto;
             user-select: none;
             padding: 10px;
@@ -29,30 +28,28 @@
             text-align: center;
             padding: 10px;
             width: 100%;
-            /* Un max-width ayuda en pantallas grandes */
-            max-width: 380px;
+            max-width: 380px; /* Ancho máximo para el contenedor */
             margin: 0 auto;
         }
 
         h1 {
             color: white;
-            font-size: 22px; /* Un poco más grande */
+            font-size: 24px;
             margin-bottom: 10px;
             text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
         }
 
         .mode-display {
             color: white;
-            font-size: 16px; /* Un poco más grande */
+            font-size: 16px;
             margin-bottom: 8px;
             font-weight: 500;
-            min-height: 20px; /* Asegura espacio */
+            min-height: 20px;
         }
 
         .canvas-container {
             position: relative;
             margin: 10px auto;
-            /* Hacemos el canvas container responsivo */
             width: 80vw;
             height: 80vw;
             max-width: 250px;
@@ -62,16 +59,20 @@
         canvas {
             background: rgba(255, 255, 255, 0.1);
             backdrop-filter: blur(10px);
-            border-radius: 50%; /* Círculo perfecto */
+            border-radius: 15px; /* Bordes redondeados, no círculo perfecto */
             box-shadow: 0 8px 32px rgba(0,0,0,0.3);
-            /* El canvas tomará el tamaño de su contenedor */
             width: 100%;
             height: 100%;
         }
+        /* Estilo para el canvas en modo ojo de buey (cuando es circular) */
+        body.bullseye-mode canvas {
+            border-radius: 50%;
+        }
+
 
         .angle-display {
             color: white;
-            font-size: 36px;
+            font-size: 38px; /* Tamaño de fuente para el ángulo */
             font-weight: bold;
             margin: 10px 0;
             text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
@@ -90,7 +91,7 @@
             background: white;
             color: #667eea;
             border: none;
-            padding: 12px 25px; /* Ajuste de padding */
+            padding: 12px 25px;
             font-size: 14px;
             font-weight: 600;
             border-radius: 50px;
@@ -115,7 +116,7 @@
             padding: 8px;
             border-radius: 8px;
             margin: 8px 0;
-            font-size: 12px; /* Un poco más grande */
+            font-size: 12px;
         }
 
         .debug {
@@ -135,7 +136,7 @@
             color: #333;
             font-size: 14px;
             padding: 12px 30px;
-            width: 90%; /* Más prominente */
+            width: 90%;
         }
 
         .sensor-info {
@@ -148,34 +149,31 @@
         }
     </style>
 </head>
-<body>
-    <div class="container">
-        <h1>📐 Nivel Ojo de Buey</h1>
+<body class="vertical-mode"> <!-- Clase para indicar el modo actual --><div class="container">
+        <h1>📐 Nivel Digital</h1>
         
-        <!-- Mostraremos los ángulos X e Y aquí -->
-        <div class="mode-display" id="modeDisplay">X: 0.0° | Y: 0.0°</div>
+        <div class="mode-display" id="modeDisplay">Modo: Vertical (Cuadros)</div>
         
         <div class="canvas-container">
-            <!-- Definimos un tamaño base, pero se ajustará con CSS -->
             <canvas id="levelCanvas" width="300" height="300"></canvas>
         </div>
 
         <div class="angle-display" id="angleDisplay">0.0°</div>
-        <div class="status" id="status">Mueve el dispositivo...</div>
+        <div class="status" id="status">Sujeta el dispositivo verticalmente...</div>
 
-        <!-- Eliminamos el botón de modo, ya que ahora es solo 2D -->
+        <button id="toggleBtn">Cambiar a Modo Horizontal</button>
         <button id="calibrateBtn">Calibrar (0°)</button>
 
         <div class="info" id="info">
-            Coloca el dispositivo horizontal (plano) para medir
+            Sujeta el dispositivo vertical y calibra para colgar cuadros.
         </div>
 
-        <button id="startBtn">Activar Acelerómetro</button>
+        <button id="startBtn">Activar Sensores</button>
 
         <div class="sensor-info" id="sensorInfo">Esperando datos del acelerómetro...</div>
         <div class="debug" id="debug">
             X: -- | Y: -- | Z: --<br>
-            CalX: -- | CalY: --<br>
+            OffsetX: -- | OffsetY: --<br>
             Soporte: Verificando...
         </div>
     </div>
@@ -191,40 +189,42 @@
         const startBtn = document.getElementById('startBtn');
         const sensorInfo = document.getElementById('sensorInfo');
         const infoDiv = document.getElementById('info');
+        const toggleBtn = document.getElementById('toggleBtn');
+        const body = document.body;
 
-        // Variables para calibración 2D
-        let calibrationOffsetX = 0;
-        let calibrationOffsetY = 0;
+        // --- Variables de Estado ---
+        let isVerticalMode = true; // Empieza en modo vertical
+        let calibrationOffsetX_bullseye = 0; // Calibración para modo ojo de buey
+        let calibrationOffsetY_bullseye = 0;
+        let calibrationOffsetAngle_vertical = 0; // Calibración para modo vertical
         
-        // Variables para guardar los últimos valores (necesarios para calibrar)
         let lastRawX = 0;
         let lastRawY = 0;
-
+        let lastRawZ = 0; // También guardamos Z para el modo vertical
         let updateCount = 0;
         
-        // Constante de gravedad (para normalizar)
-        const G_FORCE = 9.81;
+        const G_FORCE = 9.81; // Fuerza de la gravedad
 
-        // Ajustar el tamaño del canvas al contenedor
+
+        // --- Funciones de Utilidad ---
+        const clamp = (val, min, max) => Math.min(Math.max(val, min), max);
+
+        // Ajustar el tamaño del canvas al contenedor (responsivo)
         function resizeCanvas() {
             const container = document.querySelector('.canvas-container');
+            // Usamos un tamaño base más grande para la resolución de dibujo
             const size = Math.min(container.clientWidth, container.clientHeight);
+            const dpi = window.devicePixelRatio || 1; // Para pantallas de alta resolución
             
-            // Ajustar el tamaño real del canvas (píxeles de dibujo)
-            if (canvas.width !== size || canvas.height !== size) {
-                canvas.width = size;
-                canvas.height = size;
-                // Redibujar después de cambiar el tamaño
-                drawLevel(0, 0, 0, 0, 0); 
-            }
+            canvas.width = size * dpi;
+            canvas.height = size * dpi;
+            ctx.scale(dpi, dpi); // Escalar el contexto para dibujar
+            
+            // Re-dibujar al cambiar tamaño para evitar artefactos
+            drawLevel(lastRawX, lastRawY, lastRawZ); 
         }
 
-        // Llamar a resizeCanvas al inicio y cuando la ventana cambie de tamaño
-        window.addEventListener('resize', resizeCanvas, false);
-        // Llamada inicial
-        resizeCanvas();
-
-
+        // --- Inicialización de Sensores ---
         function initSensors() {
             if (window.DeviceMotionEvent) {
                 debugDiv.innerHTML = 'DeviceMotionEvent: ✓ Soportado<br>Esperando datos...';
@@ -233,7 +233,7 @@
                 
                 setTimeout(() => {
                     if (updateCount === 0) {
-                        sensorInfo.textContent = '⚠️ No se detectan datos. Prueba presionar "Activar Acelerómetro"';
+                        sensorInfo.textContent = '⚠️ No se detectan datos. Prueba presionar "Activar Sensores"';
                         sensorInfo.style.background = 'rgba(255,107,107,0.3)';
                     }
                 }, 3000);
@@ -244,6 +244,7 @@
             }
         }
 
+        // --- Manejador de Eventos de Movimiento ---
         function handleMotion(event) {
             const acc = event.accelerationIncludingGravity;
             
@@ -261,48 +262,96 @@
             }
 
             // Guardamos los valores "crudos" del acelerómetro
-            // Para un nivel plano, X e Y miden la inclinación
             lastRawX = acc.x || 0;
             lastRawY = acc.y || 0;
-            const z = acc.z || 0;
+            lastRawZ = acc.z || 0;
 
-            // Aplicar calibración
-            const calibratedX = lastRawX - calibrationOffsetX;
-            const calibratedY = lastRawY - calibrationOffsetY;
-
-            // --- Cálculo de Ángulos ---
-            // Clamp: Asegura que el valor esté entre -1 y 1 para asin
-            const clamp = (val, min, max) => Math.min(Math.max(val, min), max);
-
-            // Convertir la fuerza g (m/s²) a un ángulo en grados
-            // Un valor de 9.81 m/s² en X significa 90° de inclinación
-            const angleX = Math.asin(clamp(calibratedX / G_FORCE, -1, 1)) * (180 / Math.PI);
-            const angleY = Math.asin(clamp(calibratedY / G_FORCE, -1, 1)) * (180 / Math.PI);
-            
-            // El ángulo total es la magnitud del vector de los dos ángulos
-            const totalTiltAngle = Math.sqrt(angleX * angleX + angleY * angleY);
-
-            // Mostrar valores del acelerómetro
-            debugDiv.innerHTML = `X: ${lastRawX.toFixed(2)} | Y: ${lastRawY.toFixed(2)} | Z: ${z.toFixed(2)}<br>
-                                  CalX: ${calibratedX.toFixed(2)} | CalY: ${calibratedY.toFixed(2)}<br>
-                                  AngX: ${angleX.toFixed(1)}° | AngY: ${angleY.toFixed(1)}°`;
-
-            // Enviar datos calibrados (raw) y ángulos (deg) a la función de dibujo
-            drawLevel(calibratedX, calibratedY, totalTiltAngle, angleX, angleY);
+            drawLevel(lastRawX, lastRawY, lastRawZ);
         }
 
-        function drawLevel(rawX, rawY, totalTiltDeg, angleX, angleY) {
-            const centerX = canvas.width / 2;
-            const centerY = canvas.height / 2;
-            // El radio ahora se basa en el tamaño del canvas
-            const radius = (canvas.width / 2) * 0.8; // 80% del radio
+        // --- Lógica de Dibujo General ---
+        function drawLevel(rawX, rawY, rawZ) {
+            const centerX = canvas.width / (2 * (window.devicePixelRatio || 1));
+            const centerY = canvas.height / (2 * (window.devicePixelRatio || 1));
+            const baseRadius = (canvas.width / (2 * (window.devicePixelRatio || 1))) * 0.8; // 80% del radio
 
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // Nivel = dentro de ±1.5 grados de inclinación total
-            const isLevel = totalTiltDeg < 1.5;
-            const lineColor = isLevel ? '#00ff88' : '#ffffff';
+            let currentAngleDeg, isLevel, displayModeText;
+            let lineColor;
 
+            if (isVerticalMode) {
+                // --- Modo Vertical (Cuadros) ---
+                body.classList.remove('bullseye-mode');
+                body.classList.add('vertical-mode');
+                canvas.style.borderRadius = '15px'; // Asegura bordes cuadrados/redondeados
+                
+                // atan2(x, y) es el ángulo entre el eje Y y el punto (x, y)
+                // En modo vertical, X es la inclinación lateral (roll), Y es la inclinación hacia adelante/atrás (pitch)
+                // Para colgar cuadros, nos interesa la inclinación lateral (roll), que es acc.x
+                // Math.atan2(x, z) calcula el ángulo respecto al eje Z (vertical) en el plano XZ.
+                // Si el teléfono está en vertical, Z es la gravedad y X es la inclinación lateral.
+                currentAngleDeg = Math.atan2(rawX, rawZ) * (180 / Math.PI);
+
+                // Aplicar calibración para modo vertical
+                currentAngleDeg -= calibrationOffsetAngle_vertical;
+                
+                // Normalizar ángulo a -180 a 180
+                while (currentAngleDeg > 180) currentAngleDeg -= 360;
+                while (currentAngleDeg < -180) currentAngleDeg += 360;
+
+                isLevel = Math.abs(currentAngleDeg) < 1.5; // Nivelado si es menos de 1.5 grados
+                lineColor = isLevel ? '#00ff88' : '#ffffff';
+                displayModeText = `Modo: Vertical (Cuadros)`;
+
+                // Dibujar el medidor vertical
+                drawVerticalLevel(centerX, centerY, baseRadius, currentAngleDeg, lineColor);
+
+            } else {
+                // --- Modo Horizontal (Ojo de Buey) ---
+                body.classList.remove('vertical-mode');
+                body.classList.add('bullseye-mode');
+                canvas.style.borderRadius = '50%'; // Asegura que sea circular
+                
+                // Aplicar calibración para modo ojo de buey
+                const calibratedX = rawX - calibrationOffsetX_bullseye;
+                const calibratedY = rawY - calibrationOffsetY_bullseye;
+
+                const angleX = Math.asin(clamp(calibratedX / G_FORCE, -1, 1)) * (180 / Math.PI);
+                const angleY = Math.asin(clamp(calibratedY / G_FORCE, -1, 1)) * (180 / Math.PI);
+                
+                currentAngleDeg = Math.sqrt(angleX * angleX + angleY * angleY); // Inclinación total
+                isLevel = currentAngleDeg < 1.5; // Nivelado si es menos de 1.5 grados
+                lineColor = isLevel ? '#00ff88' : '#ffffff';
+                displayModeText = `Modo: Horizontal (Ojo de Buey) - X: ${angleX.toFixed(1)}° | Y: ${angleY.toFixed(1)}°`;
+
+                // Dibujar el medidor de ojo de buey
+                drawBullseyeLevel(centerX, centerY, baseRadius, calibratedX, calibratedY, lineColor);
+            }
+
+            // Actualizar textos globales
+            angleDisplay.textContent = currentAngleDeg.toFixed(1) + '°';
+            angleDisplay.style.color = lineColor;
+            modeDisplay.textContent = displayModeText;
+            
+            if (isLevel) {
+                statusDisplay.textContent = '✓ NIVELADO';
+                statusDisplay.style.color = '#00ff88';
+            } else {
+                statusDisplay.textContent = `Desnivelado`;
+                statusDisplay.style.color = 'white';
+            }
+
+            debugDiv.innerHTML = `X: ${rawX.toFixed(2)} | Y: ${rawY.toFixed(2)} | Z: ${rawZ.toFixed(2)}<br>
+                                  Offset X: ${calibrationOffsetX_bullseye.toFixed(2)} | Offset Y: ${calibrationOffsetY_bullseye.toFixed(2)}<br>
+                                  Offset Ang: ${calibrationOffsetAngle_vertical.toFixed(1)}°`;
+        }
+
+
+        // --- Funciones de Dibujo Específicas ---
+
+        // Dibuja el medidor de Ojo de Buey
+        function drawBullseyeLevel(centerX, centerY, radius, calibratedX, calibratedY, lineColor) {
             // Círculo exterior
             ctx.strokeStyle = 'rgba(255,255,255,0.3)';
             ctx.lineWidth = 2;
@@ -326,13 +375,12 @@
                 ctx.stroke();
             }
 
-            // --- Lógica de Burbuja 2D (Ojo de Buey) ---
-            const maxDist = radius - (canvas.width * 0.07); // Radio de la burbuja
+            // Burbuja 2D
+            const bubbleRadius = radius * 0.15; // 15% del radio principal
+            const maxDist = radius - bubbleRadius; 
             
-            // Mapear la fuerza 'g' (inclinación) a la distancia de píxeles
-            // Cuando rawX es 9.81 (90°), la burbuja debe estar en maxDist
-            let bubbleX = centerX + (rawX / G_FORCE) * maxDist;
-            let bubbleY = centerY + (rawY / G_FORCE) * maxDist; // Y del acelerómetro se mapea a Y del canvas
+            let bubbleX = centerX + (calibratedX / G_FORCE) * maxDist;
+            let bubbleY = centerY + (calibratedY / G_FORCE) * maxDist; 
 
             // Limitar la burbuja al círculo exterior
             const dist = Math.sqrt(Math.pow(bubbleX - centerX, 2) + Math.pow(bubbleY - centerY, 2));
@@ -342,15 +390,14 @@
                 bubbleY = centerY + (bubbleY - centerY) * ratio;
             }
 
-            // Sombra
+            // Sombra de la burbuja
             ctx.shadowColor = 'rgba(0,0,0,0.4)';
             ctx.shadowBlur = 12;
             ctx.shadowOffsetX = 3;
             ctx.shadowOffsetY = 3;
 
-            // Gradiente de burbuja
-            const bubbleRadius = canvas.width * 0.07; // Burbuja responsiva
-            const grad = ctx.createRadialGradient(bubbleX - 6, bubbleY - 6, 0, bubbleX, bubbleY, bubbleRadius);
+            // Gradiente de la burbuja
+            const grad = ctx.createRadialGradient(bubbleX - bubbleRadius*0.3, bubbleY - bubbleRadius*0.3, 0, bubbleX, bubbleY, bubbleRadius);
             grad.addColorStop(0, lineColor === '#00ff88' ? '#66ffaa' : '#ffffff');
             grad.addColorStop(1, lineColor === '#00ff88' ? '#00cc66' : '#cccccc');
             
@@ -368,7 +415,7 @@
             ctx.stroke();
 
             // Círculo central (zona nivelada)
-            const centerRingRadius = bubbleRadius * 1.2; // Un poco más grande que la burbuja
+            const centerRingRadius = bubbleRadius * 1.2; 
             ctx.strokeStyle = lineColor;
             ctx.lineWidth = 4;
             ctx.beginPath();
@@ -380,23 +427,106 @@
             ctx.beginPath();
             ctx.arc(centerX, centerY, 6, 0, Math.PI * 2);
             ctx.fill();
-
-            // Actualizar textos
-            angleDisplay.textContent = totalTiltDeg.toFixed(1) + '°';
-            angleDisplay.style.color = lineColor;
-            
-            modeDisplay.textContent = `X: ${angleX.toFixed(1)}° | Y: ${angleY.toFixed(1)}°`;
-            
-            if (isLevel) {
-                statusDisplay.textContent = '✓ NIVELADO';
-                statusDisplay.style.color = '#00ff88';
-            } else {
-                statusDisplay.textContent = 'Desnivelado';
-                statusDisplay.style.color = 'white';
-            }
         }
 
-        // Botón para activar sensores (principalmente para iOS)
+        // Dibuja el medidor de Palo Vertical
+        function drawVerticalLevel(centerX, centerY, radius, currentAngleDeg, lineColor) {
+            // Fondo
+            ctx.fillStyle = 'rgba(255,255,255,0.1)';
+            ctx.fillRect(0, 0, canvas.width / (window.devicePixelRatio || 1), canvas.height / (window.devicePixelRatio || 1));
+
+            // Eje central
+            ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(centerX, centerY - radius);
+            ctx.lineTo(centerX, centerY + radius);
+            ctx.stroke();
+
+            // Marcas de ángulo (opcional, para referencia)
+            ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+            ctx.lineWidth = 1;
+            for (let deg = -90; deg <= 90; deg += 15) {
+                if (deg === 0) continue;
+                const rad = deg * Math.PI / 180;
+                const x1 = centerX + Math.sin(rad) * (radius - 15);
+                const y1 = centerY - Math.cos(rad) * (radius - 15);
+                const x2 = centerX + Math.sin(rad) * (radius - 5);
+                const y2 = centerY - Math.cos(rad) * (radius - 5);
+                ctx.beginPath();
+                ctx.moveTo(x1, y1);
+                ctx.lineTo(x2, y2);
+                ctx.stroke();
+
+                // Números de grados
+                ctx.fillStyle = 'rgba(255,255,255,0.7)';
+                ctx.font = '10px Arial';
+                ctx.textAlign = 'center';
+                const textX = centerX + Math.sin(rad) * (radius + 5);
+                const textY = centerY - Math.cos(rad) * (radius + 5) + 3;
+                ctx.fillText(deg + '°', textX, textY);
+            }
+
+
+            // Palo/Aguja principal
+            ctx.save(); // Guarda el estado actual del contexto
+            ctx.translate(centerX, centerY); // Mueve el origen al centro del canvas
+            ctx.rotate(currentAngleDeg * Math.PI / 180); // Rota el canvas según el ángulo
+
+            ctx.shadowColor = 'rgba(0,0,0,0.4)';
+            ctx.shadowBlur = 15;
+            ctx.shadowOffsetX = 3;
+            ctx.shadowOffsetY = 3;
+
+            ctx.fillStyle = lineColor;
+            ctx.strokeStyle = lineColor === '#00ff88' ? '#00cc66' : '#cccccc'; // Borde más oscuro
+            ctx.lineWidth = 3;
+
+            // Dibuja el palo (como un rombo alargado)
+            const stickWidth = 10;
+            const stickLength = radius * 0.9;
+            ctx.beginPath();
+            ctx.moveTo(0, -stickLength); // Punta superior
+            ctx.lineTo(stickWidth / 2, 0); // Lado derecho medio
+            ctx.lineTo(0, stickLength); // Punta inferior
+            ctx.lineTo(-stickWidth / 2, 0); // Lado izquierdo medio
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            ctx.shadowColor = 'transparent';
+            ctx.shadowBlur = 0;
+
+            // Círculo central (cubriendo el pivote)
+            ctx.fillStyle = lineColor;
+            ctx.beginPath();
+            ctx.arc(0, 0, stickWidth / 2 + 3, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+
+            ctx.restore(); // Restaura el estado original del contexto (deshace translate y rotate)
+
+            // Marca de 0 grados (arriba)
+            ctx.strokeStyle = lineColor;
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            ctx.moveTo(centerX - 10, centerY - radius + 10);
+            ctx.lineTo(centerX + 10, centerY - radius + 10);
+            ctx.stroke();
+
+            ctx.fillStyle = lineColor;
+            ctx.font = '14px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('0°', centerX, centerY - radius + 28);
+        }
+
+
+        // --- Event Listeners ---
+        window.addEventListener('resize', resizeCanvas, false);
+        
         startBtn.addEventListener('click', async () => {
             if (typeof DeviceMotionEvent.requestPermission === 'function') {
                 try {
@@ -420,22 +550,46 @@
             }
         });
 
-        calibrateBtn.addEventListener('click', () => {
-            // Guardar la inclinación actual como el nuevo "cero"
-            calibrationOffsetX = lastRawX;
-            calibrationOffsetY = lastRawY;
+        toggleBtn.addEventListener('click', () => {
+            isVerticalMode = !isVerticalMode;
             
-            statusDisplay.textContent = '✓ Calibrado';
+            if (isVerticalMode) {
+                toggleBtn.textContent = 'Cambiar a Modo Horizontal';
+                infoDiv.textContent = 'Sujeta el dispositivo vertical y calibra para colgar cuadros.';
+                body.classList.remove('bullseye-mode');
+                body.classList.add('vertical-mode');
+            } else {
+                toggleBtn.textContent = 'Cambiar a Modo Vertical';
+                infoDiv.textContent = 'Coloca el dispositivo horizontal (plano) y calibra si es necesario.';
+                body.classList.remove('vertical-mode');
+                body.classList.add('bullseye-mode');
+            }
+            // Vuelve a dibujar para actualizar la interfaz inmediatamente
+            drawLevel(lastRawX, lastRawY, lastRawZ); 
+        });
+
+        calibrateBtn.addEventListener('click', () => {
+            if (isVerticalMode) {
+                // Calibrar el ángulo actual como el nuevo "cero" para el modo vertical
+                const currentAngle = Math.atan2(lastRawX, lastRawZ) * (180 / Math.PI);
+                calibrationOffsetAngle_vertical = currentAngle;
+                statusDisplay.textContent = '✓ Calibrado Vertical';
+            } else {
+                // Calibrar los valores X e Y como el nuevo "cero" para el modo ojo de buey
+                calibrationOffsetX_bullseye = lastRawX;
+                calibrationOffsetY_bullseye = lastRawY;
+                statusDisplay.textContent = '✓ Calibrado Horizontal';
+            }
             statusDisplay.style.color = '#00ff88';
             setTimeout(() => {
                 statusDisplay.style.color = 'white';
             }, 2000);
         });
 
-        // Iniciar inmediatamente (en dispositivos que no requieren permiso)
-        initSensors();
-        // Dibujar estado inicial
-        drawLevel(0, 0, 0, 0, 0);
+        // --- Inicialización al Cargar la Página ---
+        resizeCanvas(); // Ajusta el canvas al tamaño inicial
+        initSensors(); // Inicia la detección de sensores
+        drawLevel(0, 0, G_FORCE); // Dibuja el estado inicial (simula nivelado verticalmente)
 
         // Mantener pantalla activa
         if ('wakeLock' in navigator) {
