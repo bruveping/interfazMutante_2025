@@ -102,30 +102,61 @@
             margin: 20px;
         }
 
-        .calibration-info {
-            color: rgba(255,255,255,0.8);
+        .info {
+            color: rgba(255,255,255,0.9);
+            background: rgba(255,255,255,0.1);
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px;
             font-size: 14px;
-            margin-top: 15px;
+        }
+
+        .debug {
+            color: rgba(255,255,255,0.6);
+            font-size: 12px;
+            margin-top: 10px;
+            font-family: monospace;
+        }
+
+        #startBtn {
+            background: #00ff88;
+            color: #333;
+            font-size: 20px;
+            padding: 20px 50px;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
         }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>📐 Nivel Digital</h1>
-        <div class="mode-display" id="modeDisplay">Modo: Vertical (Pared)</div>
         
-        <div class="canvas-container">
-            <canvas id="levelCanvas" width="300" height="300"></canvas>
+        <div id="startScreen">
+            <div class="info">
+                Esta app necesita acceso a los sensores de movimiento de tu dispositivo
+            </div>
+            <button id="startBtn">Iniciar Nivel</button>
         </div>
 
-        <div class="angle-display" id="angleDisplay">--°</div>
-        <div class="status" id="status">Esperando sensor...</div>
+        <div id="levelScreen" style="display: none;">
+            <div class="mode-display" id="modeDisplay">Modo: Vertical (Pared)</div>
+            
+            <div class="canvas-container">
+                <canvas id="levelCanvas" width="300" height="300"></canvas>
+            </div>
 
-        <button id="toggleBtn">Cambiar a Modo Horizontal</button>
-        <button id="calibrateBtn">Calibrar</button>
+            <div class="angle-display" id="angleDisplay">--°</div>
+            <div class="status" id="status">Iniciando...</div>
 
-        <div class="calibration-info">
-            Coloca el celular en posición nivelada y presiona Calibrar
+            <button id="toggleBtn">Cambiar a Modo Horizontal</button>
+            <button id="calibrateBtn">Calibrar</button>
+
+            <div class="debug" id="debug"></div>
         </div>
 
         <div id="error" class="error" style="display: none;"></div>
@@ -140,10 +171,15 @@
         const calibrateBtn = document.getElementById('calibrateBtn');
         const modeDisplay = document.getElementById('modeDisplay');
         const errorDiv = document.getElementById('error');
+        const debugDiv = document.getElementById('debug');
+        const startBtn = document.getElementById('startBtn');
+        const startScreen = document.getElementById('startScreen');
+        const levelScreen = document.getElementById('levelScreen');
 
         let isVerticalMode = true;
         let currentAngle = 0;
         let calibrationOffset = { beta: 0, gamma: 0 };
+        let sensorActive = false;
 
         function showError(message) {
             errorDiv.textContent = message;
@@ -154,60 +190,96 @@
             errorDiv.style.display = 'none';
         }
 
-        // Verificar soporte de sensores
-        if (!window.DeviceOrientationEvent) {
-            showError('Tu dispositivo no soporta sensores de orientación');
-        } else {
-            // Para iOS 13+ necesitamos solicitar permiso
-            if (typeof DeviceOrientationEvent.requestPermission === 'function') {
-                calibrateBtn.addEventListener('click', async () => {
-                    try {
-                        const permission = await DeviceOrientationEvent.requestPermission();
-                        if (permission === 'granted') {
-                            hideError();
-                            startListening();
-                        } else {
-                            showError('Se necesita permiso para acceder a los sensores');
-                        }
-                    } catch (error) {
-                        showError('Error al solicitar permiso: ' + error.message);
+        function updateDebug(beta, gamma) {
+            debugDiv.textContent = `Beta: ${beta?.toFixed(1)}° | Gamma: ${gamma?.toFixed(1)}°`;
+        }
+
+        async function requestPermissionAndStart() {
+            hideError();
+            
+            // Para iOS 13+
+            if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+                try {
+                    const permission = await DeviceMotionEvent.requestPermission();
+                    if (permission === 'granted') {
+                        startListening();
+                    } else {
+                        showError('Se necesita permiso para acceder a los sensores');
                     }
-                });
-            } else {
-                // Android y navegadores que no necesitan permiso
+                } catch (error) {
+                    showError('Error al solicitar permiso: ' + error.message);
+                }
+            } 
+            // Para iOS 13+ con DeviceOrientation
+            else if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+                try {
+                    const permission = await DeviceOrientationEvent.requestPermission();
+                    if (permission === 'granted') {
+                        startListening();
+                    } else {
+                        showError('Se necesita permiso para acceder a los sensores');
+                    }
+                } catch (error) {
+                    showError('Error al solicitar permiso: ' + error.message);
+                }
+            }
+            // Android y otros navegadores
+            else {
                 startListening();
             }
         }
 
         function startListening() {
+            startScreen.style.display = 'none';
+            levelScreen.style.display = 'block';
+            
             window.addEventListener('deviceorientation', handleOrientation);
-            statusDisplay.textContent = 'Sensor activo';
-            hideError();
+            
+            // Verificar si los datos llegan después de 1 segundo
+            setTimeout(() => {
+                if (!sensorActive) {
+                    showError('No se detectan datos del sensor. Asegúrate de estar en un dispositivo móvil o que los sensores estén habilitados.');
+                }
+            }, 1000);
         }
 
         function handleOrientation(event) {
-            const beta = event.beta || 0;   // Inclinación frontal-trasera (-180 a 180)
-            const gamma = event.gamma || 0; // Inclinación izquierda-derecha (-90 a 90)
+            const beta = event.beta;   // Inclinación frontal-trasera (-180 a 180)
+            const gamma = event.gamma; // Inclinación izquierda-derecha (-90 a 90)
+
+            // Verificar si recibimos datos válidos
+            if (beta === null || gamma === null) {
+                if (!sensorActive) {
+                    statusDisplay.textContent = 'Sensor no disponible';
+                    showError('Los sensores de orientación no están disponibles en este dispositivo');
+                }
+                return;
+            }
+
+            sensorActive = true;
+            updateDebug(beta, gamma);
 
             if (isVerticalMode) {
-                // Modo vertical (pared)
-                // Aplicar calibración
+                // Modo vertical (pared) - usar gamma
                 let adjustedGamma = gamma - calibrationOffset.gamma;
                 currentAngle = adjustedGamma;
-                
-                // Normalizar ángulo
-                if (currentAngle > 180) currentAngle -= 360;
-                if (currentAngle < -180) currentAngle += 360;
-                
             } else {
-                // Modo horizontal (plano)
+                // Modo horizontal (plano) - usar beta
                 let adjustedBeta = beta - calibrationOffset.beta;
-                currentAngle = adjustedBeta;
                 
-                // Normalizar ángulo
-                if (currentAngle > 180) currentAngle -= 360;
-                if (currentAngle < -180) currentAngle += 360;
+                // Ajustar para que 0° sea horizontal
+                if (adjustedBeta > 90) {
+                    currentAngle = 180 - adjustedBeta;
+                } else if (adjustedBeta < -90) {
+                    currentAngle = -180 - adjustedBeta;
+                } else {
+                    currentAngle = -adjustedBeta;
+                }
             }
+
+            // Normalizar ángulo
+            if (currentAngle > 180) currentAngle -= 360;
+            if (currentAngle < -180) currentAngle += 360;
 
             drawLevel();
         }
@@ -234,6 +306,11 @@
             // Dibujar marcas de grados (0, 90, 180, 270)
             ctx.strokeStyle = 'rgba(255,255,255,0.5)';
             ctx.lineWidth = 2;
+            ctx.font = '14px sans-serif';
+            ctx.fillStyle = 'rgba(255,255,255,0.7)';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            
             for (let i = 0; i < 4; i++) {
                 const angle = (i * Math.PI) / 2;
                 const x1 = centerX + Math.cos(angle) * (radius - 15);
@@ -245,11 +322,18 @@
                 ctx.moveTo(x1, y1);
                 ctx.lineTo(x2, y2);
                 ctx.stroke();
+
+                // Etiquetas de grados
+                const labelX = centerX + Math.cos(angle) * (radius + 25);
+                const labelY = centerY + Math.sin(angle) * (radius + 25);
+                const degrees = (i * 90) % 360;
+                ctx.fillText(degrees + '°', labelX, labelY);
             }
 
             // Dibujar burbuja (círculo pequeño que se mueve)
             const bubbleAngle = (currentAngle * Math.PI) / 180;
-            const bubbleDistance = Math.min(Math.abs(currentAngle) * 1.5, radius - 30);
+            const maxDistance = radius - 40;
+            const bubbleDistance = Math.min(Math.abs(currentAngle) * 2, maxDistance);
             const bubbleX = centerX + Math.cos(bubbleAngle - Math.PI / 2) * bubbleDistance;
             const bubbleY = centerY + Math.sin(bubbleAngle - Math.PI / 2) * bubbleDistance;
 
@@ -259,10 +343,20 @@
             ctx.shadowOffsetX = 2;
             ctx.shadowOffsetY = 2;
 
-            ctx.fillStyle = lineColor;
+            // Burbuja con gradiente
+            const gradient = ctx.createRadialGradient(bubbleX - 5, bubbleY - 5, 0, bubbleX, bubbleY, 20);
+            gradient.addColorStop(0, lineColor);
+            gradient.addColorStop(1, lineColor === '#00ff88' ? '#00cc66' : '#cccccc');
+            
+            ctx.fillStyle = gradient;
             ctx.beginPath();
             ctx.arc(bubbleX, bubbleY, 20, 0, Math.PI * 2);
             ctx.fill();
+
+            // Borde de la burbuja
+            ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+            ctx.lineWidth = 2;
+            ctx.stroke();
 
             // Resetear sombra
             ctx.shadowColor = 'transparent';
@@ -270,20 +364,18 @@
             ctx.shadowOffsetX = 0;
             ctx.shadowOffsetY = 0;
 
-            // Círculo interior (centro)
+            // Círculo interior (zona central nivelada)
             ctx.strokeStyle = lineColor;
             ctx.lineWidth = 3;
             ctx.beginPath();
             ctx.arc(centerX, centerY, 30, 0, Math.PI * 2);
             ctx.stroke();
 
-            // Línea indicadora principal
-            ctx.strokeStyle = lineColor;
-            ctx.lineWidth = 4;
+            // Punto central
+            ctx.fillStyle = lineColor;
             ctx.beginPath();
-            ctx.moveTo(centerX, centerY - 25);
-            ctx.lineTo(centerX, centerY - radius + 10);
-            ctx.stroke();
+            ctx.arc(centerX, centerY, 5, 0, Math.PI * 2);
+            ctx.fill();
 
             // Actualizar displays
             angleDisplay.textContent = currentAngle.toFixed(1) + '°';
@@ -293,14 +385,17 @@
                 statusDisplay.textContent = '✓ NIVELADO';
                 statusDisplay.style.color = '#00ff88';
             } else {
-                statusDisplay.textContent = 'Ajustar posición';
+                const direction = currentAngle > 0 ? 'derecha' : 'izquierda';
+                statusDisplay.textContent = `Inclinar ${Math.abs(currentAngle).toFixed(1)}° a ${direction}`;
                 statusDisplay.style.color = 'white';
             }
         }
 
+        startBtn.addEventListener('click', requestPermissionAndStart);
+
         toggleBtn.addEventListener('click', () => {
             isVerticalMode = !isVerticalMode;
-            calibrationOffset = { beta: 0, gamma: 0 }; // Reset calibración al cambiar modo
+            calibrationOffset = { beta: 0, gamma: 0 };
             
             if (isVerticalMode) {
                 toggleBtn.textContent = 'Cambiar a Modo Horizontal';
@@ -312,18 +407,24 @@
         });
 
         calibrateBtn.addEventListener('click', () => {
-            // Guardar los valores actuales como offset de calibración
-            window.addEventListener('deviceorientation', (event) => {
-                if (isVerticalMode) {
-                    calibrationOffset.gamma = event.gamma || 0;
-                } else {
-                    calibrationOffset.beta = event.beta || 0;
-                }
-                statusDisplay.textContent = '✓ Calibrado';
-                setTimeout(() => {
-                    statusDisplay.textContent = 'Sensor activo';
-                }, 2000);
-            }, { once: true });
+            if (sensorActive) {
+                window.addEventListener('deviceorientation', (event) => {
+                    if (isVerticalMode) {
+                        calibrationOffset.gamma = event.gamma || 0;
+                    } else {
+                        calibrationOffset.beta = event.beta || 0;
+                    }
+                    statusDisplay.textContent = '✓ Calibrado';
+                    statusDisplay.style.color = '#00ff88';
+                    setTimeout(() => {
+                        if (!sensorActive) return;
+                        statusDisplay.textContent = 'Sensor activo';
+                        statusDisplay.style.color = 'white';
+                    }, 2000);
+                }, { once: true });
+            } else {
+                showError('El sensor no está activo todavía');
+            }
         });
 
         // Dibujar estado inicial
