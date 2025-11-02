@@ -1,1 +1,413 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"="width=device-width, initial-scale=1.0">
+    <title>Nivel Digital</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            overflow: auto;
+            user-select: none;
+            padding: 10px;
+        }
+
+        .container {
+            text-align: center;
+            padding: 10px;
+            width: 100%;
+            max-width: 100%;
+            margin: 0 auto;
+        }
+
+        h1 {
+            color: white;
+            font-size: 20px;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .mode-display {
+            color: white;
+            font-size: 14px;
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+
+        .canvas-container {
+            position: relative;
+            margin: 10px auto;
+        }
+
+        canvas {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+            max-width: 100%;
+            height: auto;
+        }
+
+        .angle-display {
+            color: white;
+            font-size: 36px;
+            font-weight: bold;
+            margin: 10px 0;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+            min-height: 40px;
+        }
+
+        .status {
+            color: white;
+            font-size: 16px;
+            margin: 8px 0;
+            font-weight: 500;
+            min-height: 20px;
+        }
+
+        button {
+            background: white;
+            color: #667eea;
+            border: none;
+            padding: 12px 30px;
+            font-size: 14px;
+            font-weight: 600;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            transition: all 0.3s ease;
+            margin: 5px;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .info {
+            color: rgba(255,255,255,0.9);
+            background: rgba(255,255,255,0.15);
+            padding: 8px;
+            border-radius: 8px;
+            margin: 8px 0;
+            font-size: 11px;
+        }
+
+        .debug {
+            color: rgba(255,255,255,0.7);
+            font-size: 9px;
+            margin-top: 5px;
+            font-family: monospace;
+            background: rgba(0,0,0,0.2);
+            padding: 5px;
+            border-radius: 5px;
+        }
+
+        #startBtn {
+            background: #00ff88;
+            color: #333;
+            font-size: 14px;
+            padding: 12px 30px;
+        }
+
+        .sensor-info {
+            background: rgba(255,255,255,0.1);
+            padding: 6px;
+            border-radius: 6px;
+            margin: 5px 0;
+            font-size: 10px;
+            color: rgba(255,255,255,0.8);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📐 Nivel Digital</h1>
+        
+        <div class="mode-display" id="modeDisplay">Modo: Vertical (Pared)</div>
+        
+        <div class="canvas-container">
+            <canvas id="levelCanvas" width="250" height="250"></canvas>
+        </div>
+
+        <div class="angle-display" id="angleDisplay">0.0°</div>
+        <div class="status" id="status">Mueve el dispositivo...</div>
+
+        <button id="toggleBtn">Cambiar a Modo Horizontal</button>
+        <button id="calibrateBtn">Calibrar (0°)</button>
+
+        <div class="info" id="info">
+            Usa el acelerómetro para medir la inclinación
+        </div>
+
+        <button id="startBtn">Activar Acelerómetro</button>
+
+        <div class="sensor-info" id="sensorInfo">Esperando datos del acelerómetro...</div>
+        <div class="debug" id="debug">
+            X: -- | Y: -- | Z: --<br>
+            Soporte: Verificando...
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('levelCanvas');
+        const ctx = canvas.getContext('2d');
+        const angleDisplay = document.getElementById('angleDisplay');
+        const statusDisplay = document.getElementById('status');
+        const toggleBtn = document.getElementById('toggleBtn');
+        const calibrateBtn = document.getElementById('calibrateBtn');
+        const modeDisplay = document.getElementById('modeDisplay');
+        const debugDiv = document.getElementById('debug');
+        const startBtn = document.getElementById('startBtn');
+        const sensorInfo = document.getElementById('sensorInfo');
+        const infoDiv = document.getElementById('info');
+
+        let isVerticalMode = true;
+        let currentAngle = 0;
+        let calibrationOffset = 0;
+        let updateCount = 0;
+
+        function initSensors() {
+            if (window.DeviceMotionEvent) {
+                debugDiv.innerHTML = 'DeviceMotionEvent: ✓ Soportado<br>Esperando datos...';
+                
+                window.addEventListener('devicemotion', handleMotion, true);
+                
+                setTimeout(() => {
+                    if (updateCount === 0) {
+                        sensorInfo.textContent = '⚠️ No se detectan datos. Prueba presionar "Activar Acelerómetro"';
+                        sensorInfo.style.background = 'rgba(255,107,107,0.3)';
+                    }
+                }, 3000);
+            } else {
+                debugDiv.innerHTML = 'DeviceMotionEvent: ✗ NO soportado';
+                sensorInfo.textContent = '❌ Este dispositivo no soporta acelerómetro';
+                sensorInfo.style.background = 'rgba(255,107,107,0.3)';
+            }
+        }
+
+        function handleMotion(event) {
+            // accelerationIncludingGravity incluye la gravedad (lo que necesitamos)
+            const acc = event.accelerationIncludingGravity;
+            
+            if (!acc || (acc.x === null && acc.y === null && acc.z === null)) {
+                return;
+            }
+
+            updateCount++;
+            
+            if (updateCount === 1) {
+                sensorInfo.textContent = '✓ Acelerómetro activo';
+                sensorInfo.style.background = 'rgba(0,255,136,0.2)';
+                infoDiv.style.display = 'none';
+                startBtn.style.display = 'none';
+            }
+
+            const x = acc.x || 0;
+            const y = acc.y || 0;
+            const z = acc.z || 0;
+
+            // Mostrar valores del acelerómetro
+            debugDiv.innerHTML = `X: ${x.toFixed(2)} | Y: ${y.toFixed(2)} | Z: ${z.toFixed(2)}<br>Actualizaciones: ${updateCount}`;
+
+            if (isVerticalMode) {
+                // Modo vertical (pared)
+                // Desfasamos 90° para usar el largo del celular como referencia
+                // Usamos Y y Z para detectar la verticalidad cuando está apoyado en el lado largo
+                currentAngle = Math.atan2(x, z) * (180 / Math.PI);
+                
+            } else {
+                // Modo horizontal (plano)
+                // Cuando el celular está horizontal en una mesa:
+                // - Z debería ser cercano a ±9.8 (gravedad)
+                // - X e Y indican la inclinación del plano
+                
+                // Calcular ángulo de inclinación del plano
+                // Usamos la componente dominante para determinar la inclinación
+                const magnitude = Math.sqrt(x*x + y*y + z*z);
+                
+                if (magnitude > 0) {
+                    // Ángulo respecto al plano horizontal
+                    // Cuando Z = magnitud total, está horizontal (0°)
+                    currentAngle = Math.asin(Math.sqrt(x*x + y*y) / magnitude) * (180 / Math.PI);
+                    
+                    // Determinar dirección de inclinación
+                    if (Math.abs(x) > Math.abs(y)) {
+                        currentAngle *= (x > 0 ? 1 : -1);
+                    } else {
+                        currentAngle *= (y > 0 ? 1 : -1);
+                    }
+                }
+            }
+
+            // Aplicar calibración
+            currentAngle -= calibrationOffset;
+
+            // Normalizar ángulo
+            while (currentAngle > 180) currentAngle -= 360;
+            while (currentAngle < -180) currentAngle += 360;
+
+            drawLevel();
+        }
+
+        function drawLevel() {
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            const radius = 100;
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Nivel = dentro de ±3 grados
+            const isLevel = Math.abs(currentAngle) < 3;
+            const lineColor = isLevel ? '#00ff88' : '#ffffff';
+
+            // Círculo exterior
+            ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+            ctx.stroke();
+
+            // Marcas cada 90°
+            ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+            ctx.lineWidth = 2;
+            for (let i = 0; i < 4; i++) {
+                const angle = (i * Math.PI) / 2;
+                const x1 = centerX + Math.cos(angle) * (radius - 10);
+                const y1 = centerY + Math.sin(angle) * (radius - 10);
+                const x2 = centerX + Math.cos(angle) * radius;
+                const y2 = centerY + Math.sin(angle) * radius;
+                
+                ctx.beginPath();
+                ctx.moveTo(x1, y1);
+                ctx.lineTo(x2, y2);
+                ctx.stroke();
+            }
+
+            // Burbuja que indica inclinación
+            const bubbleAngle = (currentAngle * Math.PI) / 180;
+            const maxDist = radius - 35;
+            const bubbleDist = Math.min(Math.abs(currentAngle) * 1.8, maxDist);
+            const bubbleX = centerX + Math.cos(bubbleAngle - Math.PI / 2) * bubbleDist;
+            const bubbleY = centerY + Math.sin(bubbleAngle - Math.PI / 2) * bubbleDist;
+
+            // Sombra
+            ctx.shadowColor = 'rgba(0,0,0,0.4)';
+            ctx.shadowBlur = 12;
+            ctx.shadowOffsetX = 3;
+            ctx.shadowOffsetY = 3;
+
+            // Gradiente de burbuja
+            const grad = ctx.createRadialGradient(bubbleX - 6, bubbleY - 6, 0, bubbleX, bubbleY, 22);
+            grad.addColorStop(0, lineColor === '#00ff88' ? '#66ffaa' : '#ffffff');
+            grad.addColorStop(1, lineColor === '#00ff88' ? '#00cc66' : '#cccccc');
+            
+            ctx.fillStyle = grad;
+            ctx.beginPath();
+            ctx.arc(bubbleX, bubbleY, 22, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.shadowColor = 'transparent';
+            ctx.shadowBlur = 0;
+
+            // Borde de burbuja
+            ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // Círculo central (zona nivelada)
+            ctx.strokeStyle = lineColor;
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, 28, 0, Math.PI * 2);
+            ctx.stroke();
+
+            // Centro
+            ctx.fillStyle = lineColor;
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, 6, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Actualizar textos
+            angleDisplay.textContent = currentAngle.toFixed(1) + '°';
+            angleDisplay.style.color = lineColor;
+            
+            if (isLevel) {
+                statusDisplay.textContent = '✓ NIVELADO';
+                statusDisplay.style.color = '#00ff88';
+            } else {
+                statusDisplay.textContent = `Desnivelado ${Math.abs(currentAngle).toFixed(1)}°`;
+                statusDisplay.style.color = 'white';
+            }
+        }
+
+        // Botón para activar sensores (principalmente para iOS)
+        startBtn.addEventListener('click', async () => {
+            if (typeof DeviceMotionEvent.requestPermission === 'function') {
+                try {
+                    const permission = await DeviceMotionEvent.requestPermission();
+                    if (permission === 'granted') {
+                        initSensors();
+                        startBtn.textContent = '✓ Permisos concedidos';
+                        startBtn.disabled = true;
+                    }
+                } catch (error) {
+                    sensorInfo.textContent = 'Error: ' + error.message;
+                }
+            } else {
+                sensorInfo.textContent = 'Iniciando sin permisos especiales...';
+                initSensors();
+                setTimeout(() => {
+                    if (updateCount > 0) {
+                        startBtn.style.display = 'none';
+                    }
+                }, 2000);
+            }
+        });
+
+        toggleBtn.addEventListener('click', () => {
+            isVerticalMode = !isVerticalMode;
+            calibrationOffset = 0;
+            
+            if (isVerticalMode) {
+                toggleBtn.textContent = 'Cambiar a Modo Horizontal';
+                modeDisplay.textContent = 'Modo: Vertical (Pared)';
+            } else {
+                toggleBtn.textContent = 'Cambiar a Modo Vertical';
+                modeDisplay.textContent = 'Modo: Horizontal (Plano)';
+            }
+        });
+
+        calibrateBtn.addEventListener('click', () => {
+            // Guardar el ángulo actual como referencia de calibración
+            calibrationOffset = currentAngle;
+            statusDisplay.textContent = '✓ Calibrado en ' + currentAngle.toFixed(1) + '°';
+            statusDisplay.style.color = '#00ff88';
+            setTimeout(() => {
+                statusDisplay.style.color = 'white';
+            }, 2000);
+        });
+
+        // Iniciar inmediatamente
+        initSensors();
+        drawLevel();
+
+        // Mantener pantalla activa
+        if ('wakeLock' in navigator) {
+            navigator.wakeLock.request('screen').catch(() => {});
+        }
+    </script>
+</body>
+</html>
