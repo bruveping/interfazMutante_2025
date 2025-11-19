@@ -14,6 +14,9 @@ Afinador de Instrumentos Pro [Afinador de Instrumentos Pro](https://bruveping.gi
 
 Selector de colores [Selector de colores](https://bruveping.github.io/interfazMutante_2025/selector_de_colores/) 
 
+visualizador de colores [visualizador de colores](https://bruveping.github.io/interfazMutante_2025/visualizador_de_colores/) 
+
+
 
 
 
