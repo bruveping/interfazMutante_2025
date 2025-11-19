@@ -12,6 +12,10 @@ nivel_en_el_celular v2 [nivel_en_el_celular v2 ](https://bruveping.github.io/int
 
 Afinador de Instrumentos Pro [Afinador de Instrumentos Pro](https://bruveping.github.io/interfazMutante_2025/afinador_de_instrumentos_pro/) 
 
+Selector de colores [Selector de colores](https://bruveping.github.io/interfazMutante_2025/selector_de_colores/) 
+
+
+
 
 
 
