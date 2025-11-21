@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Generador de Paleta Euclidiana v3</title>
+    <title>Visualizador Híbrido: Lista + Edición</title>
     <style>
         :root {
             --bg-color: #f4f4f9;
@@ -48,7 +48,7 @@
             padding: 20px;
             border-radius: 12px;
             box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-            max-height: 80vh;
+            max-height: 90vh; /* Un poco más alto para ver lista y controles */
             overflow-y: auto;
             display: flex;
             flex-direction: column;
@@ -62,6 +62,8 @@
             display: block;
             margin-bottom: 8px;
             font-weight: 600;
+            font-size: 0.9em;
+            color: #555;
         }
 
         input[type="number"] {
@@ -73,17 +75,43 @@
             box-sizing: border-box;
         }
 
-        /* Lista de inputs de colores generados */
+        /* Estilos para el Textarea de importación */
+        textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 13px;
+            font-family: monospace;
+            box-sizing: border-box;
+            resize: vertical;
+            margin-bottom: 10px;
+            background-color: #fafafa;
+        }
+        
+        textarea:focus {
+            outline: none;
+            border-color: var(--accent-color);
+            background-color: #fff;
+        }
+
+        /* Separador visual */
+        .divider {
+            height: 1px;
+            background-color: #eee;
+            margin: 20px 0;
+            width: 100%;
+        }
+
+        /* Lista de inputs individuales (Lo que querías conservar) */
         #colorList {
             flex: 1;
             display: flex;
             flex-direction: column;
             gap: 10px;
-            margin-top: 10px;
-            padding-top: 10px;
-            border-top: 1px solid #eee;
             overflow-y: auto;
             min-height: 200px;
+            padding-right: 5px;
         }
 
         .color-row {
@@ -91,9 +119,10 @@
             align-items: center;
             gap: 10px;
             animation: fadeIn 0.3s ease;
-            background: #fafafa;
-            padding: 5px;
+            background: #f9f9f9;
+            padding: 6px;
             border-radius: 6px;
+            border: 1px solid #eee;
         }
 
         .color-index {
@@ -101,12 +130,13 @@
             color: #888;
             width: 20px;
             text-align: center;
+            font-weight: bold;
         }
 
         input[type="color"] {
             border: none;
-            width: 40px;
-            height: 40px;
+            width: 35px;
+            height: 35px;
             cursor: pointer;
             background: none;
             padding: 0;
@@ -120,6 +150,7 @@
             font-family: monospace;
             text-transform: uppercase;
             font-size: 14px;
+            color: #444;
         }
 
         /* Área del Canvas */
@@ -155,8 +186,8 @@
             border: none;
             border-radius: 6px;
             cursor: pointer;
-            font-size: 15px;
-            font-weight: 500;
+            font-size: 14px;
+            font-weight: 600;
             transition: all 0.2s;
             display: flex;
             align-items: center;
@@ -167,9 +198,18 @@
             background-color: var(--accent-color);
             color: var(--btn-text);
         }
-
         .btn-action:hover {
             background-color: #3700b3;
+            transform: translateY(-1px);
+        }
+
+        /* Botón naranja para HD */
+        .btn-hd {
+            background-color: #ff6f00;
+            color: white;
+        }
+        .btn-hd:hover {
+            background-color: #e65100;
             transform: translateY(-1px);
         }
 
@@ -177,19 +217,28 @@
             background-color: var(--secondary-color);
             color: #000;
         }
-
         .btn-toggle:hover {
             filter: brightness(0.9);
+        }
+
+        /* Botón negro para "Aplicar Lista" */
+        .btn-dark {
+            background-color: #222;
+            color: #fff;
+            width: 100%;
+            justify-content: center;
+        }
+        .btn-dark:hover {
+            background-color: #444;
         }
         
         .status-indicator {
             display: inline-block;
-            width: 10px;
-            height: 10px;
+            width: 8px;
+            height: 8px;
             border-radius: 50%;
             background-color: #ccc;
         }
-        
         .status-on { background-color: green; }
         .status-off { background-color: red; }
 
@@ -211,20 +260,32 @@
 </head>
 <body>
 
-    <h1>Generador de Paletas Distribuidas</h1>
+    <h1>Visualizador Híbrido de Paletas</h1>
 
     <div class="container">
         <!-- Panel Izquierdo: Controles -->
         <div class="controls">
+            
+            <!-- 1. MODO IMPORTACIÓN MASIVA -->
             <div class="input-group">
-                <label for="numDivisions">Cantidad de Divisiones (Colores)</label>
+                <label for="bulkColors">Pegar Lista Hex (1 por línea o separados)</label>
+                <textarea id="bulkColors" rows="5" placeholder="#5C0A27&#10;#701E94&#10;#3D5FC2..."></textarea>
+                <button class="btn-dark" onclick="applyBulkColors()">⬇ Aplicar Lista al Editor</button>
+            </div>
+
+            <div class="divider"></div>
+
+            <!-- 2. MODO EDICIÓN INDIVIDUAL (Conservado) -->
+            <div class="input-group">
+                <label for="numDivisions">Cantidad de Divisiones</label>
                 <input type="number" id="numDivisions" value="5" min="1" max="100">
             </div>
             
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                <small>Colores:</small>
+                <label style="margin:0;">Editar Colores Individuales:</label>
             </div>
             
+            <!-- Aquí se generan los inputs individuales -->
             <div id="colorList"></div>
         </div>
 
@@ -237,13 +298,16 @@
             <div class="btn-group">
                 <button class="btn-toggle" onclick="toggleTextVisibility()" id="toggleBtn">
                     <span id="toggleStatus" class="status-indicator status-on"></span>
-                    <span id="toggleLabel">Ocultar Texto Hex</span>
+                    <span id="toggleLabel">Ocultar Texto</span>
                 </button>
+                
                 <button class="btn-action" onclick="downloadImage()">
-                    ⬇ Descargar Preview
+                    ⬇ Preview (PNG)
                 </button>
-                <button class="btn-action" onclick="openFullHDImage()">
-                    🖥 Ver en 1920x1080
+                
+                <!-- Nuevo Botón HD -->
+                <button class="btn-hd" onclick="downloadFullHDImage()">
+                    ⬇ Descargar 1920x1080
                 </button>
             </div>
         </div>
@@ -252,25 +316,27 @@
 <script>
     // --- Elementos del DOM ---
     const numDivisionsInput = document.getElementById('numDivisions');
+    const bulkColorsInput = document.getElementById('bulkColors');
     const colorListContainer = document.getElementById('colorList');
     const canvas = document.getElementById('paletteCanvas');
     const ctx = canvas.getContext('2d');
     
-    // Botón Toggle
+    // Botones de la UI
     const toggleBtn = document.getElementById('toggleBtn');
     const toggleStatus = document.getElementById('toggleStatus');
     const toggleLabel = document.getElementById('toggleLabel');
 
     // --- Estado de la aplicación ---
     let colors = [];
-    let showHexText = true; // Estado predeterminado: mostrar texto
+    let showHexText = true; 
 
     // --- Inicialización ---
     window.addEventListener('DOMContentLoaded', () => {
+        // Iniciamos con 5 colores aleatorios por defecto, o vacíos
         updateInputs(parseInt(numDivisionsInput.value));
     });
 
-    // --- Event Listeners ---
+    // --- Listener para el input numérico (Mantiene la lógica original) ---
     numDivisionsInput.addEventListener('input', (e) => {
         const val = parseInt(e.target.value);
         if (val > 0 && val <= 100) {
@@ -279,26 +345,47 @@
     });
 
     /**
-     * Alterna la visibilidad del texto hexadecimal
+     * NUEVO: Función para aplicar la lista de texto a los inputs individuales
+     */
+    function applyBulkColors() {
+        const rawText = bulkColorsInput.value;
+        // Regex busca cualquier cosa que parezca un hex de 6 dígitos
+        const hexMatches = rawText.match(/#[0-9A-Fa-f]{6}\b/g);
+
+        if (hexMatches && hexMatches.length > 0) {
+            // 1. Actualizamos el array de colores
+            colors = hexMatches;
+            
+            // 2. Actualizamos el input numérico para que coincida
+            numDivisionsInput.value = colors.length;
+
+            // 3. Regeneramos los inputs individuales (para que puedas editarlos después)
+            renderInputsDOM();
+            
+            // 4. Dibujamos
+            drawCanvas(canvas, ctx, colors, showHexText);
+        } else {
+            alert("No encontré códigos válidos (ej. #FF0000). Asegúrate de incluir el '#'.");
+        }
+    }
+
+    /**
+     * Alternar visibilidad de texto
      */
     function toggleTextVisibility() {
-        showHexText = !showHexText; // Invertir estado
-        
-        // Actualizar UI del botón
+        showHexText = !showHexText;
         if (showHexText) {
             toggleStatus.className = 'status-indicator status-on';
-            toggleLabel.textContent = "Ocultar Texto Hex";
+            toggleLabel.textContent = "Ocultar Texto";
         } else {
             toggleStatus.className = 'status-indicator status-off';
-            toggleLabel.textContent = "Mostrar Texto Hex";
+            toggleLabel.textContent = "Mostrar Texto";
         }
-
-        // Redibujar canvas con el nuevo estado
         drawCanvas(canvas, ctx, colors, showHexText);
     }
 
     /**
-     * Genera un color Hex aleatorio
+     * Generar color aleatorio
      */
     function getRandomHex() {
         const letters = '0123456789ABCDEF';
@@ -310,7 +397,7 @@
     }
 
     /**
-     * Gestiona la creación de inputs y actualización de estado
+     * Actualiza la cantidad de inputs cuando se cambia el número manualmente
      */
     function updateInputs(count) {
         if (count > colors.length) {
@@ -320,13 +407,12 @@
         } else {
             colors = colors.slice(0, count);
         }
-
         renderInputsDOM();
         drawCanvas(canvas, ctx, colors, showHexText);
     }
 
     /**
-     * Renderiza la lista de colores en el HTML
+     * Renderiza los inputs individuales (Tu característica favorita conservada)
      */
     function renderInputsDOM() {
         colorListContainer.innerHTML = '';
@@ -339,16 +425,18 @@
             indexLabel.className = 'color-index';
             indexLabel.textContent = index + 1;
 
+            // Input de color (Picker nativo)
             const colorInput = document.createElement('input');
             colorInput.type = 'color';
             colorInput.value = color;
             
+            // Input de texto (Edición manual)
             const hexInput = document.createElement('input');
             hexInput.type = 'text';
             hexInput.value = color;
             hexInput.maxLength = 7;
 
-            // Sincronización de inputs
+            // Sincronización bidireccional
             colorInput.addEventListener('input', (e) => {
                 colors[index] = e.target.value;
                 hexInput.value = e.target.value;
@@ -373,33 +461,19 @@
     }
 
     /**
-     * Utilidad: Luminancia relativa para contraste
+     * Utilidad de contraste
      */
-    function getRelativeLuminance(hexColor) {
+    function getContrastTextColor(hexColor) {
         const r = parseInt(hexColor.slice(1, 3), 16);
         const g = parseInt(hexColor.slice(3, 5), 16);
         const b = parseInt(hexColor.slice(5, 7), 16);
-
-        const sRGBtoLinear = (c) => {
-            c /= 255;
-            return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
-        };
-
-        const R = sRGBtoLinear(r);
-        const G = sRGBtoLinear(g);
-        const B = sRGBtoLinear(b);
-
-        return 0.2126 * R + 0.7152 * G + 0.0722 * B;
-    }
-
-    function getContrastTextColor(hexColor) {
-        const luminance = getRelativeLuminance(hexColor);
-        return luminance > 0.179 ? '#000000' : '#FFFFFF';
+        // Fórmula YIQ simple pero efectiva
+        const yiq = ((r * 299) + (g * 587) + (b * 114)) / 1000;
+        return yiq >= 128 ? '#000000' : '#FFFFFF';
     }
 
     /**
-     * Lógica Principal de Dibujo
-     * @param {boolean} shouldDrawText - Controla si se dibuja el texto o no
+     * Algoritmo de Dibujo Euclidiano (El que te gustaba)
      */
     function drawCanvas(targetCanvas, targetCtx, colorsArray, shouldDrawText) {
         targetCtx.clearRect(0, 0, targetCanvas.width, targetCanvas.height);
@@ -407,7 +481,7 @@
         const n = colorsArray.length;
         if (n === 0) return;
 
-        // Algoritmo de distribución euclidiana/balanceada
+        // Cálculo de filas/columnas balanceadas (Euclidiano)
         let rows = Math.round(Math.sqrt(n));
         if (rows < 1) rows = 1;
         if (rows > n) rows = n;
@@ -429,20 +503,18 @@
 
                 const currentColor = colorsArray[currentItemIndex];
                 
-                // 1. Dibujar rectángulo
+                // Fondo
                 targetCtx.fillStyle = currentColor;
-                // Usamos ceil para evitar líneas blancas entre bloques
+                // Math.ceil evita líneas blancas entre bloques
                 targetCtx.fillRect(Math.floor(x), Math.floor(y), Math.ceil(itemWidth), Math.ceil(rowHeight));
                 
-                // 2. Dibujar texto (SOLO si shouldDrawText es true)
+                // Texto
                 if (shouldDrawText) {
                     const textColor = getContrastTextColor(currentColor);
                     targetCtx.fillStyle = textColor;
                     
-                    // Fuente dinámica según el tamaño del bloque
                     const fontSize = Math.max(14, Math.min(itemWidth, rowHeight) / 10);
                     targetCtx.font = `bold ${fontSize}px Arial`;
-                    
                     targetCtx.textAlign = 'center';
                     targetCtx.textBaseline = 'middle';
                     targetCtx.fillText(currentColor.toUpperCase(), x + itemWidth / 2, y + rowHeight / 2);
@@ -455,45 +527,34 @@
         }
     }
 
-    // --- Funciones de Salida ---
+    // --- Descargas ---
 
     function downloadImage() {
         const link = document.createElement('a');
-        link.download = `paleta-colores-${showHexText ? 'con-texto' : 'limpia'}.png`;
-        // El canvas ya tiene el estado correcto porque drawCanvas se llama al alternar el botón
+        link.download = `preview-paleta.png`;
         link.href = canvas.toDataURL('image/png');
         link.click();
     }
 
-    function openFullHDImage() {
+    // NUEVO: Función específica para 1920x1080
+    function downloadFullHDImage() {
         const HD_WIDTH = 1920;
         const HD_HEIGHT = 1080;
 
+        // 1. Crear canvas temporal en memoria
         const tempCanvas = document.createElement('canvas');
         tempCanvas.width = HD_WIDTH;
         tempCanvas.height = HD_HEIGHT;
         const tempCtx = tempCanvas.getContext('2d');
 
-        // Pasamos explícitamente la variable global 'showHexText'
-        // Esto asegura que la imagen HD respete la configuración del botón
+        // 2. Dibujar usando la misma lógica y colores actuales
         drawCanvas(tempCanvas, tempCtx, colors, showHexText);
 
-        const imageDataURL = tempCanvas.toDataURL('image/png');
-        
-        // Abrir en ventana con un poco de estilo para mejor presentación
-        const newWindow = window.open();
-        if (newWindow) {
-            newWindow.document.write(`
-                <html>
-                    <head><title>Paleta FullHD (1920x1080)</title></head>
-                    <body style="margin:0; display:flex; align-items:center; justify-content:center; background:#333;">
-                        <img src="${imageDataURL}" style="max-width:100%; height:auto; box-shadow: 0 0 20px rgba(0,0,0,0.5);">
-                    </body>
-                </html>
-            `);
-        } else {
-            alert("Por favor permite los pop-ups para ver la imagen en alta resolución.");
-        }
+        // 3. Descargar
+        const link = document.createElement('a');
+        link.download = `paleta-1920x1080.png`;
+        link.href = tempCanvas.toDataURL('image/png');
+        link.click();
     }
 </script>
 
