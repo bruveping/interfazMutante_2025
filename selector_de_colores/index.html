@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ChromaGen Complete - Generador de Paletas</title>
-    <!-- Carga de Tailwind CSS CDN: ABSOLUTAMENTE CRUCIAL para los estilos -->
+    <!-- Carga de Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         /* Configuración de fuente y reset básico */
@@ -33,7 +33,6 @@
           transition: background 0.15s ease-in-out;
         }
 
-        /* Estilo del "thumb" en Firefox */
         input[type=range]::-moz-range-thumb {
           width: 14px;
           height: 14px;
@@ -45,7 +44,7 @@
           transition: background 0.15s ease-in-out;
         }
 
-        /* Animación para el botón de copiado */
+        /* Animación para botones */
         @keyframes pulse-once {
             0% { transform: scale(1); opacity: 1; }
             50% { transform: scale(1.1); opacity: 0.8; }
@@ -54,6 +53,29 @@
 
         .pulse-once {
             animation: pulse-once 0.3s ease-in-out;
+        }
+        
+        /* Estilos para el input de pasos */
+        .step-input:focus {
+            outline: none;
+            border-color: #6366f1;
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+        }
+        
+        .error-msg {
+            color: #ef4444;
+            font-size: 0.75rem;
+            font-weight: 600;
+            margin-top: 0.25rem;
+            display: none; /* Oculto por defecto */
+        }
+        
+        .error-msg.visible {
+            display: block;
+        }
+        
+        .input-error {
+            border-color: #ef4444 !important;
         }
     </style>
 </head>
@@ -65,19 +87,26 @@
             <div class="max-w-7xl mx-auto flex justify-between items-center">
                 <div class="flex items-center gap-3">
                     <div class="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center text-white shadow-sm">
-                        <!-- Icono de Lucide: Layers (se cargará por JS) -->
+                        <!-- Icono Layers -->
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
                     </div>
                     <h1 class="font-bold text-lg tracking-tight">ChromaGen <span class="text-indigo-600">Complete</span></h1>
                 </div>
                 <div class="flex gap-2">
                     <button id="randomizeBtn" class="p-2 hover:bg-slate-100 rounded-full text-slate-500 transition-colors" title="Color Aleatorio">
-                        <!-- Icono de Lucide: RefreshCcw -->
                         <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2v6h6"/><path d="M21 12A9 9 0 0 0 6 5.3L3 8"/><path d="M21 22v-6h-6"/><path d="M3 12a9 9 0 0 0 15 6.7l3-2.7"/></svg>
                     </button>
+                    
+                    <!-- Botón Exportar Texto -->
+                    <button id="exportTxtBtn" class="flex items-center gap-2 px-4 py-1.5 rounded-full font-medium text-xs transition-all bg-white border border-slate-200 text-slate-700 hover:bg-slate-50">
+                        <svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                        <span id="exportTxtText">TXT</span>
+                    </button>
+
+                    <!-- Botón Exportar CSS -->
                     <button id="exportCSSBtn" class="flex items-center gap-2 px-4 py-1.5 rounded-full font-medium text-xs transition-all bg-slate-900 text-white hover:bg-slate-800">
-                        <!-- Icono de Lucide: Download -->
                         <svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                        <span id="exportText">Exportar CSS</span>
+                        <span id="exportText">CSS</span>
                     </button>
                 </div>
             </div>
@@ -87,13 +116,11 @@
             <!-- Selector de Modo -->
             <div class="flex justify-center mb-8">
                 <div class="bg-white p-1 rounded-xl shadow-sm border border-slate-200 inline-flex" role="tablist">
-                    <button id="harmonyModeBtn" class="flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-bold transition-all bg-slate-100 text-slate-800" data-mode="harmony" role="tab" aria-selected="true">
-                        <!-- Icono de Lucide: Monitor -->
+                    <button id="harmonyModeBtn" class="flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-bold transition-all bg-slate-100 text-slate-800" data-mode="harmony">
                         <svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
                         Reglas Clásicas
                     </button>
-                    <button id="builderModeBtn" class="flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-bold transition-all text-slate-500 hover:text-slate-700" data-mode="builder" role="tab" aria-selected="false">
-                        <!-- Icono de Lucide: Paintbrush -->
+                    <button id="builderModeBtn" class="flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-bold transition-all text-slate-500 hover:text-slate-700" data-mode="builder">
                         <svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.5 1.5l1.5 2.5 2.5 1.5-1.5 2.5-2.5 1.5-1.5 2.5-2.5-1.5 1.5-2.5 2.5-1.5 1.5-2.5z"/><path d="M12 22l-1-2"/><path d="M16 18l-2-2"/><path d="M22 10l-2-2"/><path d="M18 16l2-2"/></svg>
                         Constructor
                     </button>
@@ -104,10 +131,10 @@
                 <!-- SIDEBAR CONTROLES -->
                 <div class="lg:col-span-4 space-y-6">
                     <div id="harmonyControls" class="space-y-6">
-                        <!-- Controles de Modo Armonía -->
+                        <!-- Controles de Modo Armonía (generados dinámicamente) -->
                     </div>
                     <div id="builderControls" class="space-y-6 hidden">
-                        <!-- Controles de Modo Constructor -->
+                        <!-- Controles de Modo Constructor (generados dinámicamente) -->
                     </div>
                 </div>
 
@@ -123,9 +150,10 @@
                                 </p>
                             </div>
                             <div id="compactPreview" class="hidden sm:flex -space-x-2">
-                                <!-- Vista previa compacta de colores -->
+                                <!-- Vista previa compacta -->
                             </div>
                         </div>
+                        <!-- Grid adaptable para mostrar colores -->
                         <div id="paletteDisplay" class="grid gap-4 flex-grow grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4">
                             <!-- Tarjetas de Color -->
                         </div>
@@ -134,7 +162,7 @@
                     <!-- UI PREVIEW -->
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div id="uiPreview" class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex flex-col justify-center items-center text-center relative overflow-hidden group">
-                            <!-- Contenido dinámico del Preview -->
+                            <!-- Preview UI -->
                         </div>
 
                         <div class="bg-slate-900 p-5 rounded-2xl shadow-sm text-slate-400 font-mono text-xs flex flex-col justify-center">
@@ -161,25 +189,22 @@
         // --- ESTADO INICIAL ---
         let state = {
             mode: 'harmony',
-            // Estado Armonía
             hue: 260,
             saturation: 75,
             lightness: 50,
-            harmony: 'tetradic', // tetradic, complementary, split, analogous, triadic, square, shades, tints
-            // Estado Constructor
+            harmony: 'tetradic',
+            // Constructor
             startHue: 220,
             startSat: 80,
             startLig: 20,
             endHue: 220,
             endSat: 10,
             endLig: 95,
-            steps: 9,
+            steps: 9, // Valor numérico
             globalShift: 0,
         };
 
         // --- UTILIDADES ---
-
-        /** Convierte HSL (grados, %, %) a HEX */
         function hslToHex(h, s, l) {
             l /= 100;
             const a = s * Math.min(l, 1 - l) / 100;
@@ -191,7 +216,6 @@
             return `#${f(0)}${f(8)}${f(4)}`.toUpperCase();
         }
 
-        /** Determina si el texto debe ser blanco o negro para el contraste */
         function getContrastYIQ(hexcolor) {
             hexcolor = hexcolor.replace("#", "");
             const r = parseInt(hexcolor.substr(0, 2), 16);
@@ -201,18 +225,15 @@
             return (yiq >= 128) ? 'text-slate-900' : 'text-white';
         }
 
-        /** Asegura que el valor esté dentro del rango min/max */
         function limit(val, min, max) {
             return Math.min(Math.max(val, min), max);
         }
 
-        /** Ajusta el matiz para que esté en el rango 0-360 */
         function adjustHue(deg) {
             return (deg + 360) % 360;
         }
 
-        // --- LÓGICA DE GENERACIÓN DE PALETA ---
-
+        // --- GENERACIÓN DE PALETA ---
         function generatePalette() {
             let colors = [];
             
@@ -233,10 +254,10 @@
                     case 'triadic':
                         colors = [base, { h: adjustHue(hue + 120), s: saturation, l: lightness }, { h: adjustHue(hue + 240), s: saturation, l: lightness }];
                         break;
-                    case 'tetradic': // Rectángulo
+                    case 'tetradic':
                         colors = [base, { h: adjustHue(hue + 180), s: saturation, l: lightness }, { h: adjustHue(hue + 60), s: saturation, l: lightness }, { h: adjustHue(hue + 240), s: saturation, l: lightness }];
                         break;
-                    case 'square': // Cuadrada
+                    case 'square':
                         colors = [base, { h: adjustHue(hue + 90), s: saturation, l: lightness }, { h: adjustHue(hue + 180), s: saturation, l: lightness }, { h: adjustHue(hue + 270), s: saturation, l: lightness }];
                         break;
                     case 'shades':
@@ -247,10 +268,14 @@
                         break;
                 }
             } else {
-                // Modo Constructor (Interpolación Lineal)
+                // MODO CONSTRUCTOR: Interpolación 1 a n
                 const { startHue, startSat, startLig, endHue, endSat, endLig, steps, globalShift } = state;
-                for (let i = 0; i < steps; i++) {
-                    const t = steps === 1 ? 0 : i / (steps - 1);
+                
+                // Asegurar que steps sea al menos 1 para evitar errores de loop infinito
+                const safeSteps = Math.max(1, steps);
+                
+                for (let i = 0; i < safeSteps; i++) {
+                    const t = safeSteps === 1 ? 0 : i / (safeSteps - 1);
                     const h = startHue + (endHue - startHue) * t;
                     const s = startSat + (endSat - startSat) * t;
                     const l = startLig + (endLig - startLig) * t;
@@ -258,122 +283,107 @@
                 }
             }
 
-            // Mapear a HEX y devolver
             return colors.map(c => ({ ...c, hex: hslToHex(c.h, c.s, c.l) }));
         }
 
-        // --- RENDERIZADO DE ELEMENTOS DE UI ---
+        // --- GENERACIÓN DE UI ---
 
-        /** Genera el HTML de un slider personalizado */
         function createSlider(id, label, value, min, max, gradient, stateKey) {
-            const html = `
+            return `
                 <div class="mb-3">
                     <div class="flex justify-between items-center mb-1">
                         <label for="${id}" class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">${label}</label>
                         <span id="${id}Value" class="text-[10px] font-mono text-slate-600 bg-slate-100 px-1.5 rounded">${Math.round(value)}</span>
                     </div>
-                    <input
-                        type="range"
-                        id="${id}"
-                        min="${min}"
-                        max="${max}"
-                        value="${value}"
-                        data-state-key="${stateKey}"
+                    <input type="range" id="${id}" min="${min}" max="${max}" value="${value}" data-state-key="${stateKey}"
                         class="w-full h-2 rounded-lg appearance-none cursor-pointer shadow-inner border border-slate-200"
-                        style="background: ${gradient}"
-                    />
+                        style="background: ${gradient}" />
                 </div>
             `;
-            return html;
         }
 
-        /** Genera el HTML de una tarjeta de color */
         function createColorCard(color, index, total, mode) {
-            const label = mode === 'builder' ? `Paso ${index + 1}` : `C${index + 1}`;
+            const label = mode === 'builder' ? `#${index + 1}` : `C${index + 1}`;
             const contrastClass = getContrastYIQ(color.hex);
-            const heightClass = total > 6 ? 'h-36' : 'h-44'; // h-36 is 9rem, h-44 is 11rem
+            // Ajuste de altura dinámico si hay muchos pasos
+            const heightClass = total > 12 ? 'h-24' : (total > 6 ? 'h-36' : 'h-44');
 
             return `
-                <div 
-                    class="color-card relative group flex flex-col justify-end p-3 rounded-xl shadow-sm border border-black/5 transition-all duration-300 transform hover:-translate-y-1 hover:shadow-md cursor-pointer ${heightClass}"
-                    style="background-color: ${color.hex}"
-                    data-hex="${color.hex}"
-                >
+                <div class="color-card relative group flex flex-col justify-end p-3 rounded-xl shadow-sm border border-black/5 transition-all duration-300 transform hover:-translate-y-1 hover:shadow-md cursor-pointer ${heightClass}"
+                    style="background-color: ${color.hex}" data-hex="${color.hex}">
                     <div class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
                         <button class="copy-btn p-1.5 rounded-full bg-white/20 backdrop-blur-md ${contrastClass} text-xs leading-none">
                             <svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
                         </button>
                     </div>
-                    <div class="mt-auto ${contrastClass}">
+                    <div class="mt-auto ${contrastClass} overflow-hidden">
                         <p class="text-[10px] font-bold uppercase opacity-70 tracking-wider mb-0.5 truncate">${label}</p>
                         <p class="text-lg font-mono font-bold leading-none truncate">${color.hex}</p>
-                        <p class="text-[10px] opacity-60 font-mono mt-1 truncate">
-                            ${Math.round(color.h)}° ${Math.round(color.s)}% ${Math.round(color.l)}%
-                        </p>
                     </div>
                 </div>
             `;
         }
 
-        /** Renderiza la UI de los Controles de Armonía */
         function renderHarmonyControls() {
             const container = document.getElementById('harmonyControls');
             const { hue, saturation, lightness, harmony } = state;
-
             const baseColorHex = hslToHex(hue, saturation, lightness);
 
             container.innerHTML = `
                 <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
                     <h2 class="text-xs font-bold text-slate-400 uppercase mb-4 flex items-center gap-2">
-                        <svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="2" x2="12" y2="22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
                         Color Base
                     </h2>
                     ${createSlider('hueSlider', 'Matiz', hue, 0, 360, "linear-gradient(to right, #f00 0%, #ff0 17%, #0f0 33%, #0ff 50%, #00f 67%, #f0f 83%, #f00 100%)", 'hue')}
                     ${createSlider('satSlider', 'Saturación', saturation, 0, 100, `linear-gradient(to right, hsl(${hue}, 0%, ${lightness}%), hsl(${hue}, 100%, ${lightness}%))`, 'saturation')}
                     ${createSlider('ligSlider', 'Luminosidad', lightness, 0, 100, `linear-gradient(to right, #000, hsl(${hue}, ${saturation}%, 50%), #fff)`, 'lightness')}
-                    
                     <div class="mt-4 flex items-center gap-2 bg-slate-50 p-2 rounded-lg border border-slate-100">
                          <div class="w-8 h-8 rounded-md shadow-sm border border-black/5" style="background-color: ${baseColorHex}"></div>
                          <span class="font-mono text-sm font-bold text-slate-600">${baseColorHex}</span>
                     </div>
                 </div>
-
                 <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
-                    <h2 class="text-xs font-bold text-slate-400 uppercase mb-4 flex items-center gap-2">
-                        <svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
-                        Modos de Armonía
-                    </h2>
+                    <h2 class="text-xs font-bold text-slate-400 uppercase mb-4 flex items-center gap-2">Modos</h2>
                     <div class="grid grid-cols-2 gap-2" id="harmonyButtons">
-                        ${createModeButton('complementary', 'Complem.', 'Maximize', harmony === 'complementary')}
-                        ${createModeButton('split', 'Split', 'Maximize', harmony === 'split')}
-                        ${createModeButton('analogous', 'Análogos', 'Layers', harmony === 'analogous')}
-                        ${createModeButton('triadic', 'Tríada', 'Box', harmony === 'triadic')}
-                        ${createModeButton('tetradic', 'Tetrádico', 'Grid', harmony === 'tetradic')}
-                        ${createModeButton('square', 'Cuadrado', 'Maximize', harmony === 'square')}
-                        ${createModeButton('shades', 'Sombras', 'Moon', harmony === 'shades')}
-                        ${createModeButton('tints', 'Tintes', 'Sun', harmony === 'tints')}
+                        ${createModeButton('complementary', 'Complem.', harmony === 'complementary')}
+                        ${createModeButton('split', 'Split', harmony === 'split')}
+                        ${createModeButton('analogous', 'Análogos', harmony === 'analogous')}
+                        ${createModeButton('triadic', 'Tríada', harmony === 'triadic')}
+                        ${createModeButton('tetradic', 'Tetrádico', harmony === 'tetradic')}
+                        ${createModeButton('square', 'Cuadrado', harmony === 'square')}
+                        ${createModeButton('shades', 'Sombras', harmony === 'shades')}
+                        ${createModeButton('tints', 'Tintes', harmony === 'tints')}
                     </div>
                 </div>
             `;
-            // Re-adjuntar listeners
             attachSliderListeners();
             attachHarmonyButtonListeners();
         }
 
-        /** Genera el HTML de los Controles de Constructor */
         function renderBuilderControls() {
             const container = document.getElementById('builderControls');
             const { startHue, startSat, startLig, endHue, endSat, endLig, steps, globalShift } = state;
 
             container.innerHTML = `
                 <div class="bg-indigo-50 p-5 rounded-2xl border border-indigo-100">
-                     <h2 class="text-xs font-bold text-indigo-800 uppercase mb-4 flex items-center gap-2">
-                        <svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M10 8h4"/></svg>
-                        Modificadores Globales
-                     </h2>
+                     <h2 class="text-xs font-bold text-indigo-800 uppercase mb-4 flex items-center gap-2">Modificadores Globales</h2>
+                     
+                     <!-- INPUT DE PASOS MODIFICADO -->
+                     <div class="mb-4">
+                        <div class="flex justify-between items-center mb-1">
+                            <label for="stepsInput" class="text-[10px] font-bold text-indigo-800 uppercase tracking-wider">Cantidad Pasos (1-n)</label>
+                        </div>
+                        <div class="relative">
+                            <input type="text" id="stepsInput" value="${steps}" 
+                                class="step-input w-full border border-indigo-200 rounded-lg px-3 py-2 font-mono text-sm text-slate-700 bg-white"
+                                placeholder="Ej: 9" autocomplete="off" />
+                        </div>
+                        <div id="stepsError" class="error-msg">solo números</div>
+                     </div>
+
                      ${createSlider('globalShiftSlider', 'Rotar Matiz Global', globalShift, 0, 360, "linear-gradient(to right, transparent, rgba(0,0,0,0.1))", 'globalShift')}
-                     ${createSlider('stepsSlider', 'Cantidad Pasos', steps, 3, 9, "transparent", 'steps')}
                 </div>
+
                 <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
                     <div class="flex items-center gap-2 mb-3">
                         <div class="w-3 h-3 rounded-full bg-slate-200"></div>
@@ -393,40 +403,26 @@
                     ${createSlider('endLigSlider', 'L', endLig, 0, 100, `linear-gradient(to right, #000, #fff)`, 'endLig')}
                 </div>
             `;
-            // Re-adjuntar listeners
             attachSliderListeners();
+            // Adjuntar listener específico para el input de pasos
+            const stepsInput = document.getElementById('stepsInput');
+            if (stepsInput) {
+                stepsInput.addEventListener('input', handleStepsInput);
+            }
         }
 
-        /** Genera el HTML de un botón de armonía (solo para renderHarmonyControls) */
-        function createModeButton(id, label, iconName, isActive) {
+        function createModeButton(id, label, isActive) {
             const activeClass = isActive 
                 ? 'bg-slate-800 text-white border-slate-800 shadow-md' 
                 : 'bg-white text-slate-600 border-slate-100 hover:bg-slate-50 hover:border-slate-200';
-            const iconClass = isActive ? "text-slate-300" : "text-slate-400";
-            
-            // Simulación simple de íconos (reemplaza con SVG o Lucide si es cargado)
-            const iconSvg = {
-                'Maximize': `<svg class="h-4 w-4 ${iconClass}" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>`,
-                'Layers': `<svg class="h-4 w-4 ${iconClass}" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19l-9-5.5L12 8l9 5.5L12 19z"/><path d="M3.5 13.5v-7L12 3l8.5 4.5v7"/></svg>`,
-                'Box': `<svg class="h-4 w-4 ${iconClass}" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 17l-9 5-9-5V7l9-5 9 5v10z"/><path d="M3.35 7.15L12 12m0 0l-8.65 5.85m0-11.7l8.65 5.85m8.65-5.85L12 12m0 0l8.65 5.85"/></svg>`,
-                'Grid': `<svg class="h-4 w-4 ${iconClass}" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="12" y1="3" x2="12" y2="21"/><line x1="3" y1="12" x2="21" y2="12"/></svg>`,
-                'Moon': `<svg class="h-4 w-4 ${iconClass}" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 9 9C21 7 17 3 12 3z"/></svg>`,
-                'Sun': `<svg class="h-4 w-4 ${iconClass}" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2m8-8h2M2 12h2m14.28 6.28l1.42 1.42m-1.42-14.14l1.42-1.42m-14.14 0l-1.42 1.42M3.28 18.28l1.42-1.42"/></svg>`,
-            }[iconName] || '';
-
             return `
-                <button
-                    class="harmony-btn flex items-center gap-2 px-3 py-2.5 rounded-lg text-xs sm:text-sm transition-all w-full border ${activeClass}"
-                    data-harmony-id="${id}"
-                    data-label="${label}"
-                >
-                    ${iconSvg}
+                <button class="harmony-btn flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-xs sm:text-sm transition-all w-full border ${activeClass}"
+                    data-harmony-id="${id}">
                     <span class="font-medium truncate">${label}</span>
                 </button>
             `;
         }
 
-        /** Renderiza la paleta, la vista previa compacta y el preview de UI */
         function renderPalette() {
             const palette = generatePalette();
             const paletteDisplay = document.getElementById('paletteDisplay');
@@ -437,256 +433,218 @@
             const infoHarmony = document.getElementById('infoHarmony');
             const infoSteps = document.getElementById('infoSteps');
 
-            // 1. Renderizar tarjetas de color
+            // 1. Render Cards
             paletteDisplay.innerHTML = palette.map((color, index) => createColorCard(color, index, palette.length, state.mode)).join('');
             
-            // Ajustar grid layout
-            let gridClasses;
-            if (palette.length <= 4) {
-                gridClasses = 'grid-cols-2 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-4';
-            } else if (palette.length <= 6) {
-                gridClasses = 'grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-6';
-            } else {
-                gridClasses = 'grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-9';
-            }
+            // Grid logic para n-pasos
+            let gridClasses = 'grid-cols-2';
+            if (palette.length <= 4) gridClasses = 'grid-cols-2 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-4';
+            else if (palette.length <= 6) gridClasses = 'grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-6';
+            else if (palette.length <= 9) gridClasses = 'grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-9';
+            else gridClasses = 'grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8'; // Para n > 9
+
             paletteDisplay.className = `grid gap-4 flex-grow ${gridClasses}`;
 
-            // 2. Renderizar vista previa compacta
-            compactPreview.innerHTML = palette.map((c, i) => `<div key="${i}" class="w-8 h-8 rounded-full border-2 border-white shadow-sm" style="background: ${c.hex}"></div>`).join('');
+            // 2. Compact Preview
+            compactPreview.innerHTML = palette.slice(0, 9).map((c, i) => `<div class="w-8 h-8 rounded-full border-2 border-white shadow-sm" style="background: ${c.hex}"></div>`).join('');
             
-            // 3. Renderizar vista previa de UI
+            // 3. UI Preview
             const primaryColor = palette[1] || palette[0];
             const secondaryColor = palette[palette.length > 2 ? 2 : 0];
             const lightColor = palette[palette.length - 1];
-            const buttonContrast = getContrastYIQ(primaryColor.hex);
+            const contrastColor = getContrastYIQ(lightColor.hex) === 'text-white' ? '#fff' : '#333';
 
             uiPreview.style.background = lightColor.hex;
             uiPreview.innerHTML = `
                 <div class="absolute inset-0 opacity-10 transition-colors duration-500" style="background: ${palette[0].hex}"></div>
-                <h3 class="text-lg font-bold mb-2 relative z-10" style="color: ${secondaryColor.hex}">Tipografía</h3>
-                <p class="text-sm opacity-80 max-w-xs relative z-10" style="color: ${getContrastYIQ(lightColor.hex) === 'text-white' ? '#333' : '#666'}">
-                    El color comunica significado. Verifica el contraste.
-                </p>
-                <button class="mt-4 px-6 py-2 rounded-lg font-bold text-sm shadow-lg transition-transform transform group-hover:scale-105 relative z-10" 
-                    style="
-                        background-color: ${primaryColor.hex}; 
-                        color: ${buttonContrast === 'text-white' ? '#fff' : '#1e293b'}
-                    ">
-                    Botón Primario
+                <h3 class="text-lg font-bold mb-2 relative z-10" style="color: ${secondaryColor.hex}">Ejemplo UI</h3>
+                <button class="mt-4 px-6 py-2 rounded-lg font-bold text-sm shadow-lg relative z-10" 
+                    style="background-color: ${primaryColor.hex}; color: ${getContrastYIQ(primaryColor.hex) === 'text-white' ? '#fff' : '#1e293b'}">
+                    Botón
                 </button>
             `;
 
-            // 4. Actualizar información de la paleta
-            const baseColor = palette[0];
-            infoHex.textContent = baseColor.hex;
+            // 4. Info Update
+            infoHex.textContent = palette[0].hex;
             infoSteps.textContent = `${palette.length} colores`;
+            infoHarmony.textContent = state.mode === 'harmony' ? state.harmony : 'Interpolación';
 
             if (state.mode === 'harmony') {
-                infoHarmony.textContent = state.harmony.charAt(0).toUpperCase() + state.harmony.slice(1);
-                paletteModeInfo.innerHTML = `
-                    <span class="w-2 h-2 rounded-full bg-green-400"></span>
-                    Modo: ${infoHarmony.textContent}
-                `;
+                paletteModeInfo.innerHTML = `<span class="w-2 h-2 rounded-full bg-green-400"></span> Modo: ${state.harmony}`;
             } else {
-                infoHarmony.textContent = 'Constructor';
-                paletteModeInfo.innerHTML = `
-                    <span class="w-2 h-2 rounded-full bg-indigo-400"></span>
-                    Interpolación de ${palette.length} pasos
-                `;
+                paletteModeInfo.innerHTML = `<span class="w-2 h-2 rounded-full bg-indigo-400"></span> Pasos: ${state.steps}`;
             }
 
-            // Re-adjuntar listeners de copiado
             attachCopyListeners();
         }
 
-        // --- MANEJADORES DE EVENTOS ---
+        // --- EVENTOS ---
 
-        /** Manejador global para sliders (Input) */
         function handleSliderChange(e) {
-            const slider = e.target;
-            const key = slider.dataset.stateKey;
-            const value = Number(slider.value);
-
-            state[key] = value;
-
-            // Actualizar valor numérico del slider
-            document.getElementById(`${key}SliderValue`).textContent = Math.round(value);
-            
-            // Forzar renderizado
-            render();
+            state[e.target.dataset.stateKey] = Number(e.target.value);
+            document.getElementById(`${e.target.dataset.stateKey}Value`).textContent = Math.round(e.target.value);
+            renderPalette();
         }
 
-        /** Manejador de cambio de modo (Harmony/Builder) */
+        // NUEVO: Manejador del input de pasos
+        function handleStepsInput(e) {
+            const input = e.target;
+            const errorMsg = document.getElementById('stepsError');
+            const rawVal = input.value;
+
+            // 1. Detectar si hay caracteres no numéricos
+            if (/[^0-9]/.test(rawVal)) {
+                errorMsg.classList.add('visible');
+                input.classList.add('input-error');
+                // No actualizamos el estado si es inválido, pero permitimos seguir editando
+                return; 
+            } else {
+                errorMsg.classList.remove('visible');
+                input.classList.remove('input-error');
+            }
+
+            // 2. Validar valor numérico
+            const val = parseInt(rawVal, 10);
+
+            if (!isNaN(val) && val >= 1) {
+                state.steps = val;
+                renderPalette(); // Renderizamos en tiempo real
+            } else if (rawVal === "") {
+                // Si borra todo, no renderizamos basura, esperamos
+            }
+        }
+
         function handleModeChange(newMode) {
             state.mode = newMode;
-
-            // Actualizar botones de modo
             const harmonyBtn = document.getElementById('harmonyModeBtn');
             const builderBtn = document.getElementById('builderModeBtn');
             const harmonyControls = document.getElementById('harmonyControls');
             const builderControls = document.getElementById('builderControls');
 
             if (newMode === 'harmony') {
-                harmonyBtn.className = harmonyBtn.className.replace('text-slate-500 hover:text-slate-700', 'bg-slate-100 text-slate-800').replace('bg-indigo-50 text-indigo-700', 'text-slate-500 hover:text-slate-700');
-                builderBtn.className = builderBtn.className.replace('bg-indigo-50 text-indigo-700', 'text-slate-500 hover:text-slate-700').replace('bg-slate-100 text-slate-800', 'text-slate-500 hover:text-slate-700');
+                harmonyBtn.className = "flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-bold transition-all bg-slate-100 text-slate-800";
+                builderBtn.className = "flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-bold transition-all text-slate-500 hover:text-slate-700";
                 harmonyControls.classList.remove('hidden');
                 builderControls.classList.add('hidden');
             } else {
-                builderBtn.className = builderBtn.className.replace('text-slate-500 hover:text-slate-700', 'bg-indigo-50 text-indigo-700').replace('bg-slate-100 text-slate-800', 'text-slate-500 hover:text-slate-700');
-                harmonyBtn.className = harmonyBtn.className.replace('bg-slate-100 text-slate-800', 'text-slate-500 hover:text-slate-700').replace('bg-indigo-50 text-indigo-700', 'text-slate-500 hover:text-slate-700');
+                builderBtn.className = "flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-bold transition-all bg-indigo-50 text-indigo-700";
+                harmonyBtn.className = "flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-bold transition-all text-slate-500 hover:text-slate-700";
                 harmonyControls.classList.add('hidden');
                 builderControls.classList.remove('hidden');
+                renderBuilderControls(); // Renderizar controles específicos
             }
-            
-            // Forzar renderizado
-            render();
+            renderPalette();
         }
 
-        /** Manejador de cambio de armonía (Complementary, Triadic, etc.) */
         function handleHarmonyChange(e) {
-            const button = e.currentTarget;
-            const newHarmony = button.dataset.harmonyId;
-            state.harmony = newHarmony;
-            render();
+            state.harmony = e.currentTarget.dataset.harmonyId;
+            render(); // Re-render completo para actualizar botones activos
         }
 
-        /** Manejador de copiado de color al hacer clic en la tarjeta */
         function handleCopy(e) {
             const card = e.currentTarget.closest('.color-card');
             const hex = card.dataset.hex;
-            const copyBtn = card.querySelector('.copy-btn');
+            copyToClipboard(hex);
             
-            // Usar document.execCommand('copy') como fallback para entornos restringidos (iFrame)
-            const tempInput = document.createElement('input');
-            tempInput.value = hex;
-            document.body.appendChild(tempInput);
-            tempInput.select();
-            document.execCommand('copy');
-            document.body.removeChild(tempInput);
-
-            // Cambiar ícono a Check y aplicar animación
-            copyBtn.innerHTML = `<svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
+            const copyBtn = card.querySelector('.copy-btn');
+            const originalHTML = copyBtn.innerHTML;
+            copyBtn.innerHTML = `<svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>`;
             copyBtn.classList.add('pulse-once');
-
             setTimeout(() => {
-                copyBtn.innerHTML = `<svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`;
+                copyBtn.innerHTML = originalHTML;
                 copyBtn.classList.remove('pulse-once');
             }, 1500);
         }
 
-        /** Exportar paleta a formato CSS */
+        function copyToClipboard(text) {
+            const temp = document.createElement('textarea');
+            temp.value = text;
+            document.body.appendChild(temp);
+            temp.select();
+            document.execCommand('copy');
+            document.body.removeChild(temp);
+        }
+
+        // EXPORTAR CSS
         function exportCSS() {
             const palette = generatePalette();
-            const css = `:root {\n${palette.map((c, i) => `  --color-${i + 1}: ${c.hex}; /* H:${c.h.toFixed(0)} S:${c.s.toFixed(0)} L:${c.l.toFixed(0)} */`).join('\n')}\n}`;
-            
-            // Copiar al portapapeles
-            const tempTextarea = document.createElement('textarea');
-            tempTextarea.value = css;
-            document.body.appendChild(tempTextarea);
-            tempTextarea.select();
-            document.execCommand('copy');
-            document.body.removeChild(tempTextarea);
+            const css = `:root {\n${palette.map((c, i) => `  --color-${i + 1}: ${c.hex};`).join('\n')}\n}`;
+            copyToClipboard(css);
+            showExportFeedback('exportCSSBtn', 'exportText', 'Copiado CSS!');
+        }
 
-            // Feedback visual
-            const btn = document.getElementById('exportCSSBtn');
-            const text = document.getElementById('exportText');
+        // NUEVO: EXPORTAR TEXTO
+        function exportText() {
+            const palette = generatePalette();
+            // Formato simple: #XXXXXX salto de línea
+            const txt = palette.map(c => c.hex).join('\n');
+            copyToClipboard(txt);
+            showExportFeedback('exportTxtBtn', 'exportTxtText', 'Copiado TXT!');
+        }
+
+        function showExportFeedback(btnId, textId, msg) {
+            const btn = document.getElementById(btnId);
+            const txtSpan = document.getElementById(textId);
+            const originalText = txtSpan.textContent;
             
-            btn.classList.remove('bg-slate-900', 'hover:bg-slate-800', 'text-white');
-            btn.classList.add('bg-green-100', 'text-green-700');
-            text.textContent = 'Copiado!';
+            const originalClasses = btn.className;
+            btn.className = "flex items-center gap-2 px-4 py-1.5 rounded-full font-medium text-xs transition-all bg-green-100 text-green-700 border border-green-200";
+            txtSpan.textContent = msg;
 
             setTimeout(() => {
-                btn.classList.add('bg-slate-900', 'hover:bg-slate-800', 'text-white');
-                btn.classList.remove('bg-green-100', 'text-green-700');
-                text.textContent = 'Exportar CSS';
+                btn.className = originalClasses;
+                txtSpan.textContent = originalText;
             }, 2000);
         }
 
-        /** Generar color aleatorio (tanto para Harmony como para Builder) */
         function randomize() {
-            // Generar valores base aleatorios
             state.hue = Math.floor(Math.random() * 360);
             state.saturation = limit(60 + Math.random() * 40, 0, 100);
             state.lightness = limit(45 + Math.random() * 15, 0, 100);
-            
-            // Generar valores de constructor aleatorios
             state.startHue = Math.floor(Math.random() * 360);
             state.endHue = Math.floor(Math.random() * 360);
-            state.startSat = limit(50 + Math.random() * 50, 0, 100);
-            state.endSat = limit(5 + Math.random() * 30, 0, 100);
-            state.startLig = limit(10 + Math.random() * 30, 0, 100);
-            state.endLig = limit(70 + Math.random() * 30, 0, 100);
             state.globalShift = Math.floor(Math.random() * 360);
             
-            render();
-        }
-
-        // --- ATTACH LISTENERS ---
-
-        function attachSliderListeners() {
-            document.querySelectorAll('input[type="range"]').forEach(slider => {
-                slider.removeEventListener('input', handleSliderChange); // Eliminar antes de adjuntar
-                slider.addEventListener('input', handleSliderChange);
-            });
-        }
-
-        function attachHarmonyButtonListeners() {
-            document.querySelectorAll('.harmony-btn').forEach(button => {
-                button.removeEventListener('click', handleHarmonyChange);
-                button.addEventListener('click', handleHarmonyChange);
-
-                // Manejar clases de activo/inactivo
-                const isActive = button.dataset.harmonyId === state.harmony;
-                const activeClass = 'bg-slate-800 text-white border-slate-800 shadow-md';
-                const inactiveClass = 'bg-white text-slate-600 border-slate-100 hover:bg-slate-50 hover:border-slate-200';
-                
-                if (isActive) {
-                    button.classList.add(...activeClass.split(' '));
-                    button.classList.remove(...inactiveClass.split(' '));
-                } else {
-                    button.classList.add(...inactiveClass.split(' '));
-                    button.classList.remove(...activeClass.split(' '));
-                }
-            });
-        }
-
-        function attachCopyListeners() {
-            document.querySelectorAll('.color-card').forEach(card => {
-                const copyBtn = card.querySelector('.copy-btn');
-                if (copyBtn) {
-                    copyBtn.removeEventListener('click', handleCopy);
-                    copyBtn.addEventListener('click', handleCopy);
-                }
-            });
-        }
-
-        /** Función principal de Renderizado */
-        function render() {
-            if (state.mode === 'harmony') {
-                renderHarmonyControls();
-            } else {
+            if(state.mode === 'harmony') renderHarmonyControls();
+            else {
+                // Actualizar sliders y el input de pasos
                 renderBuilderControls();
             }
             renderPalette();
         }
 
-        // --- INICIALIZACIÓN ---
-        window.onload = function() {
-            // Inicializar modos
-            handleModeChange(state.mode); 
+        // LISTENERS
+        function attachSliderListeners() {
+            document.querySelectorAll('input[type="range"]').forEach(s => {
+                s.removeEventListener('input', handleSliderChange);
+                s.addEventListener('input', handleSliderChange);
+            });
+        }
+        function attachHarmonyButtonListeners() {
+            document.querySelectorAll('.harmony-btn').forEach(b => {
+                b.addEventListener('click', handleHarmonyChange);
+            });
+        }
+        function attachCopyListeners() {
+            document.querySelectorAll('.copy-btn').forEach(b => b.addEventListener('click', handleCopy));
+        }
 
-            // Adjuntar listeners de cambio de modo
+        function render() {
+            if (state.mode === 'harmony') renderHarmonyControls();
+            else renderBuilderControls();
+            renderPalette();
+        }
+
+        window.onload = function() {
+            // Listeners globales
             document.getElementById('harmonyModeBtn').addEventListener('click', () => handleModeChange('harmony'));
             document.getElementById('builderModeBtn').addEventListener('click', () => handleModeChange('builder'));
-
-            // Adjuntar listeners de acciones globales
             document.getElementById('exportCSSBtn').addEventListener('click', exportCSS);
+            document.getElementById('exportTxtBtn').addEventListener('click', exportText); // Nuevo listener
             document.getElementById('randomizeBtn').addEventListener('click', randomize);
-
-            // Renderizar la aplicación por primera vez
+            
             render();
         };
-
     </script>
 </body>
 </html>
