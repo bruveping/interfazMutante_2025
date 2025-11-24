@@ -1,0 +1,812 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generador de Armonía Cromática Euclidiana</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎨</text></svg>">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background-color: #1a1a1a;
+            color: #e5e5e5;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        #preview-container {
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.4);
+            transition: filter 0.3s ease;
+        }
+
+        canvas {
+            width: 100%;
+            height: auto;
+            image-rendering: high-quality;
+            border-radius: 8px;
+        }
+
+        .color-list::-webkit-scrollbar {
+            width: 8px;
+        }
+        .color-list::-webkit-scrollbar-track {
+            background: #2d2d2d;
+        }
+        .color-list::-webkit-scrollbar-thumb {
+            background: #555;
+            border-radius: 4px;
+        }
+        .color-list::-webkit-scrollbar-thumb:hover {
+            background: #777;
+        }
+
+        .input-dark {
+            background-color: #2d2d2d;
+            border: 1px solid #444;
+            color: white;
+        }
+        .input-dark:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
+        }
+
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+        
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 16px;
+            width: 16px;
+            border-radius: 50%;
+            background: #ffffff;
+            border: 2px solid #3b82f6;
+            cursor: pointer;
+            margin-top: -6px;
+        }
+        
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: #4b5563;
+            border-radius: 2px;
+        }
+
+        /* Gradientes para sliders de Matiz */
+        #hueSlider::-webkit-slider-runnable-track, #hueEndSlider::-webkit-slider-runnable-track {
+            background: linear-gradient(to right, #f00 0%, #ff0 17%, #0f0 33%, #0ff 50%, #00f 67%, #f0f 83%, #f00 100%);
+        }
+        /* Los gradientes de Sat y Light se manejan dinámicamente o por defecto */
+        #lightSlider::-webkit-slider-runnable-track, #lightEndSlider::-webkit-slider-runnable-track {
+            background: linear-gradient(to right, #000, #808080, #fff);
+        }
+
+        /* Filtros SVG para Daltonismo (definidos en HTML, aplicados vía clase o estilo inline) */
+    </style>
+</head>
+<body class="min-h-screen flex flex-col p-4 md:p-8">
+
+    <!-- Filtros SVG para simulación precisa de daltonismo -->
+    <svg style="display: none">
+        <defs>
+            <filter id="protanopia">
+                <feColorMatrix type="matrix" values="0.567, 0.433, 0, 0, 0  0.558, 0.442, 0, 0, 0  0, 0.242, 0.758, 0, 0  0, 0, 0, 1, 0"/>
+            </filter>
+            <filter id="deuteranopia">
+                <feColorMatrix type="matrix" values="0.625, 0.375, 0, 0, 0  0.7, 0.3, 0, 0, 0  0, 0.3, 0.7, 0, 0  0, 0, 0, 1, 0"/>
+            </filter>
+            <filter id="tritanopia">
+                <feColorMatrix type="matrix" values="0.95, 0.05, 0, 0, 0  0, 0.433, 0.567, 0, 0  0, 0.475, 0.525, 0, 0  0, 0, 0, 1, 0"/>
+            </filter>
+            <filter id="achromatopsia">
+                <feColorMatrix type="matrix" values="0.299, 0.587, 0.114, 0, 0  0.299, 0.587, 0.114, 0, 0  0.299, 0.587, 0.114, 0, 0  0, 0, 0, 1, 0"/>
+            </filter>
+        </defs>
+    </svg>
+
+    <header class="mb-8 text-center">
+        <h1 class="text-3xl md:text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-500">
+            Selector Cromático Euclidiano
+        </h1>
+        <p class="text-gray-400 mt-2">Armonías, Variaciones y Temperatura</p>
+    </header>
+
+    <main class="flex flex-col lg:flex-row gap-8 max-w-7xl mx-auto w-full">
+        
+        <!-- Panel de Control -->
+        <aside class="w-full lg:w-1/3 flex flex-col gap-6 bg-neutral-800 p-6 rounded-xl shadow-lg border border-neutral-700 h-fit max-h-screen overflow-y-auto">
+            
+            <!-- Selector de Color Base -->
+            <div class="flex flex-col gap-2">
+                <label class="text-sm font-semibold text-gray-300">Color Base (Inicio)</label>
+                <div class="flex gap-2 items-center">
+                    <input type="color" id="baseColor" value="#3b82f6" class="h-12 w-16 cursor-pointer bg-transparent border-0 p-0 rounded-md shrink-0">
+                    <input type="text" id="hexDisplay" value="#3b82f6" class="input-dark rounded px-3 py-2 w-full font-mono uppercase" readonly>
+                    
+                    <!-- Botón Aleatorio -->
+                    <button id="btnRandom" class="h-10 w-10 flex items-center justify-center bg-neutral-700 hover:bg-neutral-600 rounded text-white transition-colors" title="Color Aleatorio">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 8h.01"></path><path d="M8 8h.01"></path><path d="M8 16h.01"></path><path d="M16 16h.01"></path><path d="M12 12h.01"></path></svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Sliders HSL Base -->
+            <div class="flex flex-col gap-4 border-t border-neutral-700 pt-4 pb-4">
+                <label class="text-xs font-bold text-blue-400 uppercase tracking-wider">Ajustes Finos</label>
+                
+                <div class="flex flex-col gap-1">
+                    <div class="flex justify-between text-xs text-gray-400"><span>Matiz (Hue)</span><span id="hueValue">210°</span></div>
+                    <input type="range" id="hueSlider" min="0" max="360" value="210" class="w-full">
+                </div>
+                <div class="flex flex-col gap-1">
+                    <div class="flex justify-between text-xs text-gray-400"><span>Saturación</span><span id="satValue">90%</span></div>
+                    <input type="range" id="satSlider" min="0" max="100" value="90" class="w-full">
+                </div>
+                <div class="flex flex-col gap-1">
+                    <div class="flex justify-between text-xs text-gray-400"><span>Luminosidad</span><span id="lightValue">60%</span></div>
+                    <input type="range" id="lightSlider" min="0" max="100" value="60" class="w-full">
+                </div>
+            </div>
+
+            <!-- Selector de Modo de Armonía -->
+            <div class="flex flex-col gap-2 border-t border-neutral-700 pt-4">
+                <label class="text-sm font-semibold text-gray-300">Regla de Armonía / Modelo</label>
+                <select id="harmonyMode" class="input-dark rounded px-3 py-2 w-full cursor-pointer">
+                    <optgroup label="Armonías Clásicas">
+                        <option value="monochromatic">Monocromática</option>
+                        <option value="analogous">Análoga (Adyacente)</option>
+                        <option value="complementary">Complementaria (Opuestos)</option>
+                        <option value="split-complementary">Complementaria Dividida</option>
+                        <option value="triadic">Triádica (Triángulo)</option>
+                        <option value="tetradic">Tétrade (Rectangular)</option>
+                        <option value="square">Cuadrada</option>
+                        <option value="hexagonal">Hexagonal (6 Colores)</option>
+                    </optgroup>
+                    <optgroup label="Temperatura">
+                        <option value="warmer">Más Cálido (Hacia el Naranja)</option>
+                        <option value="cooler">Más Frío (Hacia el Azul)</option>
+                    </optgroup>
+                    <optgroup label="Variaciones de Tono">
+                        <option value="tints">Tintes (Mezcla con Blanco)</option>
+                        <option value="shades">Sombras (Mezcla con Negro)</option>
+                        <option value="tones">Tonos (Mezcla con Gris)</option>
+                    </optgroup>
+                    <optgroup label="Avanzado">
+                        <option value="custom">Rango Personalizado (A -> B)</option>
+                    </optgroup>
+                </select>
+            </div>
+
+            <!-- Panel Personalizado (Cantidad + Rango Final) -->
+            <div id="customControls" class="hidden flex-col gap-4 border-t border-neutral-700 pt-4">
+                
+                <!-- Cantidad -->
+                <div class="flex flex-col gap-2">
+                    <label class="text-sm font-semibold text-gray-300">Pasos / Cantidad (N)</label>
+                    <input type="number" id="customCount" value="10" min="2" max="360" class="input-dark rounded px-3 py-2 w-full">
+                </div>
+
+                <!-- Sliders HSL Final (Target) - SOLO para modo Custom -->
+                <div id="customRangePanel" class="flex flex-col gap-4 bg-neutral-900/50 p-4 rounded-lg border border-neutral-700">
+                    <label class="text-xs font-bold text-purple-400 uppercase tracking-wider">Ajustes Final (Meta)</label>
+                    
+                    <div class="flex flex-col gap-1">
+                        <div class="flex justify-between text-xs text-gray-400"><span>Matiz Fin</span><span id="hueEndValue">250°</span></div>
+                        <input type="range" id="hueEndSlider" min="0" max="360" value="250" class="w-full">
+                    </div>
+                    <div class="flex flex-col gap-1">
+                        <div class="flex justify-between text-xs text-gray-400"><span>Sat Fin</span><span id="satEndValue">90%</span></div>
+                        <input type="range" id="satEndSlider" min="0" max="100" value="90" class="w-full">
+                    </div>
+                    <div class="flex flex-col gap-1">
+                        <div class="flex justify-between text-xs text-gray-400"><span>Lum Fin</span><span id="lightEndValue">40%</span></div>
+                        <input type="range" id="lightEndSlider" min="0" max="100" value="40" class="w-full">
+                    </div>
+                    
+                    <div class="flex justify-between items-center mt-2">
+                        <span class="text-xs text-gray-500">Color Final:</span>
+                        <div id="endColorPreview" class="w-full h-6 ml-2 rounded border border-neutral-600"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Selector de Formato Visual (NUEVO) -->
+            <div class="flex flex-col gap-2 border-t border-neutral-700 pt-4">
+                <label class="text-sm font-semibold text-gray-300 flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                    Formato de Visualización
+                </label>
+                <div class="grid grid-cols-3 gap-2">
+                    <button type="button" data-viz="radial" class="viz-btn active bg-blue-600 text-white p-2 rounded text-xs font-semibold flex flex-col items-center gap-1 hover:bg-blue-500 transition-colors">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="12" x2="21" y2="12"/><line x1="12" y1="12" x2="16.5" y2="19.79"/><line x1="12" y1="12" x2="7.5" y2="19.79"/><line x1="12" y1="12" x2="3" y2="12"/><line x1="12" y1="12" x2="7.5" y2="4.21"/><line x1="12" y1="12" x2="16.5" y2="4.21"/></svg>
+                        Radial
+                    </button>
+                    <button type="button" data-viz="linear" class="viz-btn bg-neutral-700 text-gray-300 p-2 rounded text-xs font-semibold flex flex-col items-center gap-1 hover:bg-neutral-600 transition-colors">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></svg>
+                        Lineal
+                    </button>
+                    <button type="button" data-viz="grid" class="viz-btn bg-neutral-700 text-gray-300 p-2 rounded text-xs font-semibold flex flex-col items-center gap-1 hover:bg-neutral-600 transition-colors">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+                        Mosaico
+                    </button>
+                </div>
+            </div>
+
+            <!-- Simulación de Daltonismo -->
+            <div class="flex flex-col gap-2 border-t border-neutral-700 pt-4">
+                <label class="text-sm font-semibold text-gray-300 flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+                    Simulación de Visión
+                </label>
+                <select id="visionSim" class="input-dark rounded px-3 py-2 w-full cursor-pointer">
+                    <option value="normal">Visión Normal</option>
+                    <option value="protanopia">Protanopia (Sin Rojo)</option>
+                    <option value="deuteranopia">Deuteranopia (Sin Verde)</option>
+                    <option value="tritanopia">Tritanopia (Sin Azul)</option>
+                    <option value="achromatopsia">Acromatopsia (Escala de Grises)</option>
+                </select>
+            </div>
+
+            <!-- Acciones -->
+            <div class="grid grid-cols-1 gap-3 mt-4">
+                <button id="btnCopy" class="bg-gray-700 hover:bg-gray-600 text-white font-semibold py-3 px-4 rounded transition-colors flex items-center justify-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                    Copiar Lista (HEX)
+                </button>
+                <button id="btnDownload" class="bg-blue-600 hover:bg-blue-500 text-white font-semibold py-3 px-4 rounded transition-colors flex items-center justify-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                    Descargar (1920x1080)
+                </button>
+            </div>
+            
+            <div id="messageBox" class="text-center text-sm font-semibold h-5 text-green-400 opacity-0 transition-opacity"></div>
+        </aside>
+
+        <!-- Área Visual -->
+        <section class="w-full lg:w-2/3 flex flex-col gap-4">
+            <div id="preview-wrapper" class="relative w-full">
+                <!-- Contenedor del Canvas con filtro aplicable -->
+                <div id="preview-container" class="relative w-full bg-black rounded-lg overflow-hidden border border-neutral-700">
+                    <canvas id="colorCanvas" width="1920" height="1080"></canvas>
+                </div>
+            </div>
+
+            <div class="bg-neutral-800 p-4 rounded-xl border border-neutral-700">
+                <div class="flex justify-between items-center mb-3">
+                    <h3 class="text-sm font-semibold text-gray-400">Paleta Generada</h3>
+                    <span id="visionLabel" class="text-xs text-yellow-500 hidden">Simulación Activa</span>
+                </div>
+                <!-- Lista de Colores también recibe el filtro de visión para previsualización correcta -->
+                <div id="colorListContainer" class="transition-all">
+                    <div id="colorList" class="color-list flex flex-wrap gap-2 max-h-40 overflow-y-auto">
+                        <!-- Los colores se inyectan aquí vía JS -->
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <script>
+        // --- Referencias DOM ---
+        const baseColorInput = document.getElementById('baseColor');
+        const hexDisplay = document.getElementById('hexDisplay');
+        const harmonyMode = document.getElementById('harmonyMode');
+        const btnRandom = document.getElementById('btnRandom');
+        const visionSim = document.getElementById('visionSim');
+        const visionLabel = document.getElementById('visionLabel');
+        const previewContainer = document.getElementById('preview-container');
+        const colorListContainer = document.getElementById('colorListContainer');
+        
+        // Contenedor Custom
+        const customControls = document.getElementById('customControls');
+        const customRangePanel = document.getElementById('customRangePanel'); 
+        const customCountInput = document.getElementById('customCount');
+
+        // Botones de Visualización
+        const vizBtns = document.querySelectorAll('.viz-btn');
+
+        // Canvas & UI
+        const canvas = document.getElementById('colorCanvas');
+        const ctx = canvas.getContext('2d');
+        const colorList = document.getElementById('colorList');
+        const btnCopy = document.getElementById('btnCopy');
+        const btnDownload = document.getElementById('btnDownload');
+        const messageBox = document.getElementById('messageBox');
+
+        // Sliders Inicio
+        const hueSlider = document.getElementById('hueSlider');
+        const satSlider = document.getElementById('satSlider');
+        const lightSlider = document.getElementById('lightSlider');
+        const hueValue = document.getElementById('hueValue');
+        const satValue = document.getElementById('satValue');
+        const lightValue = document.getElementById('lightValue');
+
+        // Sliders Final (End)
+        const hueEndSlider = document.getElementById('hueEndSlider');
+        const satEndSlider = document.getElementById('satEndSlider');
+        const lightEndSlider = document.getElementById('lightEndSlider');
+        const hueEndValue = document.getElementById('hueEndValue');
+        const satEndValue = document.getElementById('satEndValue');
+        const lightEndValue = document.getElementById('lightEndValue');
+        const endColorPreview = document.getElementById('endColorPreview');
+
+        let currentPalette = [];
+        let isInternalUpdate = false;
+        let visualizationMode = 'radial'; // 'radial', 'linear', 'grid'
+
+        function init() {
+            // Inicializar sliders base
+            syncSlidersFromHex(baseColorInput.value);
+            
+            // Inicializar sliders finales
+            hueEndSlider.value = (parseInt(hueSlider.value) + 90) % 360;
+            satEndSlider.value = satSlider.value;
+            lightEndSlider.value = Math.max(20, parseInt(lightSlider.value) - 30);
+            updateEndControlsUI();
+
+            updatePalette();
+            addEventListeners();
+        }
+
+        function addEventListeners() {
+            // Cambio de modo de visualización
+            vizBtns.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    // Update UI classes
+                    vizBtns.forEach(b => {
+                        b.classList.remove('bg-blue-600', 'text-white', 'active');
+                        b.classList.add('bg-neutral-700', 'text-gray-300');
+                    });
+                    btn.classList.remove('bg-neutral-700', 'text-gray-300');
+                    btn.classList.add('bg-blue-600', 'text-white', 'active');
+                    
+                    // Update State and Draw
+                    visualizationMode = btn.dataset.viz;
+                    drawVisualization();
+                });
+            });
+
+            // Random Color
+            btnRandom.addEventListener('click', () => {
+                const randomHex = '#' + Math.floor(Math.random()*16777215).toString(16).padStart(6, '0');
+                baseColorInput.value = randomHex;
+                hexDisplay.value = randomHex;
+                syncSlidersFromHex(randomHex);
+                updatePalette();
+            });
+
+            // Color Picker Base
+            baseColorInput.addEventListener('input', (e) => {
+                if (!isInternalUpdate) {
+                    hexDisplay.value = e.target.value;
+                    syncSlidersFromHex(e.target.value);
+                    updatePalette();
+                }
+            });
+
+            // Sliders Inicio
+            [hueSlider, satSlider, lightSlider].forEach(slider => {
+                slider.addEventListener('input', () => {
+                    isInternalUpdate = true;
+                    hueValue.textContent = hueSlider.value + '°';
+                    satValue.textContent = satSlider.value + '%';
+                    lightValue.textContent = lightSlider.value + '%';
+                    
+                    const newHex = hslToHex(
+                        parseInt(hueSlider.value), 
+                        parseInt(satSlider.value), 
+                        parseInt(lightSlider.value)
+                    );
+                    
+                    baseColorInput.value = newHex;
+                    hexDisplay.value = newHex;
+                    
+                    updateSaturationSlidersBackground();
+                    updatePalette();
+                    isInternalUpdate = false;
+                });
+            });
+
+            // Sliders Final (End)
+            [hueEndSlider, satEndSlider, lightEndSlider].forEach(slider => {
+                slider.addEventListener('input', () => {
+                    updateEndControlsUI();
+                    updatePalette();
+                });
+            });
+
+            // Cambio de Modo
+            harmonyMode.addEventListener('change', () => {
+                handleModeChange();
+                updatePalette();
+            });
+
+            // Simulación de Visión
+            visionSim.addEventListener('change', () => {
+                const filter = visionSim.value;
+                let filterVal = 'none';
+                
+                if (filter !== 'normal') {
+                    filterVal = `url(#${filter})`;
+                    visionLabel.classList.remove('hidden');
+                    visionLabel.textContent = `Simulación: ${visionSim.options[visionSim.selectedIndex].text}`;
+                } else {
+                    visionLabel.classList.add('hidden');
+                }
+
+                previewContainer.style.filter = filterVal;
+                colorListContainer.style.filter = filterVal;
+            });
+
+            customCountInput.addEventListener('input', updatePalette);
+            btnCopy.addEventListener('click', copyToClipboard);
+            btnDownload.addEventListener('click', downloadImage);
+        }
+
+        function handleModeChange() {
+            const mode = harmonyMode.value;
+            if (['custom', 'tints', 'shades', 'tones', 'warmer', 'cooler'].includes(mode)) {
+                customControls.classList.remove('hidden');
+                customControls.classList.add('flex');
+                
+                if (mode === 'custom') {
+                    customRangePanel.classList.remove('hidden');
+                    customRangePanel.classList.add('flex');
+                } else {
+                    customRangePanel.classList.add('hidden');
+                    customRangePanel.classList.remove('flex');
+                }
+            } else {
+                customControls.classList.add('hidden');
+                customControls.classList.remove('flex');
+            }
+        }
+
+        function updateEndControlsUI() {
+            hueEndValue.textContent = hueEndSlider.value + '°';
+            satEndValue.textContent = satEndSlider.value + '%';
+            lightEndValue.textContent = lightEndSlider.value + '%';
+            
+            const endHex = hslToHex(
+                parseInt(hueEndSlider.value), 
+                parseInt(satEndSlider.value), 
+                parseInt(lightEndSlider.value)
+            );
+            endColorPreview.style.backgroundColor = endHex;
+            updateSaturationSlidersBackground();
+        }
+
+        function updateSaturationSlidersBackground() {
+            let h = hueSlider.value, l = lightSlider.value;
+            satSlider.style.background = `linear-gradient(to right, ${hslToHex(h, 0, l)}, ${hslToHex(h, 100, l)})`;
+            h = hueEndSlider.value; l = lightEndSlider.value;
+            satEndSlider.style.background = `linear-gradient(to right, ${hslToHex(h, 0, l)}, ${hslToHex(h, 100, l)})`;
+        }
+
+        function syncSlidersFromHex(hex) {
+            const hsl = hexToHSL(hex);
+            hueSlider.value = hsl.h;
+            satSlider.value = hsl.s;
+            lightSlider.value = hsl.l;
+            hueValue.textContent = hsl.h + '°';
+            satValue.textContent = hsl.s + '%';
+            lightValue.textContent = hsl.l + '%';
+        }
+
+        function hexToHSL(H) {
+            let r = 0, g = 0, b = 0;
+            if (H.length == 4) { r = "0x" + H[1] + H[1]; g = "0x" + H[2] + H[2]; b = "0x" + H[3] + H[3]; }
+            else if (H.length == 7) { r = "0x" + H[1] + H[2]; g = "0x" + H[3] + H[4]; b = "0x" + H[5] + H[6]; }
+            r /= 255; g /= 255; b /= 255;
+            let cmin = Math.min(r,g,b), cmax = Math.max(r,g,b), delta = cmax - cmin;
+            let h = 0, s = 0, l = 0;
+
+            if (delta == 0) h = 0;
+            else if (cmax == r) h = ((g - b) / delta) % 6;
+            else if (cmax == g) h = (b - r) / delta + 2;
+            else h = (r - g) / delta + 4;
+
+            h = Math.round(h * 60);
+            if (h < 0) h += 360;
+            l = (cmax + cmin) / 2;
+            s = delta == 0 ? 0 : delta / (1 - Math.abs(2 * l - 1));
+            s = +(s * 100).toFixed(1);
+            l = +(l * 100).toFixed(1);
+            return { h, s, l };
+        }
+
+        function hslToHex(h, s, l) {
+            s /= 100; l /= 100;
+            let c = (1 - Math.abs(2 * l - 1)) * s,
+                x = c * (1 - Math.abs((h / 60) % 2 - 1)),
+                m = l - c / 2,
+                r = 0, g = 0, b = 0;
+
+            if (0 <= h && h < 60) { r = c; g = x; b = 0; }
+            else if (60 <= h && h < 120) { r = x; g = c; b = 0; }
+            else if (120 <= h && h < 180) { r = 0; g = c; b = x; }
+            else if (180 <= h && h < 240) { r = 0; g = x; b = c; }
+            else if (240 <= h && h < 300) { r = x; g = 0; b = c; }
+            else if (300 <= h && h < 360) { r = c; g = 0; b = x; }
+
+            r = Math.round((r + m) * 255).toString(16);
+            g = Math.round((g + m) * 255).toString(16);
+            b = Math.round((b + m) * 255).toString(16);
+
+            if (r.length == 1) r = "0" + r;
+            if (g.length == 1) g = "0" + g;
+            if (b.length == 1) b = "0" + b;
+            return "#" + r + g + b;
+        }
+
+        function updatePalette() {
+            const hex = baseColorInput.value;
+            const hslBase = hexToHSL(hex);
+            const mode = harmonyMode.value;
+            currentPalette = [];
+
+            let n = parseInt(customCountInput.value) || 5;
+            if (n < 2) n = 2;
+
+            if (mode === 'custom') {
+                const startH = parseInt(hueSlider.value);
+                const startS = parseInt(satSlider.value);
+                const startL = parseInt(lightSlider.value);
+                const endH = parseInt(hueEndSlider.value);
+                const endS = parseInt(satEndSlider.value);
+                const endL = parseInt(lightEndSlider.value);
+
+                for (let i = 0; i < n; i++) {
+                    const t = i / (n - 1);
+                    const h = startH + (endH - startH) * t;
+                    const s = startS + (endS - startS) * t;
+                    const l = startL + (endL - startL) * t;
+                    let normalizedH = h % 360;
+                    if (normalizedH < 0) normalizedH += 360;
+                    currentPalette.push(hslToHex(normalizedH, s, l));
+                }
+            } else if (mode === 'tints') {
+                for (let i = 0; i < n; i++) {
+                    const t = i / (n - 1);
+                    const newL = hslBase.l + (98 - hslBase.l) * t;
+                    currentPalette.push(hslToHex(hslBase.h, hslBase.s, newL));
+                }
+            } else if (mode === 'shades') {
+                for (let i = 0; i < n; i++) {
+                    const t = i / (n - 1);
+                    const newL = hslBase.l * (1 - t);
+                    currentPalette.push(hslToHex(hslBase.h, hslBase.s, newL));
+                }
+            } else if (mode === 'tones') {
+                for (let i = 0; i < n; i++) {
+                    const t = i / (n - 1);
+                    const newS = hslBase.s * (1 - t);
+                    currentPalette.push(hslToHex(hslBase.h, newS, hslBase.l));
+                }
+            } else if (mode === 'warmer') {
+                const targetH = 40; const targetS = 90; const targetL = 55;
+                for (let i = 0; i < n; i++) {
+                    const t = i / (n - 1);
+                    const s = hslBase.s + (targetS - hslBase.s) * t;
+                    const l = hslBase.l + (targetL - hslBase.l) * t;
+                    let h;
+                    let diff = targetH - hslBase.h;
+                    if (diff > 180) diff -= 360;
+                    if (diff < -180) diff += 360;
+                    h = hslBase.h + diff * t;
+                    let normalizedH = h % 360;
+                    if (normalizedH < 0) normalizedH += 360;
+                    currentPalette.push(hslToHex(normalizedH, s, l));
+                }
+            } else if (mode === 'cooler') {
+                const targetH = 220; const targetS = 90; const targetL = 45;
+                for (let i = 0; i < n; i++) {
+                    const t = i / (n - 1);
+                    const s = hslBase.s + (targetS - hslBase.s) * t;
+                    const l = hslBase.l + (targetL - hslBase.l) * t;
+                    let h;
+                    let diff = targetH - hslBase.h;
+                    if (diff > 180) diff -= 360;
+                    if (diff < -180) diff += 360;
+                    h = hslBase.h + diff * t;
+                    let normalizedH = h % 360;
+                    if (normalizedH < 0) normalizedH += 360;
+                    currentPalette.push(hslToHex(normalizedH, s, l));
+                }
+            } else {
+                switch(mode) {
+                    case 'monochromatic':
+                        currentPalette.push(hex);
+                        currentPalette.push(hslToHex(hslBase.h, Math.max(0, hslBase.s - 20), Math.min(100, hslBase.l + 40)));
+                        currentPalette.push(hslToHex(hslBase.h, Math.min(100, hslBase.s + 10), Math.max(0, hslBase.l - 10)));
+                        currentPalette.push(hslToHex(hslBase.h, Math.max(0, hslBase.s - 30), Math.min(100, hslBase.l + 30)));
+                        currentPalette.push(hslToHex(hslBase.h, hslBase.s, Math.max(0, hslBase.l - 30)));
+                        currentPalette.push(hslToHex(hslBase.h, Math.max(0, hslBase.s - 10), Math.min(100, hslBase.l + 10)));
+                        currentPalette.sort(); 
+                        break;
+                    case 'analogous':
+                        currentPalette.push(hslToHex((hslBase.h - 30 + 360) % 360, hslBase.s, hslBase.l));
+                        currentPalette.push(hex);
+                        currentPalette.push(hslToHex((hslBase.h + 30) % 360, hslBase.s, hslBase.l));
+                        break;
+                    case 'complementary':
+                        currentPalette.push(hex);
+                        currentPalette.push(hslToHex((hslBase.h + 180) % 360, hslBase.s, hslBase.l));
+                        break;
+                    case 'split-complementary':
+                        currentPalette.push(hex);
+                        currentPalette.push(hslToHex((hslBase.h + 150) % 360, hslBase.s, hslBase.l));
+                        currentPalette.push(hslToHex((hslBase.h + 210) % 360, hslBase.s, hslBase.l));
+                        break;
+                    case 'triadic':
+                        currentPalette.push(hex);
+                        currentPalette.push(hslToHex((hslBase.h + 120) % 360, hslBase.s, hslBase.l));
+                        currentPalette.push(hslToHex((hslBase.h + 240) % 360, hslBase.s, hslBase.l));
+                        break;
+                    case 'tetradic':
+                        currentPalette.push(hex);
+                        currentPalette.push(hslToHex((hslBase.h + 60) % 360, hslBase.s, hslBase.l));
+                        currentPalette.push(hslToHex((hslBase.h + 180) % 360, hslBase.s, hslBase.l));
+                        currentPalette.push(hslToHex((hslBase.h + 240) % 360, hslBase.s, hslBase.l));
+                        break;
+                    case 'square':
+                        currentPalette.push(hex);
+                        currentPalette.push(hslToHex((hslBase.h + 90) % 360, hslBase.s, hslBase.l));
+                        currentPalette.push(hslToHex((hslBase.h + 180) % 360, hslBase.s, hslBase.l));
+                        currentPalette.push(hslToHex((hslBase.h + 270) % 360, hslBase.s, hslBase.l));
+                        break;
+                    case 'hexagonal':
+                        for (let i = 0; i < 6; i++) {
+                            currentPalette.push(hslToHex((hslBase.h + (i * 60)) % 360, hslBase.s, hslBase.l));
+                        }
+                        break;
+                }
+            }
+
+            drawVisualization();
+            renderColorList();
+        }
+
+        // --- Dibujado en Canvas ---
+        function drawVisualization() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            if (visualizationMode === 'radial') {
+                drawRadial();
+            } else if (visualizationMode === 'linear') {
+                drawLinear();
+            } else if (visualizationMode === 'grid') {
+                drawGrid();
+            }
+        }
+
+        function drawRadial() {
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            // Radius para cubrir esquina (Hypotenuse)
+            const radius = Math.sqrt(Math.pow(canvas.width, 2) + Math.pow(canvas.height, 2)) / 2 + 50; 
+            const totalColors = currentPalette.length;
+            const angleStep = (2 * Math.PI) / totalColors;
+
+            for (let i = 0; i < totalColors; i++) {
+                ctx.beginPath();
+                ctx.moveTo(centerX, centerY);
+                const startAngle = (i * angleStep) - (Math.PI / 2);
+                const endAngle = ((i + 1) * angleStep) - (Math.PI / 2);
+                ctx.arc(centerX, centerY, radius, startAngle, endAngle);
+                ctx.fillStyle = currentPalette[i];
+                ctx.fill();
+                ctx.closePath();
+            }
+        }
+
+        function drawLinear() {
+            const totalColors = currentPalette.length;
+            const stripWidth = canvas.width / totalColors;
+            
+            for (let i = 0; i < totalColors; i++) {
+                ctx.fillStyle = currentPalette[i];
+                ctx.fillRect(i * stripWidth, 0, stripWidth + 1, canvas.height);
+            }
+        }
+
+        function drawGrid() {
+            const totalColors = currentPalette.length;
+            // Aproximación a grid cuadrada o ratio de aspecto
+            const ratio = canvas.width / canvas.height;
+            const cols = Math.ceil(Math.sqrt(totalColors * ratio));
+            const rows = Math.ceil(totalColors / cols);
+
+            // La altura de las filas será constante
+            const cellH = canvas.height / rows;
+
+            let colorIdx = 0;
+
+            for (let r = 0; r < rows; r++) {
+                // Calculamos cuántos ítems van en esta fila específica
+                // Si es la última fila, toma todos los restantes para llenar el espacio
+                const remaining = totalColors - colorIdx;
+                let itemsInRow = cols;
+                
+                // Si estamos en la última fila (o si quedan menos que 'cols'),
+                // ajustamos para que ocupen todo el ancho
+                if (r === rows - 1 || remaining < cols) {
+                    itemsInRow = remaining;
+                }
+
+                // El ancho de celda se calcula dinámicamente para esta fila
+                const currentCellW = canvas.width / itemsInRow;
+
+                for (let c = 0; c < itemsInRow; c++) {
+                    if (colorIdx >= totalColors) break;
+
+                    const x = c * currentCellW;
+                    const y = r * cellH;
+
+                    ctx.fillStyle = currentPalette[colorIdx];
+                    // +1 para evitar líneas finas (subpixel rendering)
+                    ctx.fillRect(x, y, currentCellW + 1, cellH + 1);
+                    
+                    colorIdx++;
+                }
+            }
+        }
+
+        function renderColorList() {
+            colorList.innerHTML = '';
+            currentPalette.forEach(color => {
+                const div = document.createElement('div');
+                div.className = "flex items-center gap-2 bg-neutral-900 rounded pr-3 overflow-hidden border border-neutral-700 hover:border-blue-500 transition-colors";
+                div.innerHTML = `
+                    <div class="w-10 h-10 shadow-inner" style="background-color: ${color}"></div>
+                    <span class="font-mono text-sm text-white">${color}</span>
+                `;
+                div.addEventListener('click', () => {
+                    navigator.clipboard.writeText(color);
+                    showMessage(`Copiado: ${color}`);
+                });
+                div.style.cursor = 'pointer';
+                div.title = "Click para copiar este color";
+                colorList.appendChild(div);
+            });
+        }
+
+        function copyToClipboard() {
+            const text = currentPalette.join('\n');
+            if (navigator.clipboard) {
+                navigator.clipboard.writeText(text).then(() => showMessage('¡Lista copiada!')).catch(err => console.error(err));
+            } else {
+                const textarea = document.createElement('textarea');
+                textarea.value = text;
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textarea);
+                showMessage('¡Lista copiada!');
+            }
+        }
+
+        function downloadImage() {
+            const link = document.createElement('a');
+            link.download = `paleta-${harmonyMode.value}.png`;
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+            showMessage('Descargando imagen...');
+        }
+
+        function showMessage(msg) {
+            messageBox.textContent = msg;
+            messageBox.style.opacity = '1';
+            setTimeout(() => {
+                messageBox.style.opacity = '0';
+            }, 3000);
+        }
+
+        init();
+    </script>
+</body>
+</html>
