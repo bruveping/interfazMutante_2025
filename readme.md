@@ -16,6 +16,9 @@ Selector de colores [Selector de colores](https://bruveping.github.io/interfazMu
 
 visualizador de colores [visualizador de colores](https://bruveping.github.io/interfazMutante_2025/visualizador_de_colores) 
 
+Otro visualizador de colores [visualizador de colores 3](https://bruveping.github.io/interfazMutante_2025/visualizador_colores_3) 
+
+
 
 
 
