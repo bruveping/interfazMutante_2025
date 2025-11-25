@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="es" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Afinador Pro</title>
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cdefs%3E%3ClinearGradient id='grad' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' style='stop-color:%234ade80;stop-opacity:1' /%3E%3Cstop offset='100%25' style='stop-color:%233b82f6;stop-opacity:1' /%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='100' height='100' rx='20' fill='%231f2937'/%3E%3Ccircle cx='50' cy='30' r='8' fill='url(%23grad)'/%3E%3Cpath d='M 46 30 Q 46 50 30 70' stroke='url(%23grad)' stroke-width='3' fill='none' stroke-linecap='round'/%3E%3Cpath d='M 54 30 Q 54 50 70 70' stroke='url(%23grad)' stroke-width='3' fill='none' stroke-linecap='round'/%3E%3Cellipse cx='30' cy='70' rx='6' ry='10' fill='url(%23grad)' opacity='0.8'/%3E%3Cellipse cx='70' cy='70' rx='6' ry='10' fill='url(%23grad)' opacity='0.8'/%3E%3Cline x1='35' y1='50' x2='65' y2='50' stroke='%234ade80' stroke-width='2' opacity='0.6'/%3E%3Cline x1='32' y1='58' x2='68' y2='58' stroke='%234ade80' stroke-width='2' opacity='0.6'/%3E%3C/svg%3E">
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            touch-action: manipulation;
+        }
+        
+        input[type=range] {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 100%;
+            height: 8px;
+            background: #4a5568;
+            border-radius: 9999px;
+            outline: none;
+            opacity: 0.7;
+            transition: opacity .2s;
+        }
+        input[type=range]:hover {
+            opacity: 1;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 24px;
+            height: 24px;
+            background: #cbd5e0;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: background .2s;
+        }
+        input[type=range]::-moz-range-thumb {
+            width: 24px;
+            height: 24px;
+            background: #cbd5e0;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: background .2s;
+        }
+        input[type=range]:active::-webkit-slider-thumb {
+            background: #f7fafc;
+        }
+        input[type=range]:active::-moz-range-thumb {
+            background: #f7fafc;
+        }
+
+        #needle {
+            width: 4px;
+            height: 80px;
+            background-color: white;
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%); 
+            transition: transform 0.1s linear, background-color 0.1s linear, left 0.1s linear;
+            border-radius: 2px;
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+        }
+
+        #tuner-visual {
+            position: relative;
+            width: 100%;
+            height: 80px;
+            background: linear-gradient(to right, 
+                #ef4444 0%,
+                #ef4444 30%,
+                #4ade80 48%,
+                #4ade80 52%,
+                #ef4444 70%,
+                #ef4444 100%
+            );
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        
+        #tuner-visual::after {
+            content: '';
+            position: absolute;
+            left: 50%;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background-color: rgba(255, 255, 255, 0.4);
+            transform: translateX(-50%);
+        }
+
+        .in-tune {
+            color: #4ade80 !important;
+        }
+        .in-tune-needle {
+            background-color: #4ade80 !important;
+            box-shadow: 0 0 20px #4ade80;
+            transform: translate(-50%, -50%) scaleY(1.1) !important;
+        }
+
+        /* Animación de pulso para afinado */
+        @keyframes pulse-green {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        .pulse-animation {
+            animation: pulse-green 1s ease-in-out infinite;
+        }
+
+        /* Indicador de nivel de audio */
+        #audio-level {
+            height: 6px;
+            background: linear-gradient(to right, #4ade80, #3b82f6);
+            border-radius: 9999px;
+            transition: width 0.1s ease;
+        }
+
+        /* Selector de instrumento */
+        .instrument-btn {
+            transition: all 0.2s;
+        }
+        .instrument-btn.active {
+            background: #3b82f6;
+            color: white;
+            transform: scale(1.05);
+        }
+
+        /* Historial de frecuencia (gráfico simple) */
+        #freq-history {
+            height: 40px;
+            position: relative;
+        }
+        .freq-bar {
+            position: absolute;
+            bottom: 0;
+            width: 2px;
+            background: #4ade80;
+            opacity: 0.6;
+            transition: height 0.1s;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-300 flex items-center justify-center min-h-screen p-4">
+
+    <div class="w-full max-w-md mx-auto">
+        <!-- Contenedor principal -->
+        <div id="tuner-app" class="bg-gray-800 rounded-2xl shadow-2xl p-6 space-y-6 hidden">
+            
+            <!-- Selector de Instrumento -->
+            <div class="flex gap-2 justify-center flex-wrap">
+                <button class="instrument-btn active px-4 py-2 rounded-lg bg-gray-700 text-sm font-medium" data-instrument="chromatic">
+                    Cromático
+                </button>
+                <button class="instrument-btn px-4 py-2 rounded-lg bg-gray-700 text-sm font-medium" data-instrument="guitar">
+                    Guitarra
+                </button>
+                <button class="instrument-btn px-4 py-2 rounded-lg bg-gray-700 text-sm font-medium" data-instrument="bass">
+                    Bajo
+                </button>
+                <button class="instrument-btn px-4 py-2 rounded-lg bg-gray-700 text-sm font-medium" data-instrument="ukulele">
+                    Ukelele
+                </button>
+            </div>
+
+            <!-- Indicador de nivel de audio -->
+            <div class="bg-gray-700 rounded-full h-6 px-3 flex items-center">
+                <div class="w-full bg-gray-600 rounded-full h-1.5">
+                    <div id="audio-level" style="width: 0%"></div>
+                </div>
+            </div>
+
+            <!-- Pantalla de la nota -->
+            <div class="text-center">
+                <div id="note-display" class="text-8xl md:text-9xl font-bold text-gray-500 transition-colors duration-100" style="min-height: 110px;">
+                    --
+                </div>
+                <div id="cents-display" class="text-2xl font-light text-gray-400" style="min-height: 32px;">
+                    &nbsp;
+                </div>
+                <div id="frequency-display" class="text-sm text-gray-500 mt-2">
+                    &nbsp;
+                </div>
+            </div>
+
+            <!-- Visualizador de afinación -->
+            <div id="tuner-visual">
+                <div id="needle"></div>
+            </div>
+
+            <!-- Mini historial de frecuencia -->
+            <div id="freq-history" class="bg-gray-700 rounded-lg"></div>
+
+            <!-- Indicador de cuerdas (solo cuando no es cromático) -->
+            <div id="string-indicator" class="hidden">
+                <div class="flex justify-between text-center text-sm">
+                    <div class="string-label flex-1 py-2 rounded" data-string="0">
+                        <div class="font-bold text-gray-400">E</div>
+                        <div class="text-xs text-gray-500">6</div>
+                    </div>
+                    <div class="string-label flex-1 py-2 rounded" data-string="1">
+                        <div class="font-bold text-gray-400">A</div>
+                        <div class="text-xs text-gray-500">5</div>
+                    </div>
+                    <div class="string-label flex-1 py-2 rounded" data-string="2">
+                        <div class="font-bold text-gray-400">D</div>
+                        <div class="text-xs text-gray-500">4</div>
+                    </div>
+                    <div class="string-label flex-1 py-2 rounded" data-string="3">
+                        <div class="font-bold text-gray-400">G</div>
+                        <div class="text-xs text-gray-500">3</div>
+                    </div>
+                    <div class="string-label flex-1 py-2 rounded" data-string="4">
+                        <div class="font-bold text-gray-400">B</div>
+                        <div class="text-xs text-gray-500">2</div>
+                    </div>
+                    <div class="string-label flex-1 py-2 rounded" data-string="5">
+                        <div class="font-bold text-gray-400">E</div>
+                        <div class="text-xs text-gray-500">1</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Controles avanzados (colapsables) -->
+            <div class="border-t border-gray-700 pt-4">
+                <button id="toggle-advanced" class="text-sm text-gray-400 hover:text-gray-300 mb-4">
+                    ⚙️ Configuración avanzada
+                </button>
+                <div id="advanced-controls" class="space-y-4 hidden">
+                    <div class="flex justify-between items-center">
+                        <label for="a4-slider" class="text-sm text-gray-400">A4 Frecuencia</label>
+                        <span id="a4-freq-display" class="font-semibold text-lg text-white">440 Hz</span>
+                    </div>
+                    <input type="range" id="a4-slider" min="430" max="450" value="440" step="0.5">
+                    <button id="reset-a4-btn" class="w-full bg-gray-700 hover:bg-gray-600 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-150">
+                        Restablecer a 440 Hz
+                    </button>
+                    
+                    <!-- Modo de notación -->
+                    <div class="flex justify-between items-center">
+                        <label class="text-sm text-gray-400">Notación</label>
+                        <select id="notation-select" class="bg-gray-700 text-white px-3 py-1 rounded">
+                            <option value="sharp">Sostenidos (#)</option>
+                            <option value="flat">Bemoles (♭)</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pantalla de inicio -->
+        <div id="start-screen" class="text-center">
+            <h1 class="text-4xl font-bold text-white mb-2">🎸 Afinador Pro</h1>
+            <p class="text-gray-400 mb-8">Afinador cromático de alta precisión</p>
+            <button id="start-btn" class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-8 rounded-full text-lg shadow-lg transition-all duration-200 transform hover:scale-105">
+                Comenzar
+            </button>
+        </div>
+    </div>
+
+    <script>
+        window.addEventListener('load', () => {
+            // Referencias del DOM
+            const startScreen = document.getElementById('start-screen');
+            const startBtn = document.getElementById('start-btn');
+            const tunerApp = document.getElementById('tuner-app');
+            const noteDisplay = document.getElementById('note-display');
+            const centsDisplay = document.getElementById('cents-display');
+            const frequencyDisplay = document.getElementById('frequency-display');
+            const needle = document.getElementById('needle');
+            const a4Slider = document.getElementById('a4-slider');
+            const a4FreqDisplay = document.getElementById('a4-freq-display');
+            const resetA4Btn = document.getElementById('reset-a4-btn');
+            const audioLevel = document.getElementById('audio-level');
+            const freqHistory = document.getElementById('freq-history');
+            const toggleAdvanced = document.getElementById('toggle-advanced');
+            const advancedControls = document.getElementById('advanced-controls');
+            const notationSelect = document.getElementById('notation-select');
+            const stringIndicator = document.getElementById('string-indicator');
+            const instrumentBtns = document.querySelectorAll('.instrument-btn');
+
+            // Constantes
+            const NOTE_NAMES_SHARP = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+            const NOTE_NAMES_FLAT = ["C", "D♭", "D", "E♭", "E", "F", "G♭", "G", "A♭", "A", "B♭", "B"];
+            
+            // Afinaciones predefinidas
+            const TUNINGS = {
+                guitar: [
+                    { note: "E", octave: 2, freq: 82.41 },
+                    { note: "A", octave: 2, freq: 110.00 },
+                    { note: "D", octave: 3, freq: 146.83 },
+                    { note: "G", octave: 3, freq: 196.00 },
+                    { note: "B", octave: 3, freq: 246.94 },
+                    { note: "E", octave: 4, freq: 329.63 }
+                ],
+                bass: [
+                    { note: "E", octave: 1, freq: 41.20 },
+                    { note: "A", octave: 1, freq: 55.00 },
+                    { note: "D", octave: 2, freq: 73.42 },
+                    { note: "G", octave: 2, freq: 98.00 }
+                ],
+                ukulele: [
+                    { note: "G", octave: 4, freq: 392.00 },
+                    { note: "C", octave: 4, freq: 261.63 },
+                    { note: "E", octave: 4, freq: 329.63 },
+                    { note: "A", octave: 4, freq: 440.00 }
+                ]
+            };
+
+            // Estado
+            let audioContext = null;
+            let analyser = null;
+            let mediaStreamSource = null;
+            let buffer;
+            let sampleRate = 44100;
+            let a4Freq = 440;
+            let animationFrameId = null;
+            let lastNoteTime = 0;
+            const persistenceThreshold = 1000;
+            let currentInstrument = 'chromatic';
+            let useFlats = false;
+            let frequencyHistoryBars = [];
+
+            // Configuración de controles
+            a4Slider.addEventListener('input', (e) => {
+                a4Freq = parseFloat(e.target.value);
+                a4FreqDisplay.textContent = `${a4Freq.toFixed(1)} Hz`;
+            });
+
+            resetA4Btn.addEventListener('click', () => {
+                a4Freq = 440;
+                a4Slider.value = 440;
+                a4FreqDisplay.textContent = '440 Hz';
+            });
+
+            toggleAdvanced.addEventListener('click', () => {
+                advancedControls.classList.toggle('hidden');
+            });
+
+            notationSelect.addEventListener('change', (e) => {
+                useFlats = e.target.value === 'flat';
+            });
+
+            // Selector de instrumento
+            instrumentBtns.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    instrumentBtns.forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    currentInstrument = btn.dataset.instrument;
+                    
+                    if (currentInstrument === 'chromatic') {
+                        stringIndicator.classList.add('hidden');
+                    } else {
+                        stringIndicator.classList.remove('hidden');
+                        updateStringLabels();
+                    }
+                });
+            });
+
+            function updateStringLabels() {
+                const tuning = TUNINGS[currentInstrument];
+                if (!tuning) return;
+                
+                const labels = stringIndicator.querySelectorAll('.string-label');
+                labels.forEach((label, i) => {
+                    if (i < tuning.length) {
+                        label.style.display = 'block';
+                        label.querySelector('.font-bold').textContent = tuning[i].note;
+                        label.querySelector('.text-xs').textContent = tuning.length - i;
+                    } else {
+                        label.style.display = 'none';
+                    }
+                });
+            }
+
+            startBtn.addEventListener('click', () => {
+                startTuner();
+            });
+
+            async function startTuner() {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    sampleRate = audioContext.sampleRate;
+                    mediaStreamSource = audioContext.createMediaStreamSource(stream);
+                    
+                    analyser = audioContext.createAnalyser();
+                    analyser.fftSize = 4096;
+                    buffer = new Float32Array(analyser.fftSize);
+                    
+                    mediaStreamSource.connect(analyser);
+
+                    startScreen.classList.add('hidden');
+                    tunerApp.classList.remove('hidden');
+                    
+                    initFrequencyHistory();
+                    updatePitch();
+
+                } catch (err) {
+                    console.error('Error al obtener el micrófono:', err);
+                    startScreen.innerHTML = `<p class="text-red-400">No se pudo acceder al micrófono. Por favor, revisa los permisos en tu navegador.</p>`;
+                }
+            }
+
+            function initFrequencyHistory() {
+                for (let i = 0; i < 50; i++) {
+                    const bar = document.createElement('div');
+                    bar.className = 'freq-bar';
+                    bar.style.left = `${i * 2}%`;
+                    bar.style.height = '0px';
+                    freqHistory.appendChild(bar);
+                    frequencyHistoryBars.push(bar);
+                }
+            }
+
+            function updateFrequencyHistory(cents) {
+                // Rotar las barras
+                frequencyHistoryBars.forEach((bar, i) => {
+                    if (i < frequencyHistoryBars.length - 1) {
+                        bar.style.height = frequencyHistoryBars[i + 1].style.height;
+                    }
+                });
+                
+                // Nueva barra
+                const height = Math.min(40, Math.abs(cents) * 0.8);
+                frequencyHistoryBars[frequencyHistoryBars.length - 1].style.height = `${height}px`;
+            }
+
+            function updatePitch() {
+                analyser.getFloatTimeDomainData(buffer);
+                const frequency = findFundamentalFrequency(buffer, sampleRate);
+
+                // Actualizar nivel de audio
+                let rms = 0;
+                for (let i = 0; i < buffer.length; i++) {
+                    rms += buffer[i] * buffer[i];
+                }
+                rms = Math.sqrt(rms / buffer.length);
+                audioLevel.style.width = `${Math.min(100, rms * 1000)}%`;
+
+                if (frequency > 0) {
+                    const noteData = getNoteData(frequency);
+                    updateUI(noteData, frequency);
+                    updateFrequencyHistory(noteData.cents);
+                    lastNoteTime = performance.now();
+                    
+                    // Resaltar cuerda correspondiente
+                    if (currentInstrument !== 'chromatic') {
+                        highlightClosestString(noteData);
+                    }
+                } else {
+                    if (performance.now() - lastNoteTime > persistenceThreshold) {
+                        resetUI();
+                    }
+                }
+
+                animationFrameId = requestAnimationFrame(updatePitch);
+            }
+
+            function highlightClosestString(noteData) {
+                const tuning = TUNINGS[currentInstrument];
+                if (!tuning) return;
+
+                let closestString = 0;
+                let minDiff = Infinity;
+
+                tuning.forEach((stringNote, i) => {
+                    if (noteData.noteName === stringNote.note) {
+                        const diff = Math.abs(noteData.octave - stringNote.octave);
+                        if (diff < minDiff) {
+                            minDiff = diff;
+                            closestString = i;
+                        }
+                    }
+                });
+
+                document.querySelectorAll('.string-label').forEach((label, i) => {
+                    if (i === closestString && minDiff <= 1) {
+                        label.style.background = '#3b82f6';
+                        label.style.color = 'white';
+                    } else {
+                        label.style.background = '';
+                        label.style.color = '';
+                    }
+                });
+            }
+
+            function findFundamentalFrequency(buffer, sampleRate) {
+                const bufferSize = buffer.length;
+                const minFreq = 27.5;
+                const maxFreq = 4200;
+                const minPeriod = Math.floor(sampleRate / maxFreq);
+                const maxPeriod = Math.min(Math.floor(sampleRate / minFreq), bufferSize - 1);
+                
+                const threshold = 0.2;
+                
+                let minDiff = Infinity;
+                let bestPeriod = 0;
+                let rms = 0;
+
+                for (let i = 0; i < bufferSize; i++) {
+                    rms += buffer[i] * buffer[i];
+                }
+                rms = Math.sqrt(rms / bufferSize);
+
+                if (rms < 0.01) {
+                    return -1;
+                }
+
+                for (let period = minPeriod; period <= maxPeriod; period++) {
+                    let diff = 0;
+                    for (let i = 0; i < bufferSize - period; i++) {
+                        const d = buffer[i] - buffer[i + period];
+                        diff += d * d;
+                    }
+                    const avgDiff = Math.sqrt(diff / (bufferSize - period));
+                    const normalizedDiff = avgDiff / (rms + 0.001);
+
+                    if (normalizedDiff < minDiff) {
+                        minDiff = normalizedDiff;
+                        bestPeriod = period;
+                    }
+                }
+                
+                if (minDiff < threshold && bestPeriod > 0) {
+                    return sampleRate / bestPeriod;
+                }
+                
+                return -1;
+            }
+
+            function getNoteData(frequency) {
+                const midiNum = 12 * (Math.log2(frequency / a4Freq)) + 69;
+                const noteIndex = Math.round(midiNum) % 12;
+                
+                const noteNames = useFlats ? NOTE_NAMES_FLAT : NOTE_NAMES_SHARP;
+                const noteName = noteNames[noteIndex];
+                const octave = Math.floor(Math.round(midiNum) / 12) - 1;
+                
+                const cents = (midiNum - Math.round(midiNum)) * 100;
+                
+                return {
+                    noteName: noteName,
+                    octave: octave,
+                    cents: cents
+                };
+            }
+
+            function updateUI(noteData, frequency) {
+                const { noteName, octave, cents } = noteData;
+
+                noteDisplay.textContent = noteName + octave;
+                centsDisplay.textContent = `${cents >= 0 ? '+' : ''}${cents.toFixed(0)} cents`;
+                frequencyDisplay.textContent = `${frequency.toFixed(1)} Hz`;
+
+                const leftPercentage = 50 + (cents * 1.0);
+                const clampedLeft = Math.max(0, Math.min(100, leftPercentage));
+                
+                needle.style.left = `${clampedLeft}%`;
+                needle.style.transform = `translate(-50%, -50%)`;
+
+                if (Math.abs(cents) < 5) {
+                    noteDisplay.classList.add('in-tune', 'pulse-animation');
+                    needle.classList.add('in-tune-needle');
+                } else {
+                    noteDisplay.classList.remove('in-tune', 'pulse-animation');
+                    needle.classList.remove('in-tune-needle');
+                    
+                    if (cents < 0) {
+                        noteDisplay.style.color = '#f8b400';
+                    } else {
+                        noteDisplay.style.color = '#ef4444';
+                    }
+                }
+            }
+
+            function resetUI() {
+                noteDisplay.textContent = '--';
+                noteDisplay.style.color = '';
+                noteDisplay.classList.remove('in-tune', 'pulse-animation');
+                centsDisplay.innerHTML = '&nbsp;';
+                frequencyDisplay.innerHTML = '&nbsp;';
+                
+                needle.style.left = '50%';
+                needle.style.transform = 'translate(-50%, -50%)';
+                needle.classList.remove('in-tune-needle');
+                
+                document.querySelectorAll('.string-label').forEach(label => {
+                    label.style.background = '';
+                    label.style.color = '';
+                });
+            }
+        });
+    </script>
+</body>
+</html>
