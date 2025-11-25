@@ -11,7 +11,6 @@
     <!-- Carga de Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        /* Fuente Inter, la estándar moderna de Tailwind */
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
         body {
             font-family: 'Inter', sans-serif;
@@ -183,18 +182,9 @@
             let a4Freq = 440;
             let animationFrameId = null;
 
-            // --- MEJORA: Persistencia de UI (aumentada) ---
+            // Persistencia de UI mejorada
             let lastNoteTime = 0;
-            const persistenceThreshold = 1500; // ms para mantener la nota en pantalla (aumentado)
-
-            // --- MEJORA: Filtro de media móvil para estabilidad ---
-            const frequencyHistory = [];
-            const historySize = 5; // Número de muestras para promediar
-            
-            // --- MEJORA: Anti-rebote de cambio de nota ---
-            let lastDisplayedNote = null;
-            let noteChangeConfidence = 0;
-            const noteChangeThreshold = 3; // Número de lecturas consecutivas para cambiar nota
+            const persistenceThreshold = 1000; // 1 segundo (ajustado)
 
             // --- Configuración de Controles ---
             a4Slider.addEventListener('input', (e) => {
@@ -222,8 +212,7 @@
                     mediaStreamSource = audioContext.createMediaStreamSource(stream);
                     
                     analyser = audioContext.createAnalyser();
-                    analyser.fftSize = 8192; // MEJORA: Mayor resolución para graves
-                    analyser.smoothingTimeConstant = 0.8; // MEJORA: Suavizado adicional
+                    analyser.fftSize = 4096; // Balance entre precisión y rendimiento
                     buffer = new Float32Array(analyser.fftSize);
                     
                     mediaStreamSource.connect(analyser);
@@ -245,57 +234,30 @@
                 const frequency = findFundamentalFrequency(buffer, sampleRate);
 
                 if (frequency > 0) {
-                    // MEJORA: Aplicar filtro de media móvil
-                    frequencyHistory.push(frequency);
-                    if (frequencyHistory.length > historySize) {
-                        frequencyHistory.shift();
-                    }
-                    
-                    // Calcular frecuencia promedio
-                    const avgFrequency = frequencyHistory.reduce((a, b) => a + b) / frequencyHistory.length;
-                    
-                    const noteData = getNoteData(avgFrequency);
-                    
-                    // MEJORA: Anti-rebote de cambio de nota
-                    const currentNote = noteData.noteName + noteData.octave;
-                    if (currentNote === lastDisplayedNote) {
-                        noteChangeConfidence = 0;
-                        updateUI(noteData);
-                        lastNoteTime = performance.now();
-                    } else {
-                        noteChangeConfidence++;
-                        if (noteChangeConfidence >= noteChangeThreshold) {
-                            lastDisplayedNote = currentNote;
-                            noteChangeConfidence = 0;
-                            updateUI(noteData);
-                            lastNoteTime = performance.now();
-                        }
-                    }
+                    const noteData = getNoteData(frequency);
+                    updateUI(noteData);
+                    lastNoteTime = performance.now();
                 } else {
-                    // MEJORA: Solo reiniciar si ha pasado el tiempo de persistencia
                     if (performance.now() - lastNoteTime > persistenceThreshold) {
                         resetUI();
-                        frequencyHistory.length = 0; // Limpiar historial
-                        lastDisplayedNote = null;
-                        noteChangeConfidence = 0;
                     }
                 }
 
                 animationFrameId = requestAnimationFrame(updatePitch);
             }
 
-            // --- MEJORA: Algoritmo de Detección de Frecuencia Mejorado (Autocorrelación + Interpolación) ---
+            // --- Algoritmo de Detección de Frecuencia (Autocorrelación) ---
             function findFundamentalFrequency(buffer, sampleRate) {
                 const bufferSize = buffer.length;
-                // MEJORA: Rango extendido 20-4500 Hz
-                const minFreq = 20; // Bajo de 5 cuerdas, piano bajo
-                const maxFreq = 4500; // Piano agudo completo
+                // Rango extendido pero realista
+                const minFreq = 27.5; // A0 (piano más bajo)
+                const maxFreq = 4200; // C8 (piano más alto)
                 const minPeriod = Math.floor(sampleRate / maxFreq);
-                const maxPeriod = Math.min(Math.floor(sampleRate / minFreq), Math.floor(bufferSize / 2));
+                const maxPeriod = Math.min(Math.floor(sampleRate / minFreq), bufferSize - 1);
                 
-                const threshold = 0.15; // MEJORA: Umbral más sensible pero estable
+                const threshold = 0.2;
                 
-                let bestCorrelation = -1;
+                let minDiff = Infinity;
                 let bestPeriod = 0;
                 let rms = 0;
 
@@ -305,47 +267,31 @@
                 }
                 rms = Math.sqrt(rms / bufferSize);
 
-                if (rms < 0.005) { // MEJORA: Umbral de silencio más bajo
+                if (rms < 0.01) {
                     return -1;
                 }
 
-                // MEJORA: Autocorrelación usando suma de productos (mejor que diferencias)
+                // Autocorrelación por diferencias
                 for (let period = minPeriod; period <= maxPeriod; period++) {
-                    let correlation = 0;
+                    let diff = 0;
                     for (let i = 0; i < bufferSize - period; i++) {
-                        correlation += buffer[i] * buffer[i + period];
+                        const d = buffer[i] - buffer[i + period];
+                        diff += d * d;
                     }
-                    correlation = correlation / (bufferSize - period);
+                    const avgDiff = Math.sqrt(diff / (bufferSize - period));
+                    const normalizedDiff = avgDiff / (rms + 0.001);
 
-                    if (correlation > bestCorrelation) {
-                        bestCorrelation = correlation;
+                    if (normalizedDiff < minDiff) {
+                        minDiff = normalizedDiff;
                         bestPeriod = period;
                     }
                 }
                 
-                // MEJORA: Interpolación parabólica para mayor precisión
-                if (bestPeriod > minPeriod && bestPeriod < maxPeriod && bestCorrelation > threshold * rms) {
-                    // Calcular correlaciones vecinas
-                    let c1 = 0, c2 = bestCorrelation, c3 = 0;
-                    
-                    for (let i = 0; i < bufferSize - bestPeriod - 1; i++) {
-                        c1 += buffer[i] * buffer[i + bestPeriod - 1];
-                        c3 += buffer[i] * buffer[i + bestPeriod + 1];
-                    }
-                    c1 = c1 / (bufferSize - bestPeriod - 1);
-                    c3 = c3 / (bufferSize - bestPeriod - 1);
-                    
-                    // Interpolación parabólica
-                    const adjustedPeriod = bestPeriod + (c3 - c1) / (2 * (2 * c2 - c1 - c3));
-                    
-                    if (isFinite(adjustedPeriod) && adjustedPeriod > 0) {
-                        return sampleRate / adjustedPeriod;
-                    }
-                    
+                if (minDiff < threshold && bestPeriod > 0) {
                     return sampleRate / bestPeriod;
                 }
                 
-                return -1; // No se encontró una frecuencia clara
+                return -1;
             }
 
             // --- Conversión de Frecuencia a Nota ---
@@ -369,21 +315,19 @@
             function updateUI(noteData) {
                 const { noteName, octave, cents } = noteData;
 
-                // 1. Actualizar texto
+                // 1. Actualizar texto con octava
                 noteDisplay.textContent = noteName + octave;
                 centsDisplay.textContent = `${cents >= 0 ? '+' : ''}${cents.toFixed(0)} cents`;
 
                 // 2. Mover la aguja
-                // MEJORA: Mapeo mejorado para mejor visualización
-                // Mapear cents (-50 a +50) con factor 0.85 para no llegar a los bordes
-                const leftPercentage = 50 + (cents * 0.85);
-                const clampedLeft = Math.max(5, Math.min(95, leftPercentage));
+                const leftPercentage = 50 + (cents * 1.0);
+                const clampedLeft = Math.max(0, Math.min(100, leftPercentage));
                 
                 needle.style.left = `${clampedLeft}%`;
                 needle.style.transform = `translate(-50%, -50%)`;
 
                 // 3. Cambiar color si está afinado
-                if (Math.abs(cents) < 5) { // Rango de afinación "perfecta"
+                if (Math.abs(cents) < 5) {
                     noteDisplay.classList.add('in-tune');
                     needle.classList.add('in-tune-needle');
                 } else {
@@ -391,9 +335,9 @@
                     needle.classList.remove('in-tune-needle');
                     
                     if (cents < 0) {
-                        noteDisplay.style.color = '#f8b400'; // Naranja para bemol
+                        noteDisplay.style.color = '#f8b400';
                     } else {
-                        noteDisplay.style.color = '#ef4444'; // Rojo para sostenido
+                        noteDisplay.style.color = '#ef4444';
                     }
                 }
             }
