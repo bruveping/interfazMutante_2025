@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="es" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Afinador de Instrumentos Pro</title>
+    
+    <!-- Favicon SVG con diseño de diapasón musical -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cdefs%3E%3ClinearGradient id='grad' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' style='stop-color:%234ade80;stop-opacity:1' /%3E%3Cstop offset='100%25' style='stop-color:%233b82f6;stop-opacity:1' /%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='100' height='100' rx='20' fill='%231f2937'/%3E%3Ccircle cx='50' cy='30' r='8' fill='url(%23grad)'/%3E%3Cpath d='M 46 30 Q 46 50 30 70' stroke='url(%23grad)' stroke-width='3' fill='none' stroke-linecap='round'/%3E%3Cpath d='M 54 30 Q 54 50 70 70' stroke='url(%23grad)' stroke-width='3' fill='none' stroke-linecap='round'/%3E%3Cellipse cx='30' cy='70' rx='6' ry='10' fill='url(%23grad)' opacity='0.8'/%3E%3Cellipse cx='70' cy='70' rx='6' ry='10' fill='url(%23grad)' opacity='0.8'/%3E%3Cline x1='35' y1='50' x2='65' y2='50' stroke='%234ade80' stroke-width='2' opacity='0.6'/%3E%3Cline x1='32' y1='58' x2='68' y2='58' stroke='%234ade80' stroke-width='2' opacity='0.6'/%3E%3C/svg%3E">
+    
+    <!-- Carga de Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Fuente Inter, la estándar moderna de Tailwind */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            touch-action: manipulation;
+        }
+        
+        /* Estilos personalizados para el slider */
+        input[type=range] {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 100%;
+            height: 8px;
+            background: #4a5568;
+            border-radius: 9999px;
+            outline: none;
+            opacity: 0.7;
+            transition: opacity .2s;
+        }
+        input[type=range]:hover {
+            opacity: 1;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 24px;
+            height: 24px;
+            background: #cbd5e0;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: background .2s;
+        }
+        input[type=range]::-moz-range-thumb {
+            width: 24px;
+            height: 24px;
+            background: #cbd5e0;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: background .2s;
+        }
+        input[type=range]:active::-webkit-slider-thumb {
+            background: #f7fafc;
+        }
+        input[type=range]:active::-moz-range-thumb {
+            background: #f7fafc;
+        }
+
+        /* La "aguja" del afinador */
+        #needle {
+            width: 4px;
+            height: 80px;
+            background-color: white;
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%); 
+            transition: transform 0.1s linear, background-color 0.1s linear, left 0.1s linear;
+            border-radius: 2px;
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+        }
+
+        /* Barra de afinación visual */
+        #tuner-visual {
+            position: relative;
+            width: 100%;
+            height: 80px;
+            background: linear-gradient(to right, 
+                #ef4444 0%,
+                #ef4444 30%,
+                #4ade80 48%,
+                #4ade80 52%,
+                #ef4444 70%,
+                #ef4444 100%
+            );
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        
+        /* Línea central de afinación */
+        #tuner-visual::after {
+            content: '';
+            position: absolute;
+            left: 50%;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background-color: rgba(255, 255, 255, 0.4);
+            transform: translateX(-50%);
+        }
+
+        /* Clase para estado "afinado" */
+        .in-tune {
+            color: #4ade80 !important;
+        }
+        .in-tune-needle {
+            background-color: #4ade80 !important;
+            box-shadow: 0 0 20px #4ade80;
+            transform: translate(-50%, -50%) scaleY(1.1) !important;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-300 flex items-center justify-center min-h-screen p-4">
+
+    <div class="w-full max-w-md mx-auto">
+        <!-- Contenedor principal del afinador -->
+        <div id="tuner-app" class="bg-gray-800 rounded-2xl shadow-2xl p-6 space-y-6 hidden">
+            
+            <!-- 1. Pantalla de la nota -->
+            <div class="text-center">
+                <div id="note-display" class="text-8xl md:text-9xl font-bold text-gray-500 transition-colors duration-100" style="min-height: 110px;">
+                    --
+                </div>
+                <div id="cents-display" class="text-2xl font-light text-gray-400" style="min-height: 32px;">
+                    &nbsp;
+                </div>
+            </div>
+
+            <!-- 2. Visualizador de afinación -->
+            <div id="tuner-visual">
+                <div id="needle"></div>
+            </div>
+
+            <!-- 3. Controles de frecuencia -->
+            <div class="space-y-4 pt-4">
+                <div class="flex justify-between items-center">
+                    <label for="a4-slider" class="text-sm text-gray-400">A4 Frecuencia</label>
+                    <span id="a4-freq-display" class="font-semibold text-lg text-white">440 Hz</span>
+                </div>
+                <input type="range" id="a4-slider" min="430" max="450" value="440" step="0.5">
+                <button id="reset-a4-btn" class="w-full bg-gray-700 hover:bg-gray-600 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-150">
+                    Restablecer a 440 Hz
+                </button>
+            </div>
+            
+            <!-- Mensaje de error -->
+            <div id="error-message" class="text-red-400 text-center text-sm hidden"></div>
+        </div>
+
+        <!-- Botón de inicio para permisos -->
+        <div id="start-screen" class="text-center">
+            <h1 class="text-3xl font-bold text-white mb-4">Afinador Cromático</h1>
+            <p class="text-gray-400 mb-8">Haz clic para activar el micrófono y comenzar a afinar.</p>
+            <button id="start-btn" class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-8 rounded-full text-lg shadow-lg transition-all duration-200 transform hover:scale-105">
+                Comenzar
+            </button>
+        </div>
+    </div>
+
+    <script>
+        window.addEventListener('load', () => {
+            // --- Referencias del DOM ---
+            const startScreen = document.getElementById('start-screen');
+            const startBtn = document.getElementById('start-btn');
+            const tunerApp = document.getElementById('tuner-app');
+            const noteDisplay = document.getElementById('note-display');
+            const centsDisplay = document.getElementById('cents-display');
+            const needle = document.getElementById('needle');
+            const a4Slider = document.getElementById('a4-slider');
+            const a4FreqDisplay = document.getElementById('a4-freq-display');
+            const resetA4Btn = document.getElementById('reset-a4-btn');
+            const errorMessage = document.getElementById('error-message');
+
+            // --- Constantes y Estado de Audio ---
+            const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+            let audioContext = null;
+            let analyser = null;
+            let mediaStreamSource = null;
+            let buffer;
+            let sampleRate = 44100;
+            let a4Freq = 440;
+            let animationFrameId = null;
+
+            // --- MEJORA: Persistencia de UI (aumentada) ---
+            let lastNoteTime = 0;
+            const persistenceThreshold = 1500; // ms para mantener la nota en pantalla (aumentado)
+
+            // --- MEJORA: Filtro de media móvil para estabilidad ---
+            const frequencyHistory = [];
+            const historySize = 5; // Número de muestras para promediar
+            
+            // --- MEJORA: Anti-rebote de cambio de nota ---
+            let lastDisplayedNote = null;
+            let noteChangeConfidence = 0;
+            const noteChangeThreshold = 3; // Número de lecturas consecutivas para cambiar nota
+
+            // --- Configuración de Controles ---
+            a4Slider.addEventListener('input', (e) => {
+                a4Freq = parseFloat(e.target.value);
+                a4FreqDisplay.textContent = `${a4Freq.toFixed(1)} Hz`;
+            });
+
+            resetA4Btn.addEventListener('click', () => {
+                a4Freq = 440;
+                a4Slider.value = 440;
+                a4FreqDisplay.textContent = '440 Hz';
+            });
+
+            // --- Botón de Inicio ---
+            startBtn.addEventListener('click', () => {
+                startTuner();
+            });
+
+            // --- Función principal para iniciar el afinador ---
+            async function startTuner() {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    sampleRate = audioContext.sampleRate;
+                    mediaStreamSource = audioContext.createMediaStreamSource(stream);
+                    
+                    analyser = audioContext.createAnalyser();
+                    analyser.fftSize = 8192; // MEJORA: Mayor resolución para graves
+                    analyser.smoothingTimeConstant = 0.8; // MEJORA: Suavizado adicional
+                    buffer = new Float32Array(analyser.fftSize);
+                    
+                    mediaStreamSource.connect(analyser);
+
+                    startScreen.classList.add('hidden');
+                    tunerApp.classList.remove('hidden');
+                    
+                    updatePitch();
+
+                } catch (err) {
+                    console.error('Error al obtener el micrófono:', err);
+                    startScreen.innerHTML = `<p class="text-red-400">No se pudo acceder al micrófono. Por favor, revisa los permisos en tu navegador.</p>`;
+                }
+            }
+
+            // --- Bucle de Detección de Tono ---
+            function updatePitch() {
+                analyser.getFloatTimeDomainData(buffer);
+                const frequency = findFundamentalFrequency(buffer, sampleRate);
+
+                if (frequency > 0) {
+                    // MEJORA: Aplicar filtro de media móvil
+                    frequencyHistory.push(frequency);
+                    if (frequencyHistory.length > historySize) {
+                        frequencyHistory.shift();
+                    }
+                    
+                    // Calcular frecuencia promedio
+                    const avgFrequency = frequencyHistory.reduce((a, b) => a + b) / frequencyHistory.length;
+                    
+                    const noteData = getNoteData(avgFrequency);
+                    
+                    // MEJORA: Anti-rebote de cambio de nota
+                    const currentNote = noteData.noteName + noteData.octave;
+                    if (currentNote === lastDisplayedNote) {
+                        noteChangeConfidence = 0;
+                        updateUI(noteData);
+                        lastNoteTime = performance.now();
+                    } else {
+                        noteChangeConfidence++;
+                        if (noteChangeConfidence >= noteChangeThreshold) {
+                            lastDisplayedNote = currentNote;
+                            noteChangeConfidence = 0;
+                            updateUI(noteData);
+                            lastNoteTime = performance.now();
+                        }
+                    }
+                } else {
+                    // MEJORA: Solo reiniciar si ha pasado el tiempo de persistencia
+                    if (performance.now() - lastNoteTime > persistenceThreshold) {
+                        resetUI();
+                        frequencyHistory.length = 0; // Limpiar historial
+                        lastDisplayedNote = null;
+                        noteChangeConfidence = 0;
+                    }
+                }
+
+                animationFrameId = requestAnimationFrame(updatePitch);
+            }
+
+            // --- MEJORA: Algoritmo de Detección de Frecuencia Mejorado (Autocorrelación + Interpolación) ---
+            function findFundamentalFrequency(buffer, sampleRate) {
+                const bufferSize = buffer.length;
+                // MEJORA: Rango extendido 20-4500 Hz
+                const minFreq = 20; // Bajo de 5 cuerdas, piano bajo
+                const maxFreq = 4500; // Piano agudo completo
+                const minPeriod = Math.floor(sampleRate / maxFreq);
+                const maxPeriod = Math.min(Math.floor(sampleRate / minFreq), Math.floor(bufferSize / 2));
+                
+                const threshold = 0.15; // MEJORA: Umbral más sensible pero estable
+                
+                let bestCorrelation = -1;
+                let bestPeriod = 0;
+                let rms = 0;
+
+                // Calcular RMS (volumen) para ignorar el silencio
+                for (let i = 0; i < bufferSize; i++) {
+                    rms += buffer[i] * buffer[i];
+                }
+                rms = Math.sqrt(rms / bufferSize);
+
+                if (rms < 0.005) { // MEJORA: Umbral de silencio más bajo
+                    return -1;
+                }
+
+                // MEJORA: Autocorrelación usando suma de productos (mejor que diferencias)
+                for (let period = minPeriod; period <= maxPeriod; period++) {
+                    let correlation = 0;
+                    for (let i = 0; i < bufferSize - period; i++) {
+                        correlation += buffer[i] * buffer[i + period];
+                    }
+                    correlation = correlation / (bufferSize - period);
+
+                    if (correlation > bestCorrelation) {
+                        bestCorrelation = correlation;
+                        bestPeriod = period;
+                    }
+                }
+                
+                // MEJORA: Interpolación parabólica para mayor precisión
+                if (bestPeriod > minPeriod && bestPeriod < maxPeriod && bestCorrelation > threshold * rms) {
+                    // Calcular correlaciones vecinas
+                    let c1 = 0, c2 = bestCorrelation, c3 = 0;
+                    
+                    for (let i = 0; i < bufferSize - bestPeriod - 1; i++) {
+                        c1 += buffer[i] * buffer[i + bestPeriod - 1];
+                        c3 += buffer[i] * buffer[i + bestPeriod + 1];
+                    }
+                    c1 = c1 / (bufferSize - bestPeriod - 1);
+                    c3 = c3 / (bufferSize - bestPeriod - 1);
+                    
+                    // Interpolación parabólica
+                    const adjustedPeriod = bestPeriod + (c3 - c1) / (2 * (2 * c2 - c1 - c3));
+                    
+                    if (isFinite(adjustedPeriod) && adjustedPeriod > 0) {
+                        return sampleRate / adjustedPeriod;
+                    }
+                    
+                    return sampleRate / bestPeriod;
+                }
+                
+                return -1; // No se encontró una frecuencia clara
+            }
+
+            // --- Conversión de Frecuencia a Nota ---
+            function getNoteData(frequency) {
+                const midiNum = 12 * (Math.log2(frequency / a4Freq)) + 69;
+                const noteIndex = Math.round(midiNum) % 12;
+                
+                const noteName = NOTE_NAMES[noteIndex];
+                const octave = Math.floor(Math.round(midiNum) / 12) - 1;
+                
+                const cents = (midiNum - Math.round(midiNum)) * 100;
+                
+                return {
+                    noteName: noteName,
+                    octave: octave,
+                    cents: cents
+                };
+            }
+
+            // --- Actualización de la Interfaz de Usuario ---
+            function updateUI(noteData) {
+                const { noteName, octave, cents } = noteData;
+
+                // 1. Actualizar texto
+                noteDisplay.textContent = noteName + octave;
+                centsDisplay.textContent = `${cents >= 0 ? '+' : ''}${cents.toFixed(0)} cents`;
+
+                // 2. Mover la aguja
+                // MEJORA: Mapeo mejorado para mejor visualización
+                // Mapear cents (-50 a +50) con factor 0.85 para no llegar a los bordes
+                const leftPercentage = 50 + (cents * 0.85);
+                const clampedLeft = Math.max(5, Math.min(95, leftPercentage));
+                
+                needle.style.left = `${clampedLeft}%`;
+                needle.style.transform = `translate(-50%, -50%)`;
+
+                // 3. Cambiar color si está afinado
+                if (Math.abs(cents) < 5) { // Rango de afinación "perfecta"
+                    noteDisplay.classList.add('in-tune');
+                    needle.classList.add('in-tune-needle');
+                } else {
+                    noteDisplay.classList.remove('in-tune');
+                    needle.classList.remove('in-tune-needle');
+                    
+                    if (cents < 0) {
+                        noteDisplay.style.color = '#f8b400'; // Naranja para bemol
+                    } else {
+                        noteDisplay.style.color = '#ef4444'; // Rojo para sostenido
+                    }
+                }
+            }
+
+            // --- Reiniciar la UI cuando no hay sonido ---
+            function resetUI() {
+                noteDisplay.textContent = '--';
+                noteDisplay.style.color = '';
+                noteDisplay.classList.remove('in-tune');
+                centsDisplay.innerHTML = '&nbsp;';
+                
+                needle.style.left = '50%';
+                needle.style.transform = 'translate(-50%, -50%)';
+                needle.classList.remove('in-tune-needle');
+            }
+        });
+    </script>
+</body>
+</html>
