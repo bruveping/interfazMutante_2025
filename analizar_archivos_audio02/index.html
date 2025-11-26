@@ -1,0 +1,955 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audio Analyzer Pro</title>
+    <!-- Favicon generado dinámicamente -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌊</text></svg>">
+    
+    <!-- Tailwind CSS para estructura y diseño responsivo -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Fuente Mono para datos técnicos -->
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --waveform-color: #06b6d4; /* Cyan 500 */
+            --cursor-color: #f43f5e;   /* Rose 500 */
+            --grid-color: #374151;     /* Gray 700 */
+            --bg-dark: #111827;        /* Gray 900 */
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-dark);
+            color: #e5e7eb;
+            overflow: hidden; /* App feel */
+        }
+
+        .mono {
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* Custom Scrollbar for Notes */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #1f2937; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #4b5563; 
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #6b7280; 
+        }
+
+        /* Canvas Containers */
+        .canvas-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            background: #0f1115;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid #374151;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Standard Range Slider Customization (Controls) */
+        input[type=range].control-slider {
+            -webkit-appearance: none;
+            background: transparent;
+        }
+        input[type=range].control-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 16px;
+            width: 16px;
+            border-radius: 50%;
+            background: #06b6d4;
+            cursor: pointer;
+            margin-top: -6px;
+            box-shadow: 0 0 5px rgba(6, 182, 212, 0.5);
+        }
+        input[type=range].control-slider::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: #374151;
+            border-radius: 2px;
+        }
+
+        /* Waveform Overlay Slider (Scrubber) */
+        #scrubber-slider {
+            -webkit-appearance: none; /* Override default look */
+            appearance: none;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: transparent;
+            z-index: 20;
+            cursor: pointer;
+            margin: 0;
+        }
+        
+        #scrubber-slider:focus {
+            outline: none;
+        }
+
+        /* Transparent Track */
+        #scrubber-slider::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 100%;
+            background: transparent; 
+            border: none;
+        }
+        
+        /* The Thumb acts as the interactable handle */
+        #scrubber-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 100%; /* Full height of container */
+            width: 2px;   /* Thin line like the cursor */
+            background: rgba(244, 63, 94, 0.01); /* Almost invisible, we use the div for visuals, or increase opacity to use this as visual */
+            cursor: col-resize;
+            margin-top: 0;
+            /* We make the hit area slightly larger but visual small if needed, 
+               but here we actually rely on the visual #cursor div for rendering 
+               and this input for INTERACTION logic (scrubbing) */
+        }
+
+        /* Overlay for Loading */
+        #loading-overlay {
+            backdrop-filter: blur(5px);
+            z-index: 50;
+        }
+
+        .btn-control {
+            transition: all 0.2s;
+        }
+        .btn-control:active {
+            transform: scale(0.95);
+        }
+    </style>
+</head>
+<body class="h-screen flex flex-col">
+
+    <!-- Header -->
+    <header class="h-14 bg-gray-800 border-b border-gray-700 flex items-center justify-between px-4 shrink-0">
+        <div class="flex items-center gap-3">
+            <div class="text-cyan-400 text-2xl">🌊</div>
+            <div>
+                <h1 class="font-bold text-sm md:text-base leading-tight">Analizador Pro</h1>
+                <div id="file-name" class="text-xs text-gray-400 mono truncate max-w-[200px]">Sin archivo cargado</div>
+            </div>
+        </div>
+        
+        <div class="flex items-center gap-4">
+            <button onclick="document.getElementById('file-input').click()" class="bg-cyan-600 hover:bg-cyan-500 text-white px-4 py-1.5 rounded text-sm font-semibold transition flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                Cargar Audio/Video
+            </button>
+            <input type="file" id="file-input" class="hidden" accept="audio/*,video/*">
+            
+            <button onclick="toggleShortcuts()" class="text-gray-400 hover:text-white" title="Atajos (Ctrl+Alt+H)">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Workspace -->
+    <div class="flex-1 flex overflow-hidden">
+        
+        <!-- Left: Visualization & Controls -->
+        <main class="flex-1 flex flex-col p-4 gap-4 overflow-y-auto">
+            
+            <!-- Spectrum Analyzer (Frequency) -->
+            <div id="spectrum-container" class="h-32 shrink-0 canvas-container relative group">
+                <canvas id="spectrum-canvas"></canvas>
+                <div class="absolute top-2 left-2 text-xs text-cyan-500 font-mono opacity-50">ESPECTRO (TIEMPO REAL)</div>
+            </div>
+
+            <!-- Main Waveform -->
+            <div class="flex-1 min-h-[200px] canvas-container relative group" id="waveform-container">
+                <canvas id="waveform-canvas"></canvas>
+                
+                <!-- Interaction Slider (Overlay) -->
+                <input type="range" id="scrubber-slider" min="0" max="1000" step="0.1" value="0">
+
+                <!-- Visual Markers Layer (Pointer Events None so Slider catches clicks) -->
+                <div id="cursor" class="absolute top-0 bottom-0 w-px bg-rose-500 pointer-events-none z-10" style="left: 0%; box-shadow: 0 0 4px #f43f5e;"></div>
+                <div id="marker-a" class="absolute top-0 bottom-0 w-0 border-l-2 border-dashed border-green-500 hidden pointer-events-none z-0"><span class="bg-green-500 text-black text-[10px] px-1 absolute top-0">A</span></div>
+                <div id="marker-b" class="absolute top-0 bottom-0 w-0 border-l-2 border-dashed border-red-500 hidden pointer-events-none z-0"><span class="bg-red-500 text-black text-[10px] px-1 absolute top-0">B</span></div>
+                
+                <div class="absolute top-2 left-2 text-xs text-cyan-500 font-mono opacity-50 pointer-events-none">FORMA DE ONDA (TOTAL)</div>
+                <div id="hover-time" class="absolute bottom-2 right-2 text-xs bg-black/80 text-white px-2 py-1 rounded hidden font-mono pointer-events-none z-30">00:00</div>
+            </div>
+
+            <!-- Dashboard / Controls -->
+            <div class="bg-gray-800 rounded-lg p-4 border border-gray-700 shadow-lg">
+                
+                <!-- Row 1: Time & VU -->
+                <div class="flex items-center justify-between mb-4">
+                    <div class="font-mono text-xl md:text-2xl tracking-widest text-cyan-400">
+                        <span id="current-time">00:00:00</span> <span class="text-gray-600">/</span> <span id="total-time" class="text-gray-400">00:00:00</span>
+                    </div>
+                    
+                    <!-- Simple VU Meter -->
+                    <div class="flex items-center gap-2">
+                        <span class="text-xs font-bold text-gray-500">L</span>
+                        <div class="w-24 h-2 bg-gray-900 rounded-full overflow-hidden">
+                            <div id="vu-l" class="h-full bg-gradient-to-r from-green-500 via-yellow-500 to-red-500 w-0 transition-all duration-75"></div>
+                        </div>
+                        <div class="w-24 h-2 bg-gray-900 rounded-full overflow-hidden">
+                            <div id="vu-r" class="h-full bg-gradient-to-r from-green-500 via-yellow-500 to-red-500 w-0 transition-all duration-75"></div>
+                        </div>
+                        <span class="text-xs font-bold text-gray-500">R</span>
+                    </div>
+                </div>
+
+                <!-- Row 2: Transport Controls -->
+                <div class="flex flex-wrap items-center justify-between gap-4">
+                    
+                    <!-- Playback Buttons -->
+                    <div class="flex items-center gap-2">
+                        <button id="btn-loop" onclick="toggleLoop()" class="btn-control p-2 rounded text-gray-400 hover:bg-gray-700" title="Bucle (Ctrl+Alt+L)">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 21h5v-5"/></svg>
+                        </button>
+                        
+                        <button onclick="skip(-10)" class="btn-control p-2 text-gray-300 hover:text-white" title="-10s">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 12h.01M10 12h.01M14 12h.01M18 12h.01"/></svg>
+                        </button>
+
+                        <button id="btn-play" onclick="togglePlay()" class="btn-control bg-cyan-600 hover:bg-cyan-500 text-white w-12 h-12 rounded-full flex items-center justify-center shadow-lg shadow-cyan-900/50" title="Play/Pause (Ctrl+Alt+P)">
+                            <svg id="icon-play" class="block" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                            <svg id="icon-pause" class="hidden" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+                        </button>
+
+                        <button onclick="stopAudio()" class="btn-control p-2 text-gray-300 hover:text-red-400" title="Stop (Ctrl+Alt+S)">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/></svg>
+                        </button>
+
+                        <button onclick="skip(10)" class="btn-control p-2 text-gray-300 hover:text-white" title="+10s">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 12h.01M10 12h.01M14 12h.01M18 12h.01"/></svg>
+                        </button>
+                    </div>
+
+                    <!-- AB Loop -->
+                    <div class="flex items-center bg-gray-900 rounded px-2 py-1 gap-2 border border-gray-700">
+                        <span class="text-xs text-gray-500 font-bold">A-B LOOP</span>
+                        <button onclick="setLoopPoint('a')" class="text-xs px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded text-green-400">Set A</button>
+                        <button onclick="setLoopPoint('b')" class="text-xs px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded text-red-400">Set B</button>
+                        <button onclick="clearLoopPoints()" class="text-xs text-gray-500 hover:text-white">✕</button>
+                    </div>
+
+                    <!-- Speed & Volume (Revised Layout) -->
+                    <div class="flex items-center gap-6 flex-1 justify-end">
+                        <div class="flex flex-col w-20 shrink-0">
+                            <label class="text-[10px] text-gray-500 font-bold uppercase flex justify-between">
+                                Speed <span id="speed-val" class="text-cyan-400">1.0x</span>
+                            </label>
+                            <input type="range" class="control-slider" min="0.5" max="2.0" step="0.1" value="1.0" oninput="setSpeed(this.value)">
+                        </div>
+                        
+                        <!-- Extra Long Gain Slider -->
+                        <div class="flex flex-col w-64 md:w-80">
+                            <label class="text-[10px] text-gray-500 font-bold uppercase flex justify-between">
+                                Ganancia (Amp) <span id="vol-val" class="text-cyan-400">100%</span>
+                            </label>
+                            <input id="vol-slider" class="control-slider" type="range" min="0" max="10" step="0.05" value="1.0" oninput="setVolume(this.value)">
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- Keyboard Guide Hint -->
+            <div class="text-center text-xs text-gray-600">
+                Usa <kbd class="bg-gray-700 px-1 rounded text-gray-300">Ctrl</kbd> + <kbd class="bg-gray-700 px-1 rounded text-gray-300">Alt</kbd> para controlar la app. Presiona 'H' para ver atajos.
+            </div>
+        </main>
+
+        <!-- Right Panel: Markdown Notes -->
+        <aside id="notes-panel" class="w-80 bg-gray-800 border-l border-gray-700 flex flex-col transition-all duration-300 transform translate-x-0">
+            <div class="p-3 bg-gray-900 border-b border-gray-700 flex justify-between items-center">
+                <h2 class="font-bold text-gray-300 flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                    Notas (Markdown)
+                </h2>
+                <button onclick="downloadNotes()" class="text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded" title="Descargar .md">⬇ MD</button>
+            </div>
+            
+            <div class="flex-1 p-0 relative">
+                <textarea id="notes-area" class="w-full h-full bg-gray-800 text-gray-300 p-4 resize-none focus:outline-none font-mono text-sm leading-relaxed" placeholder="# Notas de análisis&#10;Escribe aquí tus observaciones..."></textarea>
+                
+                <!-- Floating timestamp button -->
+                <button onclick="insertTimestamp()" class="absolute bottom-4 right-4 bg-cyan-600/90 hover:bg-cyan-500 text-white rounded-full p-3 shadow-lg backdrop-blur" title="Insertar Tiempo Actual">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                </button>
+            </div>
+            <div class="p-2 bg-gray-900 text-[10px] text-gray-500 text-center">
+                Autoguardado activado
+            </div>
+        </aside>
+
+    </div>
+
+    <!-- Shortcuts Modal -->
+    <div id="shortcuts-modal" class="fixed inset-0 bg-black/80 hidden flex items-center justify-center z-50 p-4" onclick="toggleShortcuts()">
+        <div class="bg-gray-800 border border-gray-600 rounded-lg p-6 max-w-2xl w-full shadow-2xl" onclick="event.stopPropagation()">
+            <div class="flex justify-between items-center mb-6 border-b border-gray-700 pb-2">
+                <h3 class="text-xl font-bold text-white">Atajos de Teclado</h3>
+                <button onclick="toggleShortcuts()" class="text-gray-400 hover:text-white">✕</button>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
+                <div>
+                    <h4 class="text-cyan-400 font-bold mb-2 uppercase text-xs">Reproducción</h4>
+                    <ul class="space-y-2 text-gray-300">
+                        <li class="flex justify-between"><span>Play / Pause</span> <kbd class="bg-gray-700 px-1 rounded border border-gray-600">Ctrl+Alt+P</kbd></li>
+                        <li class="flex justify-between"><span>Stop</span> <kbd class="bg-gray-700 px-1 rounded border border-gray-600">Ctrl+Alt+S</kbd></li>
+                        <li class="flex justify-between"><span>Loop On/Off</span> <kbd class="bg-gray-700 px-1 rounded border border-gray-600">Ctrl+Alt+L</kbd></li>
+                        <li class="flex justify-between"><span>Marcar Punto A</span> <kbd class="bg-gray-700 px-1 rounded border border-gray-600">Ctrl+Alt+A</kbd></li>
+                        <li class="flex justify-between"><span>Marcar Punto B</span> <kbd class="bg-gray-700 px-1 rounded border border-gray-600">Ctrl+Alt+B</kbd></li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 class="text-cyan-400 font-bold mb-2 uppercase text-xs">Navegación</h4>
+                    <ul class="space-y-2 text-gray-300">
+                        <li class="flex justify-between"><span>+/- 5 seg</span> <kbd class="bg-gray-700 px-1 rounded border border-gray-600">Ctrl+Alt+Flechas</kbd></li>
+                        <li class="flex justify-between"><span>+/- 10 seg</span> <kbd class="bg-gray-700 px-1 rounded border border-gray-600">Ctrl+Alt+Shift+Flechas</kbd></li>
+                        <li class="flex justify-between"><span>Saltar a %</span> <kbd class="bg-gray-700 px-1 rounded border border-gray-600">Ctrl+Alt+0-9</kbd></li>
+                    </ul>
+                    <h4 class="text-cyan-400 font-bold mt-4 mb-2 uppercase text-xs">Audio</h4>
+                    <ul class="space-y-2 text-gray-300">
+                        <li class="flex justify-between"><span>Ganancia (+/- 10%)</span> <kbd class="bg-gray-700 px-1 rounded border border-gray-600">Ctrl+Alt+↑/↓</kbd></li>
+                        <li class="flex justify-between"><span>Velocidad</span> <kbd class="bg-gray-700 px-1 rounded border border-gray-600">Ctrl+Alt +/-</kbd></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="fixed inset-0 flex flex-col items-center justify-center bg-black/50 hidden">
+        <div class="w-12 h-12 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+        <div class="text-white font-bold animate-pulse">Procesando Audio...</div>
+    </div>
+
+<script>
+/**
+ * AUDIO ANALYZER PRO - LOGIC
+ * Vanilla JS using Web Audio API
+ */
+
+// --- Global State ---
+let audioCtx;
+let audioBuffer = null;
+let sourceNode = null;
+let gainNode = null;
+let analyserNode = null;
+let playbackStartTime = 0; // When playback started (context time)
+let pausedAt = 0;          // Offset in seconds within the buffer
+let isPlaying = false;
+let isLooping = false;
+let loopStart = 0;
+let loopEnd = 0;
+let playbackRate = 1.0;
+let volume = 1.0;
+let isScrubbing = false;
+
+// Animation Frame IDs
+let rafSpectrum;
+let rafWaveform;
+
+// DOM Elements
+const fileInput = document.getElementById('file-input');
+const canvasWave = document.getElementById('waveform-canvas');
+const ctxWave = canvasWave.getContext('2d');
+const canvasSpec = document.getElementById('spectrum-canvas');
+const ctxSpec = canvasSpec.getContext('2d');
+const cursorEl = document.getElementById('cursor');
+const scrubberSlider = document.getElementById('scrubber-slider');
+const markerAEl = document.getElementById('marker-a');
+const markerBEl = document.getElementById('marker-b');
+const timeDisplay = document.getElementById('current-time');
+const totalTimeDisplay = document.getElementById('total-time');
+const btnPlay = document.getElementById('btn-play');
+const iconPlay = document.getElementById('icon-play');
+const iconPause = document.getElementById('icon-pause');
+const btnLoop = document.getElementById('btn-loop');
+const vuL = document.getElementById('vu-l');
+const vuR = document.getElementById('vu-r');
+const loadingOverlay = document.getElementById('loading-overlay');
+const notesArea = document.getElementById('notes-area');
+
+// --- Initialization ---
+window.addEventListener('resize', resizeCanvases);
+window.onload = () => {
+    resizeCanvases();
+    loadNotes();
+};
+
+function initAudioContext() {
+    if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+}
+
+function resizeCanvases() {
+    // Make canvas resolution match display size (prevent blur)
+    const waveContainer = document.getElementById('waveform-container');
+    canvasWave.width = waveContainer.clientWidth;
+    canvasWave.height = waveContainer.clientHeight;
+    
+    const specContainer = document.getElementById('spectrum-container');
+    canvasSpec.width = specContainer.clientWidth;
+    canvasSpec.height = specContainer.clientHeight;
+
+    // Redraw static waveform if exists
+    if (audioBuffer) drawStaticWaveform();
+}
+
+// --- File Handling ---
+fileInput.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    initAudioContext();
+    if(audioCtx.state === 'suspended') await audioCtx.resume();
+
+    stopAudio();
+    pausedAt = 0;
+    
+    // UI Updates
+    document.getElementById('file-name').textContent = file.name;
+    loadingOverlay.classList.remove('hidden');
+
+    const reader = new FileReader();
+    reader.onload = async (ev) => {
+        try {
+            const arrayBuffer = ev.target.result;
+            audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+            
+            // Set defaults
+            loopEnd = audioBuffer.duration;
+            loopStart = 0;
+            clearLoopPoints();
+            
+            // UI Updates
+            totalTimeDisplay.textContent = formatTime(audioBuffer.duration);
+            loadingOverlay.classList.add('hidden');
+            
+            drawStaticWaveform();
+            
+        } catch (err) {
+            console.error(err);
+            alert("Error decodificando el audio.");
+            loadingOverlay.classList.add('hidden');
+        }
+    };
+    reader.readAsArrayBuffer(file);
+});
+
+// --- Core Audio Logic ---
+
+function playSound() {
+    if (!audioBuffer) return;
+
+    // Create graph
+    sourceNode = audioCtx.createBufferSource();
+    sourceNode.buffer = audioBuffer;
+    sourceNode.playbackRate.value = playbackRate;
+    
+    // Looping logic
+    if (isLooping || (markerAEl.style.display !== 'none' && markerBEl.style.display !== 'none')) {
+        sourceNode.loop = true;
+        // If strict A-B is set, use that, otherwise loop whole track if loop toggled
+        if (markerAEl.style.display !== 'none' && markerBEl.style.display !== 'none') {
+            sourceNode.loopStart = loopStart;
+            sourceNode.loopEnd = loopEnd;
+        } else if (isLooping) {
+            sourceNode.loopStart = 0;
+            sourceNode.loopEnd = audioBuffer.duration;
+        }
+    }
+
+    gainNode = audioCtx.createGain();
+    gainNode.gain.value = volume;
+
+    analyserNode = audioCtx.createAnalyser();
+    analyserNode.fftSize = 2048; // Resolution for spectrum
+
+    // Connect: Source -> Gain -> Analyser -> Output
+    sourceNode.connect(gainNode);
+    gainNode.connect(analyserNode);
+    analyserNode.connect(audioCtx.destination);
+
+    // Handle Playback time
+    // We play from 'pausedAt'. 
+    // If pausedAt is past loopEnd (and looping), reset to loopStart
+    if (sourceNode.loop && pausedAt >= sourceNode.loopEnd) {
+        pausedAt = sourceNode.loopStart;
+    } else if (pausedAt >= audioBuffer.duration) {
+        pausedAt = 0;
+    }
+
+    playbackStartTime = audioCtx.currentTime - (pausedAt / playbackRate);
+    
+    sourceNode.start(0, pausedAt);
+    
+    sourceNode.onended = () => {
+        // Only trigger Stop UI if it ended naturally (not stopped by script)
+        if (isPlaying && !sourceNode.loop && Math.abs(getCurrentTime() - audioBuffer.duration) < 0.2) {
+            stopAudio(false); // false = don't seek to 0, just stop
+            pausedAt = 0; // Reset for next play
+            updateCursor(0);
+        }
+    };
+
+    isPlaying = true;
+    updateTransportUI();
+    animate();
+}
+
+function pauseAudio() {
+    if (sourceNode) {
+        // Calculate where we stopped
+        pausedAt = getCurrentTime();
+        sourceNode.stop();
+        sourceNode = null;
+    }
+    isPlaying = false;
+    cancelAnimationFrame(rafSpectrum);
+    updateTransportUI();
+    
+    // Decay VU meters
+    vuL.style.width = '0%';
+    vuR.style.width = '0%';
+}
+
+function stopAudio(resetToStart = true) {
+    if (sourceNode) {
+        try { sourceNode.stop(); } catch(e){}
+        sourceNode = null;
+    }
+    isPlaying = false;
+    if (resetToStart) {
+        pausedAt = 0;
+        updateCursor(0);
+    }
+    cancelAnimationFrame(rafSpectrum);
+    updateTransportUI();
+    
+    // Clear spectrum
+    ctxSpec.clearRect(0,0, canvasSpec.width, canvasSpec.height);
+    vuL.style.width = '0%';
+    vuR.style.width = '0%';
+}
+
+function togglePlay() {
+    if (!audioBuffer) return;
+    if (isPlaying) pauseAudio();
+    else playSound();
+}
+
+function toggleLoop() {
+    isLooping = !isLooping;
+    btnLoop.classList.toggle('text-cyan-400', isLooping);
+    btnLoop.classList.toggle('bg-gray-700', isLooping);
+    
+    // If playing, we need to restart to apply loop properties seamlessly
+    if (isPlaying) {
+        const time = getCurrentTime();
+        pauseAudio();
+        pausedAt = time;
+        playSound();
+    }
+}
+
+function setSpeed(val) {
+    playbackRate = parseFloat(val);
+    document.getElementById('speed-val').textContent = playbackRate.toFixed(1) + 'x';
+    if (sourceNode) {
+        sourceNode.playbackRate.value = playbackRate;
+        // Recalculate start time to keep cursor sync
+        playbackStartTime = audioCtx.currentTime - (pausedAt / playbackRate);
+    }
+}
+
+function setVolume(val) {
+    volume = parseFloat(val);
+    document.getElementById('vol-val').textContent = Math.round(volume * 100) + '%';
+    if (gainNode) {
+        gainNode.gain.value = volume;
+    }
+}
+
+// Gets the current playback time in seconds respecting speed
+function getCurrentTime() {
+    if (isScrubbing) {
+        // When scrubbing, trust the slider value, not the audio clock
+        return (parseFloat(scrubberSlider.value) / 1000) * audioBuffer.duration;
+    }
+
+    if (!isPlaying) return pausedAt;
+    let curr = (audioCtx.currentTime - playbackStartTime) * playbackRate;
+    
+    // Logic for visualization when looping
+    if (sourceNode && sourceNode.loop) {
+        const dur = sourceNode.loopEnd - sourceNode.loopStart;
+        if (curr >= sourceNode.loopEnd) {
+             const offset = (curr - sourceNode.loopStart) % dur;
+             curr = sourceNode.loopStart + offset;
+        }
+    }
+    return Math.min(curr, audioBuffer.duration);
+}
+
+function skip(seconds) {
+    if (!audioBuffer) return;
+    let newTime = getCurrentTime() + seconds;
+    newTime = Math.max(0, Math.min(newTime, audioBuffer.duration));
+    seekTo(newTime);
+}
+
+function seekTo(time) {
+    if(!audioBuffer) return;
+    
+    const wasPlaying = isPlaying;
+    if (isPlaying) pauseAudio();
+    
+    pausedAt = time;
+    updateCursor(time);
+    
+    if (wasPlaying) playSound();
+}
+
+// --- AB Loop ---
+function setLoopPoint(point) {
+    if (!audioBuffer) return;
+    const now = getCurrentTime();
+    
+    if (point === 'a') {
+        loopStart = now;
+        const pct = (loopStart / audioBuffer.duration) * 100;
+        markerAEl.style.left = pct + '%';
+        markerAEl.style.display = 'block';
+    } else {
+        loopEnd = now;
+        const pct = (loopEnd / audioBuffer.duration) * 100;
+        markerBEl.style.left = pct + '%';
+        markerBEl.style.display = 'block';
+    }
+    
+    // Validate
+    if (loopStart >= loopEnd && markerBEl.style.display !== 'none') {
+        // Swap or reset? let's just warn or allow user to fix.
+        // Usually A should be before B.
+    }
+    
+    // If Playing, update loop params
+    if (isPlaying && markerAEl.style.display !== 'block' && markerBEl.style.display !== 'block') {
+        // Re-trigger
+        pauseAudio();
+        playSound();
+    }
+}
+
+function clearLoopPoints() {
+    markerAEl.style.display = 'none';
+    markerBEl.style.display = 'none';
+    loopStart = 0;
+    if(audioBuffer) loopEnd = audioBuffer.duration;
+    
+    if(isPlaying && sourceNode.loop) {
+        // If regular loop was on, keep it on whole track, otherwise turn off loop property
+        if(isLooping) {
+            pauseAudio();
+            playSound();
+        } else {
+            sourceNode.loop = false;
+        }
+    }
+}
+
+
+// --- Visualization ---
+
+function drawStaticWaveform() {
+    if (!audioBuffer) return;
+    const width = canvasWave.width;
+    const height = canvasWave.height;
+    const data = audioBuffer.getChannelData(0); // Left channel
+    const step = Math.ceil(data.length / width);
+    const amp = height / 2;
+
+    ctxWave.clearRect(0, 0, width, height);
+    ctxWave.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--waveform-color') || '#06b6d4';
+    ctxWave.beginPath();
+
+    for (let i = 0; i < width; i++) {
+        let min = 1.0;
+        let max = -1.0;
+        for (let j = 0; j < step; j++) {
+            const datum = data[(i * step) + j];
+            if (datum < min) min = datum;
+            if (datum > max) max = datum;
+        }
+        ctxWave.fillRect(i, (1 + min) * amp, 1, Math.max(1, (max - min) * amp));
+    }
+}
+
+function drawSpectrum() {
+    const width = canvasSpec.width;
+    const height = canvasSpec.height;
+    const bufferLength = analyserNode.frequencyBinCount;
+    const dataArray = new Uint8Array(bufferLength);
+    
+    analyserNode.getByteFrequencyData(dataArray);
+
+    ctxSpec.clearRect(0, 0, width, height);
+    
+    const barWidth = (width / bufferLength) * 2.5;
+    let barHeight;
+    let x = 0;
+
+    for (let i = 0; i < bufferLength; i++) {
+        barHeight = dataArray[i] / 255 * height;
+        
+        // Gradient color based on height/intensity
+        const hue = (i / bufferLength) * 360; // Rainbow spectrum
+        ctxSpec.fillStyle = `hsl(${hue}, 80%, 50%)`;
+        
+        ctxSpec.fillRect(x, height - barHeight, barWidth, barHeight);
+        x += barWidth + 1;
+    }
+}
+
+function updateVUMeter() {
+    if (!analyserNode) return;
+    const array = new Uint8Array(analyserNode.frequencyBinCount);
+    analyserNode.getByteTimeDomainData(array);
+    
+    // Calculate RMS (Root Mean Square) roughly
+    let sum = 0;
+    for(let i = 0; i < array.length; i++) {
+        const x = (array[i] - 128) / 128;
+        sum += x * x;
+    }
+    const rms = Math.sqrt(sum / array.length);
+    const percentage = Math.min(100, rms * 400); // Scale up a bit
+    
+    vuL.style.width = percentage + '%';
+    vuR.style.width = percentage + '%'; // Using same for both as we only analyzed one channel for vis
+}
+
+function animate() {
+    if (!isPlaying && !isScrubbing) return;
+
+    // 1. Update Cursor & Time
+    const curr = getCurrentTime();
+    
+    // Don't update cursor position via visual div if scrubbing (let slider handle it)
+    // But we do want to update the time display
+    timeDisplay.textContent = formatTime(curr);
+    
+    // If just playing, sync the slider to the audio
+    if (!isScrubbing && audioBuffer) {
+         const val = (curr / audioBuffer.duration) * 1000;
+         scrubberSlider.value = val;
+         // Sync visual cursor div to the slider position
+         const percent = (curr / audioBuffer.duration) * 100;
+         cursorEl.style.left = percent + '%';
+    }
+
+    // 2. Update Spectrum & VU
+    if (isPlaying) {
+        drawSpectrum();
+        updateVUMeter();
+    }
+
+    rafSpectrum = requestAnimationFrame(animate);
+}
+
+function updateCursor(time) {
+    if (!audioBuffer) return;
+    
+    timeDisplay.textContent = formatTime(time);
+    
+    const percent = (time / audioBuffer.duration) * 100;
+    cursorEl.style.left = percent + '%';
+    
+    // Update the input range value as well to stay in sync
+    scrubberSlider.value = (time / audioBuffer.duration) * 1000;
+}
+
+function formatTime(seconds) {
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = Math.floor(seconds % 60);
+    const ms = Math.floor((seconds % 1) * 10);
+    
+    const hStr = h > 0 ? h + ':' : '';
+    return `${hStr}${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}.${ms}`;
+}
+
+function updateTransportUI() {
+    if (isPlaying) {
+        iconPlay.classList.add('hidden');
+        iconPause.classList.remove('hidden');
+    } else {
+        iconPlay.classList.remove('hidden');
+        iconPause.classList.add('hidden');
+    }
+}
+
+// --- Interaction ---
+
+// Scrubber Slider Logic
+scrubberSlider.addEventListener('input', (e) => {
+    if (!audioBuffer) return;
+    isScrubbing = true;
+    const val = parseFloat(e.target.value);
+    const time = (val / 1000) * audioBuffer.duration;
+    
+    // Visual update during scrub
+    timeDisplay.textContent = formatTime(time);
+    const percent = (time / audioBuffer.duration) * 100;
+    cursorEl.style.left = percent + '%';
+});
+
+scrubberSlider.addEventListener('change', (e) => {
+    if (!audioBuffer) return;
+    isScrubbing = false;
+    const val = parseFloat(e.target.value);
+    const time = (val / 1000) * audioBuffer.duration;
+    seekTo(time);
+});
+
+
+// Hover effect for time preview (Still works via pointer-events trickery or we can attach to container wrapper)
+document.getElementById('waveform-container').addEventListener('mousemove', (e) => {
+    if (!audioBuffer) return;
+    // Calculate manually since scrubber might block events if not careful, 
+    // but since scrubber is transparent and on top, we actually get the mousemove on the SLIDER.
+    // However, the event bubbles or we can calculate based on clientX
+    
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const pct = x / rect.width;
+    const time = pct * audioBuffer.duration;
+    
+    const tooltip = document.getElementById('hover-time');
+    tooltip.style.display = 'block';
+    tooltip.textContent = formatTime(time);
+});
+
+document.getElementById('waveform-container').addEventListener('mouseleave', () => {
+    document.getElementById('hover-time').style.display = 'none';
+});
+
+// --- Shortcuts ---
+function toggleShortcuts() {
+    const modal = document.getElementById('shortcuts-modal');
+    modal.classList.toggle('hidden');
+}
+
+window.addEventListener('keydown', (e) => {
+    // Check modifiers first
+    if (e.ctrlKey && e.altKey) {
+        e.preventDefault(); // Prevent browser defaults
+        
+        switch(e.code) {
+            case 'KeyP': togglePlay(); break;
+            case 'KeyS': stopAudio(); break;
+            case 'KeyL': toggleLoop(); break;
+            case 'KeyA': setLoopPoint('a'); break;
+            case 'KeyB': setLoopPoint('b'); break;
+            case 'KeyM': 
+                if (volume > 0) {
+                    volume = 0; 
+                    document.getElementById('vol-slider').value = 0;
+                } else {
+                    volume = 1; 
+                    document.getElementById('vol-slider').value = 1;
+                }
+                setVolume(volume);
+                break;
+            case 'ArrowLeft': 
+                e.shiftKey ? skip(-10) : skip(-5); 
+                break;
+            case 'ArrowRight': 
+                e.shiftKey ? skip(10) : skip(5); 
+                break;
+            case 'ArrowUp': 
+                setVolume(Math.min(10, volume + 0.1)); 
+                document.getElementById('vol-slider').value = volume;
+                break;
+            case 'ArrowDown': 
+                setVolume(Math.max(0, volume - 0.1)); 
+                document.getElementById('vol-slider').value = volume;
+                break;
+            case 'Minus': case 'NumpadSubtract':
+                setSpeed(Math.max(0.5, playbackRate - 0.1));
+                document.querySelector('input[type=range][min="0.5"]').value = playbackRate;
+                break;
+            case 'Equal': case 'NumpadAdd': // Equal is usually + without shift
+                setSpeed(Math.min(2.0, playbackRate + 0.1));
+                document.querySelector('input[type=range][min="0.5"]').value = playbackRate;
+                break;
+            case 'KeyH': toggleShortcuts(); break;
+        }
+
+        // Percentage jumps (0-9)
+        if (e.key >= '0' && e.key <= '9') {
+            const pct = parseInt(e.key) * 10;
+            if (audioBuffer) seekTo((pct / 100) * audioBuffer.duration);
+        }
+    }
+});
+
+// --- Notes Logic ---
+function loadNotes() {
+    const saved = localStorage.getItem('audio_analyzer_notes');
+    if (saved) notesArea.value = saved;
+}
+
+notesArea.addEventListener('input', () => {
+    localStorage.setItem('audio_analyzer_notes', notesArea.value);
+});
+
+function insertTimestamp() {
+    const time = formatTime(getCurrentTime());
+    const cursorPos = notesArea.selectionStart;
+    const textBefore = notesArea.value.substring(0,  cursorPos);
+    const textAfter  = notesArea.value.substring(cursorPos, notesArea.value.length);
+    
+    notesArea.value = textBefore + `[${time}] ` + textAfter;
+    notesArea.focus();
+    // Trigger save
+    localStorage.setItem('audio_analyzer_notes', notesArea.value);
+}
+
+function downloadNotes() {
+    const blob = new Blob([notesArea.value], {type: 'text/markdown'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'notas_audio.md';
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+</script>
+</body>
+</html>
