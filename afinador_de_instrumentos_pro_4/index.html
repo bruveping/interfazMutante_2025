@@ -142,7 +142,7 @@
             left: 50%;
             top: 0;
             bottom: 0;
-            width: 3px;
+            width: 2px;
             background: rgba(255, 255, 255, 0.9);
             transform: translateX(-50%);
             z-index: 1;
@@ -152,10 +152,10 @@
             position: absolute;
             top: 50%;
             left: 50%;
-            width: 6px;
+            width: 2px;
             height: 60px;
-            background: white;
-            border-radius: 3px;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 1px;
             transform: translate(-50%, -50%);
             transition: left 0.15s ease-out;
             box-shadow: 0 3px 10px rgba(0, 0, 0, 0.5);
@@ -172,16 +172,7 @@
             height: 0;
             border-left: 8px solid transparent;
             border-right: 8px solid transparent;
-            border-top: 12px solid white;
-        }
-
-        #needle.in-tune-needle {
-            background: #10b981;
-            box-shadow: 0 5px 20px rgba(16, 185, 129, 0.8);
-        }
-
-        #needle.in-tune-needle::before {
-            border-top-color: #10b981;
+            border-top: 12px solid rgba(255, 255, 255, 0.95);
         }
 
         /* Marcas del medidor */
@@ -204,6 +195,75 @@
             border-radius: 20px;
             padding: 25px;
             margin-top: 30px;
+        }
+
+        /* Selector de modo */
+        .mode-selector {
+            margin-bottom: 20px;
+        }
+
+        .mode-selector-label {
+            font-size: 0.9em;
+            color: #666;
+            font-weight: 600;
+            margin-bottom: 12px;
+            display: block;
+        }
+
+        .mode-buttons {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+        }
+
+        .mode-btn {
+            background: white;
+            color: #667eea;
+            border: 2px solid #e5e7eb;
+            padding: 12px;
+            font-size: 0.95em;
+            border-radius: 12px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .mode-btn:hover {
+            border-color: #667eea;
+            transform: translateY(-2px);
+            box-shadow: 0 3px 10px rgba(102, 126, 234, 0.2);
+        }
+
+        .mode-btn.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-color: #667eea;
+            box-shadow: 0 3px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .target-note-display {
+            text-align: center;
+            padding: 15px;
+            background: white;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            border: 2px solid #e5e7eb;
+        }
+
+        .target-note-display.hidden {
+            display: none;
+        }
+
+        .target-label {
+            font-size: 0.85em;
+            color: #666;
+            margin-bottom: 5px;
+        }
+
+        .target-note {
+            font-size: 1.5em;
+            font-weight: 700;
+            color: #667eea;
         }
 
         .control-group {
@@ -281,6 +341,44 @@
             color: white;
             transform: translateY(-2px);
             box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        /* Volumen */
+        #volume-display {
+            margin-top: 30px;
+            padding-top: 25px;
+            border-top: 2px solid #e5e7eb;
+        }
+
+        .volume-label {
+            font-size: 0.9em;
+            color: #666;
+            font-weight: 600;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+
+        .volume-bar-container {
+            height: 8px;
+            background: #e5e7eb;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-bottom: 8px;
+        }
+
+        #volume-bar {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(to right, #10b981, #f8b400, #ef4444);
+            border-radius: 10px;
+            transition: width 0.1s ease-out;
+        }
+
+        #volume-db {
+            text-align: center;
+            font-size: 1em;
+            color: #667eea;
+            font-weight: 600;
         }
 
         /* Animación de pulso */
@@ -366,6 +464,14 @@
                     <button id="reset-a4-btn">Resetear A4 a 440 Hz</button>
                 </div>
             </div>
+
+            <div id="volume-display">
+                <div class="volume-label">Volumen</div>
+                <div class="volume-bar-container">
+                    <div id="volume-bar"></div>
+                </div>
+                <div id="volume-db">-- dB</div>
+            </div>
         </div>
 
         <div id="error-message"></div>
@@ -380,6 +486,8 @@
             const noteDisplay = document.getElementById('note-display');
             const centsDisplay = document.getElementById('cents-display');
             const needle = document.getElementById('needle');
+            const volumeBar = document.getElementById('volume-bar');
+            const volumeDb = document.getElementById('volume-db');
             const a4Slider = document.getElementById('a4-slider');
             const a4FreqDisplay = document.getElementById('a4-freq-display');
             const resetA4Btn = document.getElementById('reset-a4-btn');
@@ -444,6 +552,11 @@
             // --- Bucle de Detección de Tono ---
             function updatePitch() {
                 analyser.getFloatTimeDomainData(buffer);
+                
+                // Calcular volumen (RMS y dB)
+                const volume = calculateVolume(buffer);
+                updateVolumeDisplay(volume);
+                
                 const frequency = findFundamentalFrequency(buffer, sampleRate);
 
                 if (frequency > 0) {
@@ -457,6 +570,39 @@
                 }
 
                 animationFrameId = requestAnimationFrame(updatePitch);
+            }
+
+            // --- Cálculo de Volumen ---
+            function calculateVolume(buffer) {
+                let rms = 0;
+                for (let i = 0; i < buffer.length; i++) {
+                    rms += buffer[i] * buffer[i];
+                }
+                rms = Math.sqrt(rms / buffer.length);
+                
+                // Convertir a decibelios (dB)
+                // Referencia: 20 * log10(rms / referencia)
+                const db = 20 * Math.log10(rms + 0.00001); // +pequeño valor para evitar log(0)
+                
+                return {
+                    rms: rms,
+                    db: db
+                };
+            }
+
+            // --- Actualizar Display de Volumen ---
+            function updateVolumeDisplay(volume) {
+                const { db } = volume;
+                
+                // Mostrar dB
+                volumeDb.textContent = `${db.toFixed(1)} dB`;
+                
+                // Escalar para la barra visual (típicamente -60 dB a 0 dB)
+                const minDb = -60;
+                const maxDb = 0;
+                const percentage = Math.max(0, Math.min(100, ((db - minDb) / (maxDb - minDb)) * 100));
+                
+                volumeBar.style.width = `${percentage}%`;
             }
 
             // --- Algoritmo de Detección de Frecuencia (Autocorrelación) ---
@@ -539,19 +685,19 @@
                 needle.style.left = `${clampedLeft}%`;
                 needle.style.transform = `translate(-50%, -50%)`;
 
-                // 3. Cambiar color si está afinado
-                if (Math.abs(cents) < 5) {
+                // 3. Cambiar color según los cents
+                if (cents >= -5 && cents <= 5) {
+                    // Verde: afinado (entre -5 y +5)
+                    noteDisplay.style.color = '#10b981';
                     noteDisplay.classList.add('in-tune');
-                    needle.classList.add('in-tune-needle');
-                } else {
+                } else if (cents < -5) {
+                    // Amarillo: bemol (menos de -5)
+                    noteDisplay.style.color = '#f8b400';
                     noteDisplay.classList.remove('in-tune');
-                    needle.classList.remove('in-tune-needle');
-                    
-                    if (cents < 0) {
-                        noteDisplay.style.color = '#f8b400';
-                    } else {
-                        noteDisplay.style.color = '#ef4444';
-                    }
+                } else {
+                    // Rojo: sostenido (más de +5)
+                    noteDisplay.style.color = '#ef4444';
+                    noteDisplay.classList.remove('in-tune');
                 }
             }
 
@@ -564,7 +710,8 @@
                 
                 needle.style.left = '50%';
                 needle.style.transform = 'translate(-50%, -50%)';
-                needle.classList.remove('in-tune-needle');
+                
+                // No resetear el volumen ya que siempre se actualiza
             }
         });
     </script>
