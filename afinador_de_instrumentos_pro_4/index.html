@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Afinador Cromático</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 500px;
+        }
+
+        /* Pantalla de inicio */
+        #start-screen {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 30px;
+            padding: 60px 40px;
+            text-align: center;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(10px);
+        }
+
+        #start-screen h1 {
+            font-size: 2.5em;
+            color: #667eea;
+            margin-bottom: 15px;
+            font-weight: 700;
+        }
+
+        #start-screen p {
+            color: #666;
+            font-size: 1.1em;
+            margin-bottom: 40px;
+            line-height: 1.6;
+        }
+
+        #start-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 18px 50px;
+            font-size: 1.2em;
+            border-radius: 50px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
+        }
+
+        #start-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 40px rgba(102, 126, 234, 0.6);
+        }
+
+        #start-btn:active {
+            transform: translateY(-1px);
+        }
+
+        /* App principal */
+        #tuner-app {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 30px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(10px);
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        /* Display de nota */
+        .note-section {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        #note-display {
+            font-size: 6em;
+            font-weight: 700;
+            color: #667eea;
+            margin-bottom: 10px;
+            transition: all 0.3s ease;
+            text-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        #note-display.in-tune {
+            color: #10b981;
+            transform: scale(1.1);
+            text-shadow: 0 5px 20px rgba(16, 185, 129, 0.5);
+        }
+
+        #cents-display {
+            font-size: 1.3em;
+            color: #666;
+            font-weight: 500;
+            min-height: 30px;
+        }
+
+        /* Medidor visual */
+        .meter-section {
+            position: relative;
+            margin-bottom: 50px;
+        }
+
+        .meter-container {
+            position: relative;
+            height: 80px;
+            background: linear-gradient(to right, #f8b400 0%, #10b981 50%, #ef4444 100%);
+            border-radius: 40px;
+            overflow: hidden;
+            box-shadow: inset 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .meter-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(to bottom, rgba(255, 255, 255, 0.3), transparent);
+        }
+
+        .meter-center {
+            position: absolute;
+            left: 50%;
+            top: 0;
+            bottom: 0;
+            width: 3px;
+            background: rgba(255, 255, 255, 0.9);
+            transform: translateX(-50%);
+            z-index: 1;
+        }
+
+        #needle {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 6px;
+            height: 60px;
+            background: white;
+            border-radius: 3px;
+            transform: translate(-50%, -50%);
+            transition: left 0.15s ease-out;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.5);
+            z-index: 2;
+        }
+
+        #needle::before {
+            content: '';
+            position: absolute;
+            top: -8px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            height: 0;
+            border-left: 8px solid transparent;
+            border-right: 8px solid transparent;
+            border-top: 12px solid white;
+        }
+
+        #needle.in-tune-needle {
+            background: #10b981;
+            box-shadow: 0 5px 20px rgba(16, 185, 129, 0.8);
+        }
+
+        #needle.in-tune-needle::before {
+            border-top-color: #10b981;
+        }
+
+        /* Marcas del medidor */
+        .meter-marks {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 10px;
+            padding: 0 15px;
+        }
+
+        .meter-marks span {
+            font-size: 0.9em;
+            color: #666;
+            font-weight: 500;
+        }
+
+        /* Controles */
+        .controls {
+            background: #f8f9fa;
+            border-radius: 20px;
+            padding: 25px;
+            margin-top: 30px;
+        }
+
+        .control-group {
+            margin-bottom: 20px;
+        }
+
+        .control-group:last-child {
+            margin-bottom: 0;
+        }
+
+        .control-label {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            color: #333;
+            font-weight: 600;
+        }
+
+        #a4-freq-display {
+            color: #667eea;
+            font-size: 1.1em;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            height: 8px;
+            border-radius: 5px;
+            background: #ddd;
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            cursor: pointer;
+            box-shadow: 0 3px 10px rgba(102, 126, 234, 0.4);
+            transition: all 0.3s ease;
+        }
+
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+        }
+
+        input[type="range"]::-moz-range-thumb {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 3px 10px rgba(102, 126, 234, 0.4);
+        }
+
+        #reset-a4-btn {
+            width: 100%;
+            background: white;
+            color: #667eea;
+            border: 2px solid #667eea;
+            padding: 12px;
+            font-size: 1em;
+            border-radius: 12px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        #reset-a4-btn:hover {
+            background: #667eea;
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        /* Animación de pulso */
+        @keyframes pulse {
+            0%, 100% {
+                transform: scale(1);
+            }
+            50% {
+                transform: scale(1.05);
+            }
+        }
+
+        .note-section.active #note-display {
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        /* Responsive */
+        @media (max-width: 600px) {
+            #start-screen {
+                padding: 40px 25px;
+            }
+
+            #start-screen h1 {
+                font-size: 2em;
+            }
+
+            #tuner-app {
+                padding: 25px;
+            }
+
+            #note-display {
+                font-size: 4.5em;
+            }
+
+            .meter-container {
+                height: 60px;
+            }
+
+            #needle {
+                height: 45px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Pantalla de inicio -->
+        <div id="start-screen">
+            <h1>🎵 Afinador Cromático</h1>
+            <p>Afina tu instrumento con precisión profesional. Haz clic en el botón para comenzar.</p>
+            <button id="start-btn">Iniciar Afinador</button>
+        </div>
+
+        <!-- App del afinador -->
+        <div id="tuner-app" class="hidden">
+            <div class="note-section">
+                <div id="note-display">--</div>
+                <div id="cents-display">&nbsp;</div>
+            </div>
+
+            <div class="meter-section">
+                <div class="meter-container">
+                    <div class="meter-overlay"></div>
+                    <div class="meter-center"></div>
+                    <div id="needle"></div>
+                </div>
+                <div class="meter-marks">
+                    <span>-50¢</span>
+                    <span>0</span>
+                    <span>+50¢</span>
+                </div>
+            </div>
+
+            <div class="controls">
+                <div class="control-group">
+                    <div class="control-label">
+                        <span>Referencia A4</span>
+                        <span id="a4-freq-display">440 Hz</span>
+                    </div>
+                    <input type="range" id="a4-slider" min="430" max="450" value="440" step="0.1">
+                </div>
+                <div class="control-group">
+                    <button id="reset-a4-btn">Resetear A4 a 440 Hz</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="error-message"></div>
+    </div>
+
+    <script>
+        window.addEventListener('load', () => {
+            // --- Referencias del DOM ---
+            const startScreen = document.getElementById('start-screen');
+            const startBtn = document.getElementById('start-btn');
+            const tunerApp = document.getElementById('tuner-app');
+            const noteDisplay = document.getElementById('note-display');
+            const centsDisplay = document.getElementById('cents-display');
+            const needle = document.getElementById('needle');
+            const a4Slider = document.getElementById('a4-slider');
+            const a4FreqDisplay = document.getElementById('a4-freq-display');
+            const resetA4Btn = document.getElementById('reset-a4-btn');
+            const errorMessage = document.getElementById('error-message');
+
+            // --- Constantes y Estado de Audio ---
+            const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+            let audioContext = null;
+            let analyser = null;
+            let mediaStreamSource = null;
+            let buffer;
+            let sampleRate = 44100;
+            let a4Freq = 440;
+            let animationFrameId = null;
+
+            // Persistencia de UI mejorada
+            let lastNoteTime = 0;
+            const persistenceThreshold = 1000; // 1 segundo (ajustado)
+
+            // --- Configuración de Controles ---
+            a4Slider.addEventListener('input', (e) => {
+                a4Freq = parseFloat(e.target.value);
+                a4FreqDisplay.textContent = `${a4Freq.toFixed(1)} Hz`;
+            });
+
+            resetA4Btn.addEventListener('click', () => {
+                a4Freq = 440;
+                a4Slider.value = 440;
+                a4FreqDisplay.textContent = '440 Hz';
+            });
+
+            // --- Botón de Inicio ---
+            startBtn.addEventListener('click', () => {
+                startTuner();
+            });
+
+            // --- Función principal para iniciar el afinador ---
+            async function startTuner() {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    sampleRate = audioContext.sampleRate;
+                    mediaStreamSource = audioContext.createMediaStreamSource(stream);
+                    
+                    analyser = audioContext.createAnalyser();
+                    analyser.fftSize = 4096; // Balance entre precisión y rendimiento
+                    buffer = new Float32Array(analyser.fftSize);
+                    
+                    mediaStreamSource.connect(analyser);
+
+                    startScreen.classList.add('hidden');
+                    tunerApp.classList.remove('hidden');
+                    
+                    updatePitch();
+
+                } catch (err) {
+                    console.error('Error al obtener el micrófono:', err);
+                    startScreen.innerHTML = `<p style="color: #ef4444; font-size: 1.1em;">No se pudo acceder al micrófono. Por favor, revisa los permisos en tu navegador.</p>`;
+                }
+            }
+
+            // --- Bucle de Detección de Tono ---
+            function updatePitch() {
+                analyser.getFloatTimeDomainData(buffer);
+                const frequency = findFundamentalFrequency(buffer, sampleRate);
+
+                if (frequency > 0) {
+                    const noteData = getNoteData(frequency);
+                    updateUI(noteData);
+                    lastNoteTime = performance.now();
+                } else {
+                    if (performance.now() - lastNoteTime > persistenceThreshold) {
+                        resetUI();
+                    }
+                }
+
+                animationFrameId = requestAnimationFrame(updatePitch);
+            }
+
+            // --- Algoritmo de Detección de Frecuencia (Autocorrelación) ---
+            function findFundamentalFrequency(buffer, sampleRate) {
+                const bufferSize = buffer.length;
+                // Rango extendido pero realista
+                const minFreq = 27.5; // A0 (piano más bajo)
+                const maxFreq = 4200; // C8 (piano más alto)
+                const minPeriod = Math.floor(sampleRate / maxFreq);
+                const maxPeriod = Math.min(Math.floor(sampleRate / minFreq), bufferSize - 1);
+                
+                const threshold = 0.2;
+                
+                let minDiff = Infinity;
+                let bestPeriod = 0;
+                let rms = 0;
+
+                // Calcular RMS (volumen) para ignorar el silencio
+                for (let i = 0; i < bufferSize; i++) {
+                    rms += buffer[i] * buffer[i];
+                }
+                rms = Math.sqrt(rms / bufferSize);
+
+                if (rms < 0.01) {
+                    return -1;
+                }
+
+                // Autocorrelación por diferencias
+                for (let period = minPeriod; period <= maxPeriod; period++) {
+                    let diff = 0;
+                    for (let i = 0; i < bufferSize - period; i++) {
+                        const d = buffer[i] - buffer[i + period];
+                        diff += d * d;
+                    }
+                    const avgDiff = Math.sqrt(diff / (bufferSize - period));
+                    const normalizedDiff = avgDiff / (rms + 0.001);
+
+                    if (normalizedDiff < minDiff) {
+                        minDiff = normalizedDiff;
+                        bestPeriod = period;
+                    }
+                }
+                
+                if (minDiff < threshold && bestPeriod > 0) {
+                    return sampleRate / bestPeriod;
+                }
+                
+                return -1;
+            }
+
+            // --- Conversión de Frecuencia a Nota ---
+            function getNoteData(frequency) {
+                const midiNum = 12 * (Math.log2(frequency / a4Freq)) + 69;
+                const noteIndex = Math.round(midiNum) % 12;
+                
+                const noteName = NOTE_NAMES[noteIndex];
+                const octave = Math.floor(Math.round(midiNum) / 12) - 1;
+                
+                const cents = (midiNum - Math.round(midiNum)) * 100;
+                
+                return {
+                    noteName: noteName,
+                    octave: octave,
+                    cents: cents
+                };
+            }
+
+            // --- Actualización de la Interfaz de Usuario ---
+            function updateUI(noteData) {
+                const { noteName, octave, cents } = noteData;
+
+                // 1. Actualizar texto con octava
+                noteDisplay.textContent = noteName + octave;
+                centsDisplay.textContent = `${cents >= 0 ? '+' : ''}${cents.toFixed(0)} cents`;
+
+                // 2. Mover la aguja
+                const leftPercentage = 50 + (cents * 1.0);
+                const clampedLeft = Math.max(0, Math.min(100, leftPercentage));
+                
+                needle.style.left = `${clampedLeft}%`;
+                needle.style.transform = `translate(-50%, -50%)`;
+
+                // 3. Cambiar color si está afinado
+                if (Math.abs(cents) < 5) {
+                    noteDisplay.classList.add('in-tune');
+                    needle.classList.add('in-tune-needle');
+                } else {
+                    noteDisplay.classList.remove('in-tune');
+                    needle.classList.remove('in-tune-needle');
+                    
+                    if (cents < 0) {
+                        noteDisplay.style.color = '#f8b400';
+                    } else {
+                        noteDisplay.style.color = '#ef4444';
+                    }
+                }
+            }
+
+            // --- Reiniciar la UI cuando no hay sonido ---
+            function resetUI() {
+                noteDisplay.textContent = '--';
+                noteDisplay.style.color = '';
+                noteDisplay.classList.remove('in-tune');
+                centsDisplay.innerHTML = '&nbsp;';
+                
+                needle.style.left = '50%';
+                needle.style.transform = 'translate(-50%, -50%)';
+                needle.classList.remove('in-tune-needle');
+            }
+        });
+    </script>
+</body>
+</html>
