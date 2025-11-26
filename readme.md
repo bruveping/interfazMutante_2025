@@ -18,11 +18,14 @@ Afinador de Instrumentos Pro 3 [Afinador de Instrumentos Pro 3](https://bruvepin
 
 Afinador de Instrumentos Pro 4 [Afinador de Instrumentos Pro 4](https://bruveping.github.io/interfazMutante_2025/afinador_de_instrumentos_pro_4/)
 
+Afinador de Instrumentos Pro 5 [Afinador de Instrumentos Pro 5](https://bruveping.github.io/interfazMutante_2025/afinador_de_instrumentos_pro_5/)
+
 Selector de colores [Selector de colores](https://bruveping.github.io/interfazMutante_2025/selector_de_colores/) 
 
 visualizador de colores [visualizador de colores](https://bruveping.github.io/interfazMutante_2025/visualizador_de_colores) 
 
 Otro visualizador de colores [visualizador de colores 3](https://bruveping.github.io/interfazMutante_2025/visualizador_colores_3) 
+
 
 
 
