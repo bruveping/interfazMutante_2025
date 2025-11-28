@@ -28,7 +28,11 @@ Otro visualizador de colores [visualizador de colores 3](https://bruveping.githu
 
 Analizar archivos de audio [analizar archivos de audio](https://bruveping.github.io/interfazMutante_2025/analizar_archivos_audio02) 
 
-Analizar archivos de audio [analizar archivos de audio 03](https://bruveping.github.io/interfazMutante_2025/analizar_archivos_audio03) 
+Analizar archivos de audio [analizar archivos de audio 03](https://bruveping.github.io/interfazMutante_2025/analizar_archivos_audio03)
+
+Analizar archivos de audio [analizar archivos de audio 04](https://bruveping.github.io/interfazMutante_2025/analizar_archivos_audio04)
+
+
 
 
 
