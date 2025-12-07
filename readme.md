@@ -32,6 +32,9 @@ Analizar archivos de audio [analizar archivos de audio 03](https://bruveping.git
 
 Analizar archivos de audio [analizar archivos de audio 04](https://bruveping.github.io/interfazMutante_2025/analizar_archivos_audio04)
 
+Mezclar audio [Mezclar audio](https://bruveping.github.io/interfazMutante_2025/mezclar_audio)
+
+
 
 
 
