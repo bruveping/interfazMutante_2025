@@ -1,0 +1,812 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DJ PRO STATION V3 // TOUCH WAVEFORM</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --neon-blue: #06b6d4;
+            --neon-pink: #f43f5e;
+            --bg-dark: #0f1115;
+            --panel-bg: #111827;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #000;
+            color: #e5e7eb;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        .mono { font-family: 'JetBrains Mono', monospace; }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: #111827; }
+        ::-webkit-scrollbar-thumb { background: #374151; }
+
+        /* General Range Reset */
+        input[type=range] { -webkit-appearance: none; background: transparent; }
+        input[type=range]:focus { outline: none; }
+
+        /* EQ Sliders (Vertical) */
+        .eq-container {
+            position: relative;
+            height: 140px;
+            width: 30px;
+            display: flex;
+            justify-content: center;
+        }
+        
+        .eq-slider {
+            writing-mode: bt-lr; /* IE/Edge */
+            -webkit-appearance: slider-vertical; /* Webkit */
+            width: 24px; 
+            height: 100%; 
+            background: transparent;
+            cursor: pointer;
+            z-index: 2;
+            position: relative;
+        }
+        
+        /* EQ Background Track & Zero Marker */
+        .eq-track {
+            position: absolute;
+            top: 0; bottom: 0; left: 12px;
+            width: 6px;
+            background: #1f2937;
+            border-radius: 3px;
+            z-index: 1;
+        }
+        /* Zero Point Marker (80% from bottom because range is -40 to +10, so 0 is high up) */
+        .eq-zero-marker {
+            position: absolute;
+            top: 20%; /* 10dB is top, -40dB bottom. 0dB is 20% from top */
+            left: -4px;
+            right: -4px;
+            height: 2px;
+            background: #9ca3af;
+            z-index: 0;
+            box-shadow: 0 0 4px rgba(255,255,255,0.5);
+        }
+
+        /* Crossfader Styling */
+        #crossfader {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 40px;
+            background: #1f2937;
+            border-radius: 4px;
+            border: 2px solid #374151;
+            position: relative;
+            z-index: 10;
+        }
+        #crossfader::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 60px;
+            height: 40px;
+            background: linear-gradient(90deg, #374151 10%, #9ca3af 50%, #374151 90%);
+            border: 1px solid #000;
+            border-radius: 2px;
+            cursor: col-resize;
+            box-shadow: 0 0 10px rgba(0,0,0,0.5);
+            margin-top: -2px;
+        }
+        
+        /* Deck Containers */
+        .deck-container {
+            transition: border-color 0.2s;
+            border: 1px solid #374151;
+        }
+        .deck-active-a { border-color: var(--neon-blue); box-shadow: 0 0 15px rgba(6, 182, 212, 0.1); }
+        .deck-active-b { border-color: var(--neon-pink); box-shadow: 0 0 15px rgba(244, 63, 94, 0.1); }
+
+        .btn-loop {
+            font-size: 10px;
+            padding: 4px 0;
+            background: #374151;
+            color: #9ca3af;
+            border-radius: 3px;
+            font-weight: 600;
+            border: 1px solid #4b5563;
+        }
+        .btn-loop:hover { background: #4b5563; color: white; border-color: #6b7280; }
+        .btn-loop:active { transform: scale(0.95); background: #000; }
+        
+        /* Canvas Scrubbing Cursor */
+        .canvas-scrub-area {
+            cursor: ew-resize; /* Cursor de redimensionar horizontal para indicar scroll */
+        }
+        
+        /* Canvas */
+        canvas { display: block; width: 100%; height: 100%; }
+    </style>
+</head>
+<body class="h-screen flex flex-col bg-black">
+
+    <!-- Header / Top Bar -->
+    <header class="h-10 bg-gray-900 border-b border-gray-800 flex items-center justify-between px-4 shrink-0 z-20">
+        <div class="flex items-center gap-2">
+            <span class="text-xl">🎛️</span>
+            <h1 class="font-bold text-gray-200 tracking-wider text-sm">DJ STATION <span class="text-cyan-500 text-[10px] align-top">V3</span></h1>
+        </div>
+        <div class="flex gap-4 text-[10px] font-mono text-gray-500">
+            <div>AUDIO: <span id="ctx-state" class="text-green-500">READY</span></div>
+        </div>
+    </header>
+
+    <!-- Main Workspace -->
+    <div class="flex-1 flex overflow-hidden relative">
+        
+        <!-- DECK A (LEFT) -->
+        <div id="deck-a" class="flex-1 flex flex-col bg-gray-900/50 border-r border-gray-800 deck-container relative">
+            <!-- Header A -->
+            <div class="p-2 bg-gray-800 flex justify-between items-center border-b border-gray-700">
+                <div class="flex items-center gap-2 overflow-hidden">
+                    <div class="w-6 h-6 bg-cyan-900 rounded flex items-center justify-center font-bold text-cyan-400 border border-cyan-700 text-xs">A</div>
+                    <div id="title-a" class="text-xs font-mono text-cyan-100 truncate max-w-[200px]">Sin Pista</div>
+                </div>
+                <button onclick="document.getElementById('file-a').click()" class="bg-gray-700 hover:bg-gray-600 text-[10px] px-3 py-1 rounded text-cyan-400 font-bold border border-gray-600 uppercase">Load Track</button>
+                <input type="file" id="file-a" class="hidden" accept="audio/*">
+            </div>
+
+            <!-- Visualizer A (INTERACTIVE) -->
+            <div id="wave-container-a" class="h-40 bg-black relative w-full group border-b border-gray-800 canvas-scrub-area touch-none">
+                <canvas id="canvas-a"></canvas>
+                
+                <!-- Playhead Cursor -->
+                <div id="cursor-a" class="absolute top-0 bottom-0 w-0.5 bg-cyan-500 pointer-events-none z-20 shadow-[0_0_10px_#06b6d4]" style="left: 0%"></div>
+                
+                <!-- Loop Markers -->
+                <div id="loop-a-start" class="absolute top-0 bottom-0 w-0 border-l border-dashed border-green-500 hidden pointer-events-none opacity-80 z-10"><span class="bg-green-600 text-white text-[9px] px-1 absolute top-0">IN</span></div>
+                <div id="loop-a-end" class="absolute top-0 bottom-0 w-0 border-l border-dashed border-red-500 hidden pointer-events-none opacity-80 z-10"><span class="bg-red-600 text-white text-[9px] px-1 absolute bottom-0 right-0">OUT</span></div>
+                
+                <!-- Time Overlay -->
+                <div class="absolute bottom-2 left-2 font-mono text-lg text-cyan-500 bg-black/60 px-2 rounded backdrop-blur-sm pointer-events-none" id="time-a">00:00</div>
+                
+                <!-- Helper text -->
+                <div class="absolute top-2 right-2 text-[9px] text-gray-500 bg-black/40 px-1 rounded pointer-events-none opacity-0 group-hover:opacity-100 transition">Drag to Seek</div>
+            </div>
+
+            <!-- Controls A -->
+            <div class="flex-1 p-4 flex flex-col gap-4 overflow-y-auto">
+                
+                <!-- Transport & Loop -->
+                <div class="flex flex-wrap gap-2 justify-between items-start mt-2">
+                    <div class="flex gap-2">
+                        <button onclick="deckA.togglePlay()" id="btn-play-a" class="w-20 h-20 rounded-full bg-gray-800 border-2 border-cyan-600 hover:bg-cyan-900 text-cyan-400 flex items-center justify-center shadow-[0_0_20px_rgba(6,182,212,0.2)] transition active:scale-95">
+                            <svg class="w-10 h-10" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                        </button>
+                        <div class="flex flex-col gap-2">
+                            <button onclick="deckA.stop()" class="w-12 h-9 rounded bg-gray-800 hover:bg-red-900/50 text-gray-400 flex items-center justify-center border border-gray-700 active:bg-red-900">
+                                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12"/></svg>
+                            </button>
+                            <!-- Loop Controls IN / OUT / EXIT in one row -->
+                            <div class="flex gap-1.5">
+                                <button onclick="deckA.setLoopIn()" class="w-10 h-8 rounded bg-gray-800 hover:bg-cyan-900/50 text-cyan-200 text-xs font-bold border border-gray-700 active:bg-cyan-900">IN</button>
+                                <button onclick="deckA.setLoopOut()" class="w-10 h-8 rounded bg-gray-800 hover:bg-rose-900/50 text-rose-200 text-xs font-bold border border-gray-700 active:bg-rose-900">OUT</button>
+                                <button onclick="deckA.exitLoop()" class="w-10 h-8 rounded bg-gray-800 hover:bg-gray-700/50 text-gray-400 text-xs font-bold border border-gray-700 active:bg-gray-700">EXIT</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Loop Section -->
+                    <div class="bg-gray-800 p-3 rounded border border-gray-700 flex flex-col gap-2 w-full md:w-auto shadow-lg">
+                        <div class="flex justify-between items-center mb-1 border-b border-gray-700 pb-1">
+                            <span class="text-[10px] font-bold text-cyan-500 uppercase tracking-wider">Loop / Beatjump</span>
+                            <div class="text-[9px] text-gray-500">Base: <span id="loop-base-a">--</span>s</div>
+                        </div>
+                        
+                        <!-- Grid de botones Extendida -->
+                        <div class="grid grid-cols-5 gap-1">
+                            <button class="btn-loop text-cyan-200" onclick="deckA.setLoopFraction(2)">/2</button>
+                            <button class="btn-loop text-cyan-200" onclick="deckA.setLoopFraction(4)">/4</button>
+                            <button class="btn-loop text-cyan-200" onclick="deckA.setLoopFraction(8)">/8</button>
+                            <button class="btn-loop text-cyan-200" onclick="deckA.setLoopFraction(16)">/16</button>
+                            <button class="btn-loop text-cyan-200" onclick="deckA.setLoopFraction(32)">/32</button>
+                            
+                            <button class="btn-loop text-yellow-200" onclick="deckA.setLoopFraction(3)">/3</button>
+                            <button class="btn-loop text-yellow-200" onclick="deckA.setLoopFraction(6)">/6</button>
+                            <button class="btn-loop text-yellow-200" onclick="deckA.setLoopFraction(12)">/12</button>
+                            <button class="btn-loop text-white font-bold bg-gray-600" onclick="deckA.restoreOriginalLoop()">1/1</button>
+                            <button class="btn-loop text-purple-300" onclick="deckA.setLoopFraction(64)">/64</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Pitch Only -->
+                <div class="mt-2 p-2 rounded border border-gray-700 bg-gray-800/30">
+                     <label class="text-[10px] text-gray-500 uppercase flex justify-between">Pitch / Detune <span id="pitch-val-a" class="text-cyan-400">0</span></label>
+                     <input type="range" class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer mt-1" min="-1200" max="1200" step="10" value="0" oninput="deckA.setDetune(this.value)" ondblclick="deckA.setDetune(0); this.value=0;">
+                </div>
+            </div>
+        </div>
+
+        <!-- MIXER (CENTER) -->
+        <div class="w-32 md:w-40 bg-[#15181e] border-l border-r border-gray-800 flex flex-col items-center py-4 gap-4 shrink-0 z-10 shadow-2xl">
+            
+            <div class="text-[10px] font-bold text-gray-500 tracking-[0.2em] text-center w-full border-b border-gray-800 pb-2">EQ MIX</div>
+            <div class="text-[9px] text-gray-600 text-center">Dbl-Click to Reset</div>
+
+            <div class="flex-1 flex gap-2 justify-center w-full px-1">
+                <!-- EQs Deck A -->
+                <div class="flex flex-col gap-1 items-center flex-1">
+                    <!-- HI -->
+                    <div class="flex flex-col items-center flex-1 w-full">
+                        <span class="text-[9px] text-cyan-600 mb-1 font-bold">HI</span>
+                        <div class="eq-container">
+                            <div class="eq-track"><div class="eq-zero-marker"></div></div>
+                            <input type="range" class="eq-slider accent-cyan-500" orient="vertical" min="-40" max="10" value="0" 
+                                   oninput="deckA.setEQ('high', this.value, 'lbl-a-hi')" 
+                                   ondblclick="this.value=0; deckA.setEQ('high', 0, 'lbl-a-hi')">
+                        </div>
+                        <span id="lbl-a-hi" class="text-[8px] text-gray-400 mt-1 font-mono">0</span>
+                    </div>
+                    <!-- MID -->
+                    <div class="flex flex-col items-center flex-1 w-full">
+                        <span class="text-[9px] text-cyan-600 mb-1 font-bold">MID</span>
+                        <div class="eq-container">
+                            <div class="eq-track"><div class="eq-zero-marker"></div></div>
+                            <input type="range" class="eq-slider accent-cyan-500" orient="vertical" min="-40" max="10" value="0" 
+                                   oninput="deckA.setEQ('mid', this.value, 'lbl-a-mid')" 
+                                   ondblclick="this.value=0; deckA.setEQ('mid', 0, 'lbl-a-mid')">
+                        </div>
+                        <span id="lbl-a-mid" class="text-[8px] text-gray-400 mt-1 font-mono">0</span>
+                    </div>
+                    <!-- LOW -->
+                    <div class="flex flex-col items-center flex-1 w-full">
+                        <span class="text-[9px] text-cyan-600 mb-1 font-bold">LOW</span>
+                        <div class="eq-container">
+                            <div class="eq-track"><div class="eq-zero-marker"></div></div>
+                            <input type="range" class="eq-slider accent-cyan-500" orient="vertical" min="-40" max="10" value="0" 
+                                   oninput="deckA.setEQ('low', this.value, 'lbl-a-low')" 
+                                   ondblclick="this.value=0; deckA.setEQ('low', 0, 'lbl-a-low')">
+                        </div>
+                        <span id="lbl-a-low" class="text-[8px] text-gray-400 mt-1 font-mono">0</span>
+                    </div>
+                </div>
+
+                 <!-- EQs Deck B -->
+                 <div class="flex flex-col gap-1 items-center flex-1 border-l border-gray-800 pl-1">
+                    <!-- HI -->
+                    <div class="flex flex-col items-center flex-1 w-full">
+                        <span class="text-[9px] text-rose-600 mb-1 font-bold">HI</span>
+                        <div class="eq-container">
+                            <div class="eq-track"><div class="eq-zero-marker"></div></div>
+                            <input type="range" class="eq-slider accent-rose-500" orient="vertical" min="-40" max="10" value="0" 
+                                   oninput="deckB.setEQ('high', this.value, 'lbl-b-hi')" 
+                                   ondblclick="this.value=0; deckB.setEQ('high', 0, 'lbl-b-hi')">
+                        </div>
+                        <span id="lbl-b-hi" class="text-[8px] text-gray-400 mt-1 font-mono">0</span>
+                    </div>
+                    <!-- MID -->
+                    <div class="flex flex-col items-center flex-1 w-full">
+                        <span class="text-[9px] text-rose-600 mb-1 font-bold">MID</span>
+                        <div class="eq-container">
+                            <div class="eq-track"><div class="eq-zero-marker"></div></div>
+                            <input type="range" class="eq-slider accent-rose-500" orient="vertical" min="-40" max="10" value="0" 
+                                   oninput="deckB.setEQ('mid', this.value, 'lbl-b-mid')" 
+                                   ondblclick="this.value=0; deckB.setEQ('mid', 0, 'lbl-b-mid')">
+                        </div>
+                        <span id="lbl-b-mid" class="text-[8px] text-gray-400 mt-1 font-mono">0</span>
+                    </div>
+                    <!-- LOW -->
+                    <div class="flex flex-col items-center flex-1 w-full">
+                        <span class="text-[9px] text-rose-600 mb-1 font-bold">LOW</span>
+                        <div class="eq-container">
+                            <div class="eq-track"><div class="eq-zero-marker"></div></div>
+                            <input type="range" class="eq-slider accent-rose-500" orient="vertical" min="-40" max="10" value="0" 
+                                   oninput="deckB.setEQ('low', this.value, 'lbl-b-low')" 
+                                   ondblclick="this.value=0; deckB.setEQ('low', 0, 'lbl-b-low')">
+                        </div>
+                        <span id="lbl-b-low" class="text-[8px] text-gray-400 mt-1 font-mono">0</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- DECK B (RIGHT) -->
+        <div id="deck-b" class="flex-1 flex flex-col bg-gray-900/50 deck-container relative">
+            <!-- Header B -->
+            <div class="p-2 bg-gray-800 flex justify-between items-center border-b border-gray-700">
+                <div class="flex items-center gap-2 overflow-hidden">
+                    <div class="w-6 h-6 bg-rose-900 rounded flex items-center justify-center font-bold text-rose-400 border border-rose-700 text-xs">B</div>
+                    <div id="title-b" class="text-xs font-mono text-rose-100 truncate max-w-[200px]">Sin Pista</div>
+                </div>
+                <button onclick="document.getElementById('file-b').click()" class="bg-gray-700 hover:bg-gray-600 text-[10px] px-3 py-1 rounded text-rose-400 font-bold border border-gray-600 uppercase">Load Track</button>
+                <input type="file" id="file-b" class="hidden" accept="audio/*">
+            </div>
+
+            <!-- Visualizer B (INTERACTIVE) -->
+            <div id="wave-container-b" class="h-40 bg-black relative w-full group border-b border-gray-800 canvas-scrub-area touch-none">
+                <canvas id="canvas-b"></canvas>
+                
+                <!-- Playhead Cursor -->
+                <div id="cursor-b" class="absolute top-0 bottom-0 w-0.5 bg-rose-500 pointer-events-none z-20 shadow-[0_0_10px_#f43f5e]" style="left: 0%"></div>
+                
+                <!-- Loop Markers -->
+                <div id="loop-b-start" class="absolute top-0 bottom-0 w-0 border-l border-dashed border-green-500 hidden pointer-events-none opacity-80 z-10"><span class="bg-green-600 text-white text-[9px] px-1 absolute top-0">IN</span></div>
+                <div id="loop-b-end" class="absolute top-0 bottom-0 w-0 border-l border-dashed border-red-500 hidden pointer-events-none opacity-80 z-10"><span class="bg-red-600 text-white text-[9px] px-1 absolute bottom-0 right-0">OUT</span></div>
+ 
+                <!-- Time Overlay -->
+                <div class="absolute bottom-2 right-2 font-mono text-lg text-rose-500 bg-black/60 px-2 rounded backdrop-blur-sm pointer-events-none" id="time-b">00:00</div>
+
+                <!-- Helper text -->
+                <div class="absolute top-2 left-2 text-[9px] text-gray-500 bg-black/40 px-1 rounded pointer-events-none opacity-0 group-hover:opacity-100 transition">Drag to Seek</div>
+            </div>
+
+            <!-- Controls B -->
+            <div class="flex-1 p-4 flex flex-col gap-4 overflow-y-auto">
+                 
+                <!-- Transport & Loop -->
+                <div class="flex flex-wrap gap-2 justify-between items-start mt-2">
+                    <div class="flex gap-2">
+                        <button onclick="deckB.togglePlay()" id="btn-play-b" class="w-20 h-20 rounded-full bg-gray-800 border-2 border-rose-600 hover:bg-rose-900 text-rose-400 flex items-center justify-center shadow-[0_0_20px_rgba(244,63,94,0.2)] transition active:scale-95">
+                            <svg class="w-10 h-10" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                        </button>
+                        <div class="flex flex-col gap-2">
+                            <button onclick="deckB.stop()" class="w-12 h-9 rounded bg-gray-800 hover:bg-red-900/50 text-gray-400 flex items-center justify-center border border-gray-700 active:bg-red-900">
+                                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12"/></svg>
+                            </button>
+                            <!-- Loop Controls IN / OUT / EXIT in one row -->
+                            <div class="flex gap-1.5">
+                                <button onclick="deckB.setLoopIn()" class="w-10 h-8 rounded bg-gray-800 hover:bg-cyan-900/50 text-cyan-200 text-xs font-bold border border-gray-700 active:bg-cyan-900">IN</button>
+                                <button onclick="deckB.setLoopOut()" class="w-10 h-8 rounded bg-gray-800 hover:bg-rose-900/50 text-rose-200 text-xs font-bold border border-gray-700 active:bg-rose-900">OUT</button>
+                                <button onclick="deckB.exitLoop()" class="w-10 h-8 rounded bg-gray-800 hover:bg-gray-700/50 text-gray-400 text-xs font-bold border border-gray-700 active:bg-gray-700">EXIT</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Loop Section -->
+                    <div class="bg-gray-800 p-3 rounded border border-gray-700 flex flex-col gap-2 w-full md:w-auto shadow-lg">
+                        <div class="flex justify-between items-center mb-1 border-b border-gray-700 pb-1">
+                            <span class="text-[10px] font-bold text-rose-500 uppercase tracking-wider">Loop / Beatjump</span>
+                            <div class="text-[9px] text-gray-500">Base: <span id="loop-base-b">--</span>s</div>
+                        </div>
+                        
+                        <!-- Grid de botones -->
+                        <div class="grid grid-cols-5 gap-1">
+                            <button class="btn-loop text-rose-200" onclick="deckB.setLoopFraction(2)">/2</button>
+                            <button class="btn-loop text-rose-200" onclick="deckB.setLoopFraction(4)">/4</button>
+                            <button class="btn-loop text-rose-200" onclick="deckB.setLoopFraction(8)">/8</button>
+                            <button class="btn-loop text-rose-200" onclick="deckB.setLoopFraction(16)">/16</button>
+                            <button class="btn-loop text-rose-200" onclick="deckB.setLoopFraction(32)">/32</button>
+                            
+                            <button class="btn-loop text-yellow-200" onclick="deckB.setLoopFraction(3)">/3</button>
+                            <button class="btn-loop text-yellow-200" onclick="deckB.setLoopFraction(6)">/6</button>
+                            <button class="btn-loop text-yellow-200" onclick="deckB.setLoopFraction(12)">/12</button>
+                            <button class="btn-loop text-white font-bold bg-gray-600" onclick="deckB.restoreOriginalLoop()">1/1</button>
+                            <button class="btn-loop text-purple-300" onclick="deckB.setLoopFraction(64)">/64</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Pitch Only -->
+                <div class="mt-2 p-2 rounded border border-gray-700 bg-gray-800/30">
+                     <label class="text-[10px] text-gray-500 uppercase flex justify-between">Pitch / Detune <span id="pitch-val-b" class="text-rose-400">0</span></label>
+                     <input type="range" class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer mt-1" min="-1200" max="1200" step="10" value="0" oninput="deckB.setDetune(this.value)" ondblclick="deckB.setDetune(0); this.value=0;">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- BOTTOM CROSSFADER SECTION -->
+    <div class="h-20 bg-gray-900 border-t border-gray-800 flex flex-col items-center justify-center shrink-0 px-8 relative z-30">
+        <div class="w-full max-w-4xl flex items-center gap-4">
+            <div class="font-bold text-cyan-600 text-xl">A</div>
+            
+            <div class="flex-1 relative h-12 flex items-center">
+                <!-- Background marks -->
+                <div class="absolute inset-0 flex justify-between px-2 pointer-events-none">
+                   <div class="w-px h-full bg-gray-700"></div>
+                   <div class="w-px h-full bg-gray-600 h-6 mt-3"></div> <!-- Center -->
+                   <div class="w-px h-full bg-gray-700"></div>
+                </div>
+                <input id="crossfader" type="range" min="0" max="100" value="50" oninput="updateCrossfader(this.value)" ondblclick="this.value=50; updateCrossfader(50);">
+            </div>
+            
+            <div class="font-bold text-rose-600 text-xl">B</div>
+        </div>
+    </div>
+
+<script>
+/**
+ * DJ PRO AUDIO ENGINE V3
+ */
+
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+let deckA, deckB;
+
+class Deck {
+    constructor(id, color) {
+        this.id = id;
+        this.color = color;
+        this.buffer = null;
+        this.source = null;
+        
+        // Audio Graph
+        this.gainNode = audioCtx.createGain();
+        this.eqLow = audioCtx.createBiquadFilter();
+        this.eqMid = audioCtx.createBiquadFilter();
+        this.eqHigh = audioCtx.createBiquadFilter();
+        this.analyser = audioCtx.createAnalyser();
+
+        // Config Nodes
+        this.eqLow.type = "lowshelf";
+        this.eqLow.frequency.value = 320;
+        this.eqMid.type = "peaking";
+        this.eqMid.frequency.value = 1000;
+        this.eqMid.Q.value = 1.0;
+        this.eqHigh.type = "highshelf";
+        this.eqHigh.frequency.value = 3200;
+
+        // Chain
+        this.eqHigh.connect(this.eqMid);
+        this.eqMid.connect(this.eqLow);
+        this.eqLow.connect(this.gainNode);
+        this.gainNode.connect(this.analyser);
+        this.analyser.connect(audioCtx.destination);
+        this.analyser.fftSize = 1024;
+
+        // State
+        this.isPlaying = false;
+        this.startTime = 0;
+        this.pausedAt = 0;
+        this.detune = 0;
+        
+        // Loop State V2 (Absolute Logic)
+        this.loopStart = 0;
+        this.loopEnd = 0;
+        this.isLoopActive = false;
+        this.originalLoopLength = 0; 
+        
+        // UI Refs
+        this.container = document.getElementById(`wave-container-${id}`);
+        this.canvas = document.getElementById(`canvas-${id}`);
+        this.ctx = this.canvas.getContext('2d');
+        this.cursor = document.getElementById(`cursor-${id}`);
+        this.timeDisplay = document.getElementById(`time-${id}`);
+        this.playBtnIcon = document.querySelector(`#btn-play-${id} svg`);
+        
+        // Canvas Interaction Setup
+        this.setupCanvasInteraction();
+
+        this.resizeCanvas();
+        window.addEventListener('resize', () => this.resizeCanvas());
+        this.draw();
+    }
+
+    setupCanvasInteraction() {
+        let isDragging = false;
+
+        const seek = (e) => {
+            if(!this.buffer) return;
+            const rect = this.canvas.getBoundingClientRect();
+            // Handle both Mouse and Touch
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            let x = clientX - rect.left;
+            // Clamp
+            x = Math.max(0, Math.min(x, rect.width));
+            
+            const pct = x / rect.width;
+            const targetTime = pct * this.buffer.duration;
+            
+            // Scrub logic
+            const wasPlaying = this.isPlaying;
+            if(wasPlaying) {
+                // To avoid stutter, we just update pausedAt and restart logic in loop if needed
+                // But simplified: pause, update, play
+                this.pause();
+            }
+            this.pausedAt = targetTime;
+            this.updateUI(targetTime);
+            if(wasPlaying) this.play();
+        };
+
+        // Mouse Events
+        this.container.addEventListener('mousedown', (e) => {
+            isDragging = true;
+            seek(e);
+        });
+        window.addEventListener('mousemove', (e) => {
+            if(isDragging) seek(e);
+        });
+        window.addEventListener('mouseup', () => {
+            isDragging = false;
+        });
+
+        // Touch Events
+        this.container.addEventListener('touchstart', (e) => {
+            isDragging = true;
+            seek(e);
+        }, {passive: false});
+        this.container.addEventListener('touchmove', (e) => {
+            if(isDragging) {
+                e.preventDefault(); // Prevent scroll
+                seek(e);
+            }
+        }, {passive: false});
+        this.container.addEventListener('touchend', () => isDragging = false);
+    }
+
+    resizeCanvas() {
+        this.canvas.width = this.container.clientWidth;
+        this.canvas.height = this.container.clientHeight;
+        if(this.buffer) this.drawWaveform();
+    }
+
+    async loadFile(file) {
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            const data = await audioCtx.decodeAudioData(e.target.result);
+            this.buffer = data;
+            document.getElementById(`title-${this.id}`).textContent = file.name;
+            this.stop();
+            this.drawWaveform();
+        };
+        reader.readAsArrayBuffer(file);
+    }
+
+    play() {
+        if (!this.buffer) return;
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+
+        this.source = audioCtx.createBufferSource();
+        this.source.buffer = this.buffer;
+        this.source.detune.value = this.detune;
+        
+        if (this.isLoopActive) {
+            this.source.loop = true;
+            this.source.loopStart = this.loopStart;
+            this.source.loopEnd = this.loopEnd;
+        }
+
+        this.source.connect(this.eqHigh);
+        
+        if (this.isLoopActive && (this.pausedAt < this.loopStart || this.pausedAt > this.loopEnd)) {
+            this.pausedAt = this.loopStart;
+        }
+
+        this.startTime = audioCtx.currentTime - this.pausedAt;
+        this.source.start(0, this.pausedAt);
+        this.isPlaying = true;
+        this.updatePlayBtn();
+    }
+
+    pause() {
+        if (this.source) {
+            this.pausedAt = this.getCurrentTime();
+            try { this.source.stop(); } catch(e){}
+            this.source = null;
+        }
+        this.isPlaying = false;
+        this.updatePlayBtn();
+    }
+
+    togglePlay() {
+        if (this.isPlaying) this.pause();
+        else this.play();
+    }
+
+    stop() {
+        if (this.source) {
+            try{ this.source.stop(); }catch(e){}
+            this.source = null;
+        }
+        this.isPlaying = false;
+        this.pausedAt = 0;
+        this.isLoopActive = false;
+        this.hideLoopMarkers();
+        this.updateUI(0);
+        this.updatePlayBtn();
+    }
+
+    getCurrentTime() {
+        if (!this.isPlaying) return this.pausedAt;
+        let curr = audioCtx.currentTime - this.startTime;
+        if (this.isLoopActive) {
+            const duration = this.loopEnd - this.loopStart;
+            if (curr >= this.loopEnd) {
+                 const offset = (curr - this.loopStart) % duration;
+                 curr = this.loopStart + offset;
+            }
+        } else if (curr >= this.buffer.duration) {
+            this.pause(); 
+            return this.buffer.duration;
+        }
+        return curr;
+    }
+
+    // --- Loop Logic ---
+    setLoopIn() {
+        if (!this.buffer) return;
+        this.loopStart = this.getCurrentTime();
+        this.drawLoopMarkers();
+        this.originalLoopLength = 0;
+        document.getElementById(`loop-base-${this.id}`).innerText = "--";
+    }
+
+    setLoopOut() {
+        if (!this.buffer) return;
+        const now = this.getCurrentTime();
+        if (now > this.loopStart) {
+            this.loopEnd = now;
+            this.isLoopActive = true;
+            this.originalLoopLength = this.loopEnd - this.loopStart;
+            document.getElementById(`loop-base-${this.id}`).innerText = this.originalLoopLength.toFixed(2);
+            this.restartStreamForLoop();
+        }
+        this.drawLoopMarkers();
+    }
+
+    setLoopFraction(denominator) {
+        if (!this.buffer || !this.originalLoopLength) return;
+        const newLength = this.originalLoopLength / denominator;
+        this.loopEnd = this.loopStart + newLength;
+        this.forceLoopOn();
+    }
+
+    restoreOriginalLoop() {
+        if (!this.buffer || !this.originalLoopLength) return;
+        this.loopEnd = this.loopStart + this.originalLoopLength;
+        this.forceLoopOn();
+    }
+
+    forceLoopOn() {
+        this.isLoopActive = true;
+        this.drawLoopMarkers();
+        this.restartStreamForLoop();
+    }
+
+    exitLoop() {
+        this.isLoopActive = false;
+        this.hideLoopMarkers();
+        this.restartStreamForLoop();
+    }
+
+    restartStreamForLoop() {
+        if (this.isPlaying && this.source) {
+            this.source.loop = this.isLoopActive;
+            this.source.loopStart = this.loopStart;
+            this.source.loopEnd = this.loopEnd;
+            const curr = this.getCurrentTime();
+            if (this.isLoopActive && (curr < this.loopStart || curr > this.loopEnd)) {
+                this.pause(); this.play(); 
+            }
+        }
+    }
+
+    // --- Visuals ---
+    drawWaveform() {
+        if (!this.buffer) return;
+        const data = this.buffer.getChannelData(0);
+        const w = this.canvas.width;
+        const h = this.canvas.height;
+        const step = Math.ceil(data.length / w);
+        const amp = h / 2;
+
+        this.ctx.clearRect(0, 0, w, h);
+        this.ctx.fillStyle = '#111827'; 
+        this.ctx.fillRect(0,0,w,h);
+        
+        this.ctx.beginPath();
+        this.ctx.strokeStyle = this.color;
+        this.ctx.lineWidth = 1;
+        
+        for (let i = 0; i < w; i++) {
+            let min = 1.0, max = -1.0;
+            for (let j = 0; j < step; j++) {
+                const datum = data[(i * step) + j];
+                if (datum < min) min = datum;
+                if (datum > max) max = datum;
+            }
+            const y1 = (1 + min) * amp;
+            const y2 = (1 + max) * amp;
+            this.ctx.moveTo(i, y1);
+            this.ctx.lineTo(i, y2);
+        }
+        this.ctx.stroke();
+        this.drawLoopMarkers();
+    }
+
+    draw() {
+        requestAnimationFrame(() => this.draw());
+        if (!this.buffer) return;
+        const time = this.getCurrentTime();
+        this.updateUI(time);
+    }
+
+    updateUI(time) {
+        if(!this.buffer) return;
+        const min = Math.floor(time / 60);
+        const sec = Math.floor(time % 60);
+        const ms = Math.floor((time % 1) * 100);
+        this.timeDisplay.innerText = `${min}:${sec.toString().padStart(2,'0')}.${ms.toString().padStart(2,'0')}`;
+        const pct = (time / this.buffer.duration) * 100;
+        this.cursor.style.left = pct + '%';
+    }
+
+    drawLoopMarkers() {
+        if (!this.buffer) return;
+        const elStart = document.getElementById(`loop-${this.id}-start`);
+        const elEnd = document.getElementById(`loop-${this.id}-end`);
+        if (this.loopStart > 0 || this.isLoopActive) {
+            elStart.style.display = 'block';
+            elStart.style.left = (this.loopStart / this.buffer.duration * 100) + '%';
+        }
+        if (this.loopEnd < this.buffer.duration && this.loopEnd > 0) {
+            elEnd.style.display = 'block';
+            elEnd.style.left = (this.loopEnd / this.buffer.duration * 100) + '%';
+        }
+    }
+    
+    hideLoopMarkers() {
+        document.getElementById(`loop-${this.id}-start`).style.display = 'none';
+        document.getElementById(`loop-${this.id}-end`).style.display = 'none';
+    }
+
+    updatePlayBtn() {
+        if (this.isPlaying) {
+            this.playBtnIcon.innerHTML = '<rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>';
+        } else {
+            this.playBtnIcon.innerHTML = '<path d="M8 5v14l11-7z"/>';
+        }
+    }
+
+    setDetune(val) {
+        this.detune = parseInt(val);
+        document.getElementById(`pitch-val-${this.id}`).textContent = (this.detune > 0 ? '+' : '') + this.detune;
+        if (this.source) this.source.detune.value = this.detune;
+    }
+
+    setEQ(type, val, labelId) {
+        const db = parseInt(val);
+        document.getElementById(labelId).innerText = (db > 0 ? '+' : '') + db + 'dB';
+        if (type === 'low') this.eqLow.gain.value = db;
+        if (type === 'mid') this.eqMid.gain.value = db;
+        if (type === 'high') this.eqHigh.gain.value = db;
+    }
+
+    setVolume(pct) {
+        this.gainNode.gain.value = pct;
+        const container = document.getElementById(`deck-${this.id}`);
+        if (pct > 0.8) container.classList.add(`deck-active-${this.id}`);
+        else container.classList.remove(`deck-active-${this.id}`);
+    }
+}
+
+deckA = new Deck('a', '#06b6d4');
+deckB = new Deck('b', '#f43f5e');
+
+function updateCrossfader(val) {
+    const v = parseInt(val);
+    deckA.setVolume((100 - v) / 100);
+    deckB.setVolume(v / 100);
+}
+deckA.setVolume(0.5);
+deckB.setVolume(0.5);
+
+document.getElementById('file-a').addEventListener('change', (e) => { if(e.target.files.length) deckA.loadFile(e.target.files[0]); });
+document.getElementById('file-b').addEventListener('change', (e) => { if(e.target.files.length) deckB.loadFile(e.target.files[0]); });
+
+window.addEventListener('keydown', (e) => {
+    if (e.target.tagName === 'INPUT') return;
+    switch(e.code) {
+        case 'KeyQ': deckA.togglePlay(); break;
+        case 'KeyW': deckA.setLoopIn(); break;
+        case 'KeyE': deckA.setLoopOut(); break;
+        case 'KeyR': deckA.exitLoop(); break;
+        case 'KeyU': deckB.togglePlay(); break;
+        case 'KeyI': deckB.setLoopIn(); break;
+        case 'KeyO': deckB.setLoopOut(); break;
+        case 'KeyP': deckB.exitLoop(); break;
+    }
+});
+</script>
+</body>
+</html>
