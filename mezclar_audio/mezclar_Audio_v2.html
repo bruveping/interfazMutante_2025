@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DJ PRO STATION V6 // SEAMLESS LOOPS</title>
+    <title>DJ PRO STATION V4 // QUEUE & GAIN</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
 
@@ -35,6 +35,7 @@
         input[type=range]:focus { outline: none; }
 
         /* --- VERTICAL SLIDERS (STRICT) --- */
+        /* Usamos transform para asegurar verticalidad en todos los navegadores si slider-vertical falla */
         .slider-vertical-wrapper {
             position: relative;
             height: 127px; /* REQUERIMIENTO: 127px */
@@ -80,8 +81,8 @@
         /* Volume Fader Specifics (Rectangular thumb) */
         .vol-fader::-webkit-slider-thumb {
             -webkit-appearance: none;
-            height: 24px;
-            width: 30px;
+            height: 24px; /* Ancho visual al estar rotado */
+            width: 30px;  /* Altura visual al estar rotado */
             border-radius: 2px;
             background: #fff;
             border: 1px solid #000;
@@ -119,11 +120,10 @@
             background: #374151;
             color: #9ca3af;
             border-radius: 3px;
-            font-weight: 700;
+            font-weight: 600;
             border: 1px solid #4b5563;
         }
         .btn-loop:hover { background: #4b5563; color: white; border-color: #6b7280; }
-        .btn-loop:active { transform: scale(0.95); }
         
         canvas { display: block; width: 100%; height: 100%; }
 
@@ -149,8 +149,8 @@
         <div class="flex items-center gap-3">
             <span class="text-2xl">🎛️</span>
             <div>
-                <h1 class="font-bold text-gray-200 tracking-wider text-sm leading-none">DJ STATION <span class="text-cyan-500 text-[10px] align-top">V6</span></h1>
-                <span class="text-[9px] text-gray-500 font-mono">SEAMLESS LOOPS // KILL EQs</span>
+                <h1 class="font-bold text-gray-200 tracking-wider text-sm leading-none">DJ STATION <span class="text-cyan-500 text-[10px] align-top">V4</span></h1>
+                <span class="text-[9px] text-gray-500 font-mono">MULTI-TRACK // GAIN-LINKED WAVEFORMS</span>
             </div>
         </div>
         
@@ -173,6 +173,7 @@
                     <div class="w-6 h-6 bg-cyan-900 rounded flex items-center justify-center font-bold text-cyan-400 border border-cyan-700 text-xs shadow-[0_0_10px_rgba(6,182,212,0.3)]">A</div>
                     <div id="title-a" class="text-xs font-mono text-cyan-100 truncate max-w-[200px]">No Track Loaded</div>
                 </div>
+                <div class="text-[10px] text-cyan-500 font-bold" id="bpm-a">-- BPM</div>
             </div>
 
             <!-- Visualizer A -->
@@ -181,46 +182,34 @@
                 <!-- Playhead -->
                 <div id="cursor-a" class="absolute top-0 bottom-0 w-0.5 bg-cyan-400 pointer-events-none z-20 shadow-[0_0_10px_#06b6d4]" style="left: 0%"></div>
                 <div class="absolute bottom-2 left-2 font-mono text-xl text-cyan-500 bg-black/60 px-2 rounded backdrop-blur-sm pointer-events-none" id="time-a">00:00</div>
-                <!-- Gain Indicator -->
+                <!-- Gain Indicator on Waveform -->
                 <div id="gain-indicator-a" class="absolute top-2 right-2 text-[10px] text-cyan-700 font-mono pointer-events-none transition-colors">GAIN x1.0</div>
             </div>
 
             <!-- Controls A -->
             <div class="flex-1 p-4 flex flex-col gap-4 overflow-y-auto bg-gradient-to-b from-gray-900 to-black">
-                <div class="flex flex-wrap gap-4 justify-between items-start">
+                <div class="flex flex-wrap gap-4 justify-center md:justify-start items-start">
                     <!-- Play/Cue -->
-                    <div class="flex flex-col gap-2 shrink-0">
+                    <div class="flex flex-col gap-2">
                         <button onclick="deckA.togglePlay()" id="btn-play-a" class="w-20 h-20 rounded-full bg-gray-800 border-2 border-cyan-600 hover:bg-cyan-900 hover:border-cyan-400 text-cyan-400 flex items-center justify-center shadow-[0_0_20px_rgba(6,182,212,0.15)] transition active:scale-95 active:shadow-[0_0_30px_rgba(6,182,212,0.4)]">
                             <svg class="w-8 h-8" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
                         </button>
-                        <button onclick="deckA.cue()" class="w-20 h-8 rounded bg-gray-800 hover:bg-orange-900/40 text-orange-400 border border-gray-700 text-xs font-bold active:bg-orange-900">CUE</button>
+                        <button onclick="deckA.stop()" class="w-20 h-8 rounded bg-gray-800 hover:bg-red-900/40 text-gray-400 border border-gray-700 text-xs font-bold">CUE</button>
                     </div>
 
-                    <!-- Loop Grid (ORIGINAL RESTORED) -->
-                    <div class="bg-gray-800/50 p-2 rounded border border-gray-700 flex flex-col gap-2 shadow-lg backdrop-blur-sm flex-1 max-w-[260px]">
-                        <div class="flex justify-between items-center border-b border-gray-700 pb-1 mb-1">
-                             <span class="text-[9px] font-bold text-cyan-600 uppercase tracking-widest">Loop / Beatjump</span>
-                             <!-- Loop In/Out Buttons Small -->
-                             <div class="flex gap-1">
-                                <button onclick="deckA.setLoopIn()" class="px-2 bg-cyan-900/40 text-[9px] text-cyan-400 border border-cyan-800 rounded">IN</button>
-                                <button onclick="deckA.setLoopOut()" class="px-2 bg-cyan-900/40 text-[9px] text-cyan-400 border border-cyan-800 rounded">OUT</button>
-                                <button onclick="deckA.exitLoop()" class="px-2 bg-gray-700 text-[9px] text-gray-300 border border-gray-600 rounded">EXIT</button>
-                             </div>
+                    <!-- Loop Grid -->
+                    <div class="bg-gray-800/50 p-3 rounded border border-gray-700 flex flex-col gap-2 shadow-lg backdrop-blur-sm">
+                        <div class="text-[9px] font-bold text-cyan-600 uppercase tracking-widest mb-1 border-b border-gray-700 pb-1">Loop Control</div>
+                        <div class="flex gap-1 mb-1">
+                            <button onclick="deckA.setLoopIn()" class="flex-1 h-6 bg-cyan-900/30 text-cyan-400 border border-cyan-800 text-[10px] rounded hover:bg-cyan-800">IN</button>
+                            <button onclick="deckA.setLoopOut()" class="flex-1 h-6 bg-cyan-900/30 text-cyan-400 border border-cyan-800 text-[10px] rounded hover:bg-cyan-800">OUT</button>
+                            <button onclick="deckA.exitLoop()" class="flex-1 h-6 bg-gray-700 text-gray-300 border border-gray-600 text-[10px] rounded hover:bg-gray-600">EXIT</button>
                         </div>
-                        
-                        <!-- Grid Completo Restaurado -->
-                        <div class="grid grid-cols-5 gap-1">
-                            <button class="btn-loop text-cyan-200" onclick="deckA.setLoopFraction(2)">/2</button>
-                            <button class="btn-loop text-cyan-200" onclick="deckA.setLoopFraction(4)">/4</button>
-                            <button class="btn-loop text-cyan-200" onclick="deckA.setLoopFraction(8)">/8</button>
-                            <button class="btn-loop text-cyan-200" onclick="deckA.setLoopFraction(16)">/16</button>
-                            <button class="btn-loop text-cyan-200" onclick="deckA.setLoopFraction(32)">/32</button>
-                            
-                            <button class="btn-loop text-yellow-200" onclick="deckA.setLoopFraction(3)">/3</button>
-                            <button class="btn-loop text-yellow-200" onclick="deckA.setLoopFraction(6)">/6</button>
-                            <button class="btn-loop text-yellow-200" onclick="deckA.setLoopFraction(12)">/12</button>
-                            <button class="btn-loop text-white font-bold bg-gray-600" onclick="deckA.restoreOriginalLoop()">1/1</button>
-                            <button class="btn-loop text-purple-300" onclick="deckA.setLoopFraction(64)">/64</button>
+                        <div class="grid grid-cols-4 gap-1 w-40">
+                            <button class="btn-loop text-cyan-200" onclick="deckA.setLoopFraction(2)">1/2</button>
+                            <button class="btn-loop text-cyan-200" onclick="deckA.setLoopFraction(4)">1/4</button>
+                            <button class="btn-loop text-cyan-200" onclick="deckA.setLoopFraction(8)">1/8</button>
+                            <button class="btn-loop text-cyan-200" onclick="deckA.setLoopFraction(16)">1/16</button>
                         </div>
                     </div>
                 </div>
@@ -251,20 +240,20 @@
                          <span class="text-[9px] text-gray-400 mb-1">VOL A</span>
                          <div class="slider-vertical-wrapper">
                              <div class="slider-track-bg w-[6px] bg-gray-800"></div>
+                             <!-- Max value 3 for 300% amplification -->
                              <input type="range" class="slider-vertical vol-fader" min="0" max="3" step="0.01" value="1" 
                                     oninput="deckA.setGain(this.value)" ondblclick="this.value=1; deckA.setGain(1)">
                          </div>
                          <span id="gain-val-a" class="text-[9px] font-mono text-cyan-500 mt-2">1.0</span>
                     </div>
 
-                    <!-- EQs A (KILL) -->
+                    <!-- EQs A -->
                     <div class="flex gap-1">
                          <!-- HI -->
                          <div class="flex flex-col items-center">
                              <div class="slider-vertical-wrapper" style="height: 80px;">
                                  <div class="slider-track-bg"></div>
-                                 <!-- Min -60 for KILL -->
-                                 <input type="range" class="slider-vertical" style="width: 80px;" min="-60" max="10" value="0" oninput="deckA.setEQ('high', this.value)">
+                                 <input type="range" class="slider-vertical" style="width: 80px;" min="-20" max="10" value="0" oninput="deckA.setEQ('high', this.value)">
                              </div>
                              <span class="text-[8px] text-gray-500 mt-1">HI</span>
                          </div>
@@ -272,7 +261,7 @@
                          <div class="flex flex-col items-center">
                              <div class="slider-vertical-wrapper" style="height: 80px;">
                                  <div class="slider-track-bg"></div>
-                                 <input type="range" class="slider-vertical" style="width: 80px;" min="-60" max="10" value="0" oninput="deckA.setEQ('low', this.value)">
+                                 <input type="range" class="slider-vertical" style="width: 80px;" min="-20" max="10" value="0" oninput="deckA.setEQ('low', this.value)">
                              </div>
                              <span class="text-[8px] text-gray-500 mt-1">LO</span>
                          </div>
@@ -292,13 +281,13 @@
                          <span id="gain-val-b" class="text-[9px] font-mono text-rose-500 mt-2">1.0</span>
                     </div>
 
-                    <!-- EQs B (KILL) -->
+                    <!-- EQs B -->
                     <div class="flex gap-1">
                          <!-- HI -->
                          <div class="flex flex-col items-center">
                              <div class="slider-vertical-wrapper" style="height: 80px;">
                                  <div class="slider-track-bg"></div>
-                                 <input type="range" class="slider-vertical" style="width: 80px;" min="-60" max="10" value="0" oninput="deckB.setEQ('high', this.value)">
+                                 <input type="range" class="slider-vertical" style="width: 80px;" min="-20" max="10" value="0" oninput="deckB.setEQ('high', this.value)">
                              </div>
                              <span class="text-[8px] text-gray-500 mt-1">HI</span>
                          </div>
@@ -306,7 +295,7 @@
                          <div class="flex flex-col items-center">
                              <div class="slider-vertical-wrapper" style="height: 80px;">
                                  <div class="slider-track-bg"></div>
-                                 <input type="range" class="slider-vertical" style="width: 80px;" min="-60" max="10" value="0" oninput="deckB.setEQ('low', this.value)">
+                                 <input type="range" class="slider-vertical" style="width: 80px;" min="-20" max="10" value="0" oninput="deckB.setEQ('low', this.value)">
                              </div>
                              <span class="text-[8px] text-gray-500 mt-1">LO</span>
                          </div>
@@ -315,18 +304,19 @@
 
             </div>
 
-            <!-- EQs GENERALES (FILTER) -->
+            <!-- EQs GENERALES (Requerimiento 1: 127px) -->
+            <!-- Colocados en el centro o abajo para cumplir el pedido especifico -->
             <div class="w-full bg-black border-t border-gray-800 p-2 flex justify-center gap-4">
                 <div class="flex flex-col items-center">
                      <span class="text-[9px] text-gray-500 mb-1">FILTER A</span>
-                     <div class="slider-vertical-wrapper"> 
+                     <div class="slider-vertical-wrapper"> <!-- 127px set in CSS -->
                          <div class="slider-track-bg bg-cyan-900/30"></div>
                          <input type="range" class="slider-vertical" min="0" max="100" value="50" oninput="deckA.setFilter(this.value)" ondblclick="this.value=50; deckA.setFilter(50)">
                      </div>
                 </div>
                 <div class="flex flex-col items-center">
                      <span class="text-[9px] text-gray-500 mb-1">FILTER B</span>
-                     <div class="slider-vertical-wrapper"> 
+                     <div class="slider-vertical-wrapper"> <!-- 127px set in CSS -->
                          <div class="slider-track-bg bg-rose-900/30"></div>
                          <input type="range" class="slider-vertical" min="0" max="100" value="50" oninput="deckB.setFilter(this.value)" ondblclick="this.value=50; deckB.setFilter(50)">
                      </div>
@@ -342,6 +332,7 @@
                     <div class="w-6 h-6 bg-rose-900 rounded flex items-center justify-center font-bold text-rose-400 border border-rose-700 text-xs shadow-[0_0_10px_rgba(244,63,94,0.3)]">B</div>
                     <div id="title-b" class="text-xs font-mono text-rose-100 truncate max-w-[200px]">No Track Loaded</div>
                 </div>
+                <div class="text-[10px] text-rose-500 font-bold" id="bpm-b">-- BPM</div>
             </div>
 
             <!-- Visualizer B -->
@@ -356,38 +347,29 @@
 
             <!-- Controls B -->
             <div class="flex-1 p-4 flex flex-col gap-4 overflow-y-auto bg-gradient-to-b from-gray-900 to-black">
-                <div class="flex flex-wrap gap-4 justify-between items-start">
-                     <!-- Loop Grid (ORIGINAL RESTORED) -->
-                     <div class="bg-gray-800/50 p-2 rounded border border-gray-700 flex flex-col gap-2 shadow-lg backdrop-blur-sm flex-1 max-w-[260px] order-2 md:order-1">
-                        <div class="flex justify-between items-center border-b border-gray-700 pb-1 mb-1">
-                            <span class="text-[9px] font-bold text-rose-600 uppercase tracking-widest">Loop / Beatjump</span>
-                            <div class="flex gap-1">
-                                <button onclick="deckB.setLoopIn()" class="px-2 bg-rose-900/40 text-[9px] text-rose-400 border border-rose-800 rounded">IN</button>
-                                <button onclick="deckB.setLoopOut()" class="px-2 bg-rose-900/40 text-[9px] text-rose-400 border border-rose-800 rounded">OUT</button>
-                                <button onclick="deckB.exitLoop()" class="px-2 bg-gray-700 text-[9px] text-gray-300 border border-gray-600 rounded">EXIT</button>
-                            </div>
+                <div class="flex flex-wrap gap-4 justify-center md:justify-end items-start">
+                     <!-- Loop Grid -->
+                     <div class="bg-gray-800/50 p-3 rounded border border-gray-700 flex flex-col gap-2 shadow-lg backdrop-blur-sm order-2 md:order-1">
+                        <div class="text-[9px] font-bold text-rose-600 uppercase tracking-widest mb-1 border-b border-gray-700 pb-1">Loop Control</div>
+                        <div class="flex gap-1 mb-1">
+                            <button onclick="deckB.setLoopIn()" class="flex-1 h-6 bg-rose-900/30 text-rose-400 border border-rose-800 text-[10px] rounded hover:bg-rose-800">IN</button>
+                            <button onclick="deckB.setLoopOut()" class="flex-1 h-6 bg-rose-900/30 text-rose-400 border border-rose-800 text-[10px] rounded hover:bg-rose-800">OUT</button>
+                            <button onclick="deckB.exitLoop()" class="flex-1 h-6 bg-gray-700 text-gray-300 border border-gray-600 text-[10px] rounded hover:bg-gray-600">EXIT</button>
                         </div>
-                        <div class="grid grid-cols-5 gap-1">
-                            <button class="btn-loop text-rose-200" onclick="deckB.setLoopFraction(2)">/2</button>
-                            <button class="btn-loop text-rose-200" onclick="deckB.setLoopFraction(4)">/4</button>
-                            <button class="btn-loop text-rose-200" onclick="deckB.setLoopFraction(8)">/8</button>
-                            <button class="btn-loop text-rose-200" onclick="deckB.setLoopFraction(16)">/16</button>
-                            <button class="btn-loop text-rose-200" onclick="deckB.setLoopFraction(32)">/32</button>
-                            
-                            <button class="btn-loop text-yellow-200" onclick="deckB.setLoopFraction(3)">/3</button>
-                            <button class="btn-loop text-yellow-200" onclick="deckB.setLoopFraction(6)">/6</button>
-                            <button class="btn-loop text-yellow-200" onclick="deckB.setLoopFraction(12)">/12</button>
-                            <button class="btn-loop text-white font-bold bg-gray-600" onclick="deckB.restoreOriginalLoop()">1/1</button>
-                            <button class="btn-loop text-purple-300" onclick="deckB.setLoopFraction(64)">/64</button>
+                        <div class="grid grid-cols-4 gap-1 w-40">
+                            <button class="btn-loop text-rose-200" onclick="deckB.setLoopFraction(2)">1/2</button>
+                            <button class="btn-loop text-rose-200" onclick="deckB.setLoopFraction(4)">1/4</button>
+                            <button class="btn-loop text-rose-200" onclick="deckB.setLoopFraction(8)">1/8</button>
+                            <button class="btn-loop text-rose-200" onclick="deckB.setLoopFraction(16)">1/16</button>
                         </div>
                     </div>
 
                     <!-- Play/Cue -->
-                    <div class="flex flex-col gap-2 shrink-0 order-1 md:order-2">
+                    <div class="flex flex-col gap-2 order-1 md:order-2">
                         <button onclick="deckB.togglePlay()" id="btn-play-b" class="w-20 h-20 rounded-full bg-gray-800 border-2 border-rose-600 hover:bg-rose-900 hover:border-rose-400 text-rose-400 flex items-center justify-center shadow-[0_0_20px_rgba(244,63,94,0.15)] transition active:scale-95 active:shadow-[0_0_30px_rgba(244,63,94,0.4)]">
                             <svg class="w-8 h-8" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
                         </button>
-                        <button onclick="deckB.cue()" class="w-20 h-8 rounded bg-gray-800 hover:bg-orange-900/40 text-orange-400 border border-gray-700 text-xs font-bold active:bg-orange-900">CUE</button>
+                        <button onclick="deckB.stop()" class="w-20 h-8 rounded bg-gray-800 hover:bg-red-900/40 text-gray-400 border border-gray-700 text-xs font-bold">CUE</button>
                     </div>
                 </div>
 
@@ -415,6 +397,7 @@
             </label>
         </div>
         <div id="queue-list" class="flex-1 overflow-y-auto">
+            <!-- Items will appear here -->
             <div class="p-4 text-center text-gray-600 text-xs italic" id="empty-msg">Drag files here or click + ADD TRACKS</div>
         </div>
     </div>
@@ -425,6 +408,7 @@
             <div class="font-bold text-cyan-600 text-xl tracking-tighter">DECK A</div>
             <div class="flex-1 relative h-10 flex items-center">
                 <input id="crossfader" type="range" min="0" max="100" value="50" oninput="updateCrossfader(this.value)" ondblclick="this.value=50; updateCrossfader(50);">
+                <!-- Center Mark -->
                 <div class="absolute left-1/2 top-0 bottom-0 w-px bg-white/20 pointer-events-none transform -translate-x-1/2"></div>
             </div>
             <div class="font-bold text-rose-600 text-xl tracking-tighter">DECK B</div>
@@ -432,12 +416,18 @@
     </div>
 
 <script>
+/**
+ * DJ PRO ENGINE V4
+ * Supports: Multiple File Queue, Individual Gain (x3), Reactive Waveforms
+ */
+
 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 let deckA, deckB;
 let masterGainNode = audioCtx.createGain();
 masterGainNode.connect(audioCtx.destination);
-masterGainNode.gain.value = 0.8; 
+masterGainNode.gain.value = 0.8; // Default Master
 
+// Library State
 const trackLibrary = [];
 
 class Deck {
@@ -447,36 +437,37 @@ class Deck {
         this.buffer = null;
         this.source = null;
         
-        // Graph: Source -> High -> Low -> Filter -> Gain -> Crossfader -> Master
-        this.channelGain = audioCtx.createGain(); 
-        this.crossfaderGain = audioCtx.createGain(); 
+        // Audio Graph
+        // Source -> EQ High -> EQ Low -> Filter -> Channel Gain -> Crossfader Gain -> Master
+        this.channelGain = audioCtx.createGain(); // The per-deck slider (x3)
+        this.crossfaderGain = audioCtx.createGain(); // Controlled by crossfader
         this.filterNode = audioCtx.createBiquadFilter();
         this.eqLow = audioCtx.createBiquadFilter();
         this.eqHigh = audioCtx.createBiquadFilter();
         
-        // Initial Settings
-        this.filterNode.type = "allpass"; 
+        // Settings
+        this.filterNode.type = "allpass"; // Start neutral
         this.eqLow.type = "lowshelf";
         this.eqLow.frequency.value = 320;
         this.eqHigh.type = "highshelf";
         this.eqHigh.frequency.value = 3200;
         
+        // Connections
         this.eqHigh.connect(this.eqLow);
         this.eqLow.connect(this.filterNode);
         this.filterNode.connect(this.channelGain);
         this.channelGain.connect(this.crossfaderGain);
         this.crossfaderGain.connect(masterGainNode);
 
+        // Initial Values
         this.channelGain.gain.value = 1.0; 
-        this.currentGainValue = 1.0; 
+        this.currentGainValue = 1.0; // Stored for visual scaling
 
-        // Playback
+        // Playback State
         this.isPlaying = false;
         this.startTime = 0;
         this.pausedAt = 0;
         this.detune = 0;
-        
-        // Loop Vars
         this.loopStart = 0;
         this.loopEnd = 0;
         this.isLoopActive = false;
@@ -574,17 +565,11 @@ class Deck {
         this.isPlaying ? this.pause() : this.play();
     }
 
-    cue() {
+    stop() {
         this.pause();
-        this.pausedAt = 0; 
+        this.pausedAt = 0;
         this.isLoopActive = false;
         this.updateUI(0);
-        this.canvas.parentElement.classList.add('bg-gray-800');
-        setTimeout(() => this.canvas.parentElement.classList.remove('bg-gray-800'), 100);
-    }
-
-    stop() {
-        this.cue();
     }
 
     getCurrentTime() {
@@ -594,6 +579,7 @@ class Deck {
             this.pause();
             return this.buffer.duration;
         }
+        // Loop calc
         if (this.isLoopActive && curr >= this.loopEnd) {
              const loopDur = this.loopEnd - this.loopStart;
              curr = this.loopStart + (curr - this.loopStart) % loopDur;
@@ -601,36 +587,45 @@ class Deck {
         return curr;
     }
 
+    // --- Audio Logic ---
     setGain(val) {
-        const gain = parseFloat(val); 
+        const gain = parseFloat(val); // 0 to 3.0
         this.channelGain.gain.setTargetAtTime(gain, audioCtx.currentTime, 0.05);
-        this.currentGainValue = gain; 
+        this.currentGainValue = gain; // Store for visuals
+        
+        // Update Label
         document.getElementById(`gain-val-${this.id}`).innerText = "x" + gain.toFixed(2);
         
+        // Update Waveform Visual Indicator (text color changes based on clipping)
         const indicator = document.getElementById(`gain-indicator-${this.id}`);
         indicator.innerText = `GAIN x${gain.toFixed(2)}`;
         indicator.className = `absolute top-2 ${this.id==='a'?'right-2':'left-2'} text-[10px] font-mono pointer-events-none transition-colors ` + (gain > 1.5 ? 'text-red-500 font-bold' : (this.id==='a'?'text-cyan-700':'text-rose-700'));
         
+        // Redraw waveform to reflect amplification
         if(this.buffer) requestAnimationFrame(() => this.drawWaveform());
     }
 
     setEQ(type, val) {
+        // Simple shelf EQ
         if(type === 'low') this.eqLow.gain.value = parseFloat(val);
         if(type === 'high') this.eqHigh.gain.value = parseFloat(val);
     }
     
     setFilter(val) {
+        // 0-45 = LowPass, 45-55 = Off, 55-100 = HighPass
         const v = parseInt(val);
         if (v > 45 && v < 55) {
             this.filterNode.type = "allpass";
             this.filterNode.frequency.value = 0;
         } else if (v <= 45) {
             this.filterNode.type = "lowpass";
+            // Map 45->0 to 20000->50Hz
             const freq = 50 + (v/45) * 6000; 
             this.filterNode.frequency.value = freq;
             this.filterNode.Q.value = 2; 
         } else {
             this.filterNode.type = "highpass";
+            // Map 55->100 to 100->10000Hz
             const freq = 100 + ((v-55)/45) * 8000; 
             this.filterNode.frequency.value = freq;
             this.filterNode.Q.value = 2; 
@@ -645,7 +640,7 @@ class Deck {
         if (this.source) this.source.detune.value = this.detune;
     }
 
-    // --- LOOP LOGIC FIXED (V6) ---
+    // --- Loop Logic ---
     setLoopIn() { this.loopStart = this.getCurrentTime(); }
     setLoopOut() { 
         if(this.getCurrentTime() > this.loopStart) {
@@ -655,40 +650,20 @@ class Deck {
         }
     }
     setLoopFraction(denom) {
-        if(!this.originalLoopLength) {
-             this.loopStart = this.getCurrentTime();
-             this.originalLoopLength = 4.0;
-             this.loopEnd = this.loopStart + this.originalLoopLength;
-        }
-        
-        const newLength = this.originalLoopLength / denom;
-        this.loopEnd = this.loopStart + newLength;
+        if(!this.originalLoopLength) return;
+        this.loopEnd = this.loopStart + (this.originalLoopLength / denom);
         this.activateLoop();
-    }
-    restoreOriginalLoop() {
-         if(!this.originalLoopLength) return;
-         this.loopEnd = this.loopStart + this.originalLoopLength;
-         this.activateLoop();
     }
     activateLoop() {
         this.isLoopActive = true;
-        if(this.isPlaying) { 
-            // FIX: Guardamos el tiempo exacto antes de reiniciar el nodo de audio
-            this.pausedAt = this.getCurrentTime();
-            this.stopSource(); 
-            this.playSource(); 
-        }
+        if(this.isPlaying) { this.stopSource(); this.playSource(); }
     }
     exitLoop() {
         this.isLoopActive = false;
-        if(this.isPlaying) { 
-            // FIX: Guardamos el tiempo exacto antes de reiniciar el nodo de audio
-            this.pausedAt = this.getCurrentTime();
-            this.stopSource(); 
-            this.playSource(); 
-        }
+        if(this.isPlaying) { this.stopSource(); this.playSource(); }
     }
 
+    // --- Visuals ---
     drawLoop() {
         if(this.isPlaying) {
             const t = this.getCurrentTime();
@@ -714,6 +689,10 @@ class Deck {
         else container.classList.remove(`deck-active-${this.id}`);
     }
 
+    /**
+     * DYNAMIC WAVEFORM DRAWING
+     * Reflects the current GAIN volume setting directly in the wave height
+     */
     drawWaveform() {
         if (!this.buffer) return;
         const data = this.buffer.getChannelData(0);
@@ -721,10 +700,15 @@ class Deck {
         const h = this.canvas.height;
         const step = Math.ceil(data.length / w);
         const ampBase = h / 2;
+        
+        // Dynamic Scaling Factor:
+        // We multiply the raw data by currentGainValue to simulate visual amplification
+        // We limit it slightly so x3 doesn't just fill the screen instantly with noise
         const visualGain = Math.max(0.1, this.currentGainValue); 
 
         this.ctx.clearRect(0, 0, w, h);
         
+        // Draw center line
         this.ctx.beginPath();
         this.ctx.strokeStyle = '#374151';
         this.ctx.moveTo(0, h/2);
@@ -737,15 +721,21 @@ class Deck {
         
         for (let i = 0; i < w; i++) {
             let min = 1.0, max = -1.0;
+            // Optimization: Downsampling logic
             for (let j = 0; j < step; j++) {
                 const datum = data[(i * step) + j];
                 if (datum < min) min = datum;
                 if (datum > max) max = datum;
             }
+            
+            // Apply GAIN to the drawing coordinates
             const y1 = (1 + min * visualGain) * ampBase;
             const y2 = (1 + max * visualGain) * ampBase;
+
+            // Clamp to canvas height to prevent drawing outside
             const clampedY1 = Math.max(0, Math.min(h, y1));
             const clampedY2 = Math.max(0, Math.min(h, y2));
+
             this.ctx.moveTo(i, clampedY1);
             this.ctx.lineTo(i, clampedY2);
         }
@@ -753,15 +743,23 @@ class Deck {
     }
 }
 
-deckA = new Deck('a', '#22d3ee'); 
-deckB = new Deck('b', '#fb7185'); 
+// --- INIT ---
+deckA = new Deck('a', '#22d3ee'); // Cyan
+deckB = new Deck('b', '#fb7185'); // Rose
 
+// --- QUEUE SYSTEM ---
 document.getElementById('file-upload').addEventListener('change', async (e) => {
     const files = Array.from(e.target.files);
     if(files.length > 0) {
         document.getElementById('empty-msg').style.display = 'none';
+        
         for (const file of files) {
-            const item = { file: file, name: file.name };
+            // Decode immediately to get duration? No, lazy load to save memory. Just store file ref.
+            // But we need to play it.
+            const item = {
+                file: file,
+                name: file.name
+            };
             trackLibrary.push(item);
             addToQueueUI(item, trackLibrary.length - 1);
         }
@@ -785,7 +783,10 @@ function addToQueueUI(item, index) {
 async function loadToDeck(deckId, index) {
     const item = trackLibrary[index];
     const targetDeck = deckId === 'a' ? deckA : deckB;
+    
+    // Show loading state
     document.getElementById(`title-${deckId}`).innerText = "LOADING...";
+    
     const reader = new FileReader();
     reader.onload = async (e) => {
         const audioData = await audioCtx.decodeAudioData(e.target.result);
@@ -794,21 +795,28 @@ async function loadToDeck(deckId, index) {
     reader.readAsArrayBuffer(item.file);
 }
 
+// --- GLOBAL CONTROLS ---
 function updateMasterVolume(val) {
     masterGainNode.gain.value = val;
     document.getElementById('master-val').innerText = Math.round(val * 100) + '%';
 }
 
 function updateCrossfader(val) {
-    const v = parseInt(val); 
+    const v = parseInt(val); // 0 to 100
+    // Equal Power Crossfade Curve (approx)
+    // Vol A = cos(p * pi/2), Vol B = sin(p * pi/2) usually
+    // But linear is okay for web simple:
     const volA = Math.cos((v / 100) * (Math.PI / 2));
     const volB = Math.cos(((100 - v) / 100) * (Math.PI / 2));
+    
     deckA.crossfaderGain.gain.value = volA;
     deckB.crossfaderGain.gain.value = volB;
 }
 
+// Init Crossfader
 updateCrossfader(50);
 
+// Drag and drop zone for Library
 const queueDrawer = document.querySelector('.h-32');
 queueDrawer.addEventListener('dragover', (e) => { e.preventDefault(); queueDrawer.classList.add('bg-gray-800'); });
 queueDrawer.addEventListener('dragleave', (e) => { e.preventDefault(); queueDrawer.classList.remove('bg-gray-800'); });
@@ -818,10 +826,12 @@ queueDrawer.addEventListener('drop', (e) => {
     if(e.dataTransfer.files.length) {
         const input = document.getElementById('file-upload');
         input.files = e.dataTransfer.files;
+        // Trigger change manually
         const event = new Event('change');
         input.dispatchEvent(event);
     }
 });
+
 </script>
 </body>
 </html>

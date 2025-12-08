@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DJ PRO STATION V6 // SEAMLESS LOOPS</title>
+    <title>DJ PRO STATION V5 // RESTORED LOOPS & KILL EQ</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
 
@@ -149,8 +149,8 @@
         <div class="flex items-center gap-3">
             <span class="text-2xl">🎛️</span>
             <div>
-                <h1 class="font-bold text-gray-200 tracking-wider text-sm leading-none">DJ STATION <span class="text-cyan-500 text-[10px] align-top">V6</span></h1>
-                <span class="text-[9px] text-gray-500 font-mono">SEAMLESS LOOPS // KILL EQs</span>
+                <h1 class="font-bold text-gray-200 tracking-wider text-sm leading-none">DJ STATION <span class="text-cyan-500 text-[10px] align-top">V5</span></h1>
+                <span class="text-[9px] text-gray-500 font-mono">KILL EQs // RESTORED LOOPS</span>
             </div>
         </div>
         
@@ -574,11 +574,13 @@ class Deck {
         this.isPlaying ? this.pause() : this.play();
     }
 
+    // CUE FUNCTION: Stops and returns to start (or Cue Point if we had one)
     cue() {
         this.pause();
-        this.pausedAt = 0; 
-        this.isLoopActive = false;
+        this.pausedAt = 0; // Return to zero
+        this.isLoopActive = false; // Reset loop on cue
         this.updateUI(0);
+        // Visual feedback
         this.canvas.parentElement.classList.add('bg-gray-800');
         setTimeout(() => this.canvas.parentElement.classList.remove('bg-gray-800'), 100);
     }
@@ -615,6 +617,7 @@ class Deck {
     }
 
     setEQ(type, val) {
+        // Allows for -60dB kill
         if(type === 'low') this.eqLow.gain.value = parseFloat(val);
         if(type === 'high') this.eqHigh.gain.value = parseFloat(val);
     }
@@ -645,7 +648,7 @@ class Deck {
         if (this.source) this.source.detune.value = this.detune;
     }
 
-    // --- LOOP LOGIC FIXED (V6) ---
+    // --- RESTORED LOOP LOGIC (V3) ---
     setLoopIn() { this.loopStart = this.getCurrentTime(); }
     setLoopOut() { 
         if(this.getCurrentTime() > this.loopStart) {
@@ -655,9 +658,13 @@ class Deck {
         }
     }
     setLoopFraction(denom) {
+        // If no loop set, default to a 4-beat-ish loop relative to current playhead? 
+        // Simple logic: if no loop, define one of 1s * 4 / denom. 
+        // Better logic: Assume user sets IN/OUT first. 
         if(!this.originalLoopLength) {
+             // Fallback: If no loop, create a 4s loop for demo
              this.loopStart = this.getCurrentTime();
-             this.originalLoopLength = 4.0;
+             this.originalLoopLength = 4.0; // Assume 4s bar at 120bpm approx
              this.loopEnd = this.loopStart + this.originalLoopLength;
         }
         
@@ -672,21 +679,11 @@ class Deck {
     }
     activateLoop() {
         this.isLoopActive = true;
-        if(this.isPlaying) { 
-            // FIX: Guardamos el tiempo exacto antes de reiniciar el nodo de audio
-            this.pausedAt = this.getCurrentTime();
-            this.stopSource(); 
-            this.playSource(); 
-        }
+        if(this.isPlaying) { this.stopSource(); this.playSource(); }
     }
     exitLoop() {
         this.isLoopActive = false;
-        if(this.isPlaying) { 
-            // FIX: Guardamos el tiempo exacto antes de reiniciar el nodo de audio
-            this.pausedAt = this.getCurrentTime();
-            this.stopSource(); 
-            this.playSource(); 
-        }
+        if(this.isPlaying) { this.stopSource(); this.playSource(); }
     }
 
     drawLoop() {
