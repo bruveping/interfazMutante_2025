@@ -36,6 +36,10 @@ Mezclar audio [Mezclar audio](https://bruveping.github.io/interfazMutante_2025/m
 
 medir distacia 01 [medir distacia 01](https://bruveping.github.io/interfazMutante_2025/medir_distancia_01)
 
+medir distacia 02 [medir distacia 02](https://bruveping.github.io/interfazMutante_2025/medir_distancia_02)
+
+
+
 
 
 
