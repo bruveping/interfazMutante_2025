@@ -34,6 +34,9 @@ Analizar archivos de audio [analizar archivos de audio 04](https://bruveping.git
 
 Mezclar audio [Mezclar audio](https://bruveping.github.io/interfazMutante_2025/mezclar_audio)
 
+medir distacia 01 [medir distacia 01](https://bruveping.github.io/interfazMutante_2025/medir_distancia_01)
+
+
 
 
 
