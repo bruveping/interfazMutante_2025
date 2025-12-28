@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Herramienta de Medición de Distancia</title>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            overflow: hidden;
+        }
+        #map {
+            height: 100vh;
+            width: 100%;
+            cursor: crosshair;
+        }
+        .distance-tooltip {
+            background: rgba(255, 255, 255, 0.9);
+            border: 1px solid #666;
+            border-radius: 4px;
+            padding: 2px 6px;
+            font-weight: bold;
+            font-size: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+        }
+        /* Transición para el panel colapsable */
+        #menu-content {
+            transition: max-height 0.3s ease-out, opacity 0.2s ease-out;
+            overflow: hidden;
+        }
+        .menu-collapsed {
+            max-height: 0 !important;
+            opacity: 0;
+            pointer-events: none;
+            margin-bottom: 0 !important;
+        }
+        .menu-expanded {
+            max-height: 500px !important;
+            opacity: 1;
+            margin-bottom: 0.75rem !important;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 font-sans">
+
+    <!-- UI Overlay -->
+    <div class="absolute top-4 left-1/2 transform -translate-x-1/2 z-[1000] w-full max-w-sm px-4">
+        <div class="bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl border border-gray-200 p-3">
+            <!-- Header con Botón de Colapso -->
+            <div class="flex items-center justify-between cursor-pointer" onclick="toggleMenu()">
+                <div class="flex items-center gap-2">
+                    <span class="text-xl">📏</span>
+                    <h1 class="text-base font-bold text-gray-800">Medidor</h1>
+                </div>
+                <button id="toggle-btn" class="p-2 hover:bg-gray-100 rounded-full transition-colors">
+                    <svg id="chevron-icon" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-600 transition-transform duration-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                    </svg>
+                </button>
+            </div>
+
+            <!-- Contenido Colapsable -->
+            <div id="menu-content" class="menu-expanded mt-2">
+                <p class="text-[11px] text-gray-500 mb-3 leading-tight px-1">
+                    Haz <b>doble clic</b> en el mapa para iniciar o añadir puntos a la medición.
+                </p>
+                
+                <div id="stats" class="flex justify-between items-center py-3 px-4 bg-blue-50 rounded-xl border border-blue-100">
+                    <span class="text-xs font-semibold text-blue-700 uppercase tracking-wider">Total:</span>
+                    <span id="total-distance" class="text-xl font-black text-blue-900">0.00 m</span>
+                </div>
+
+                <div class="mt-4 flex gap-2">
+                    <button onclick="resetMeasurement()" class="flex-1 bg-red-500 hover:bg-red-600 text-white text-xs font-bold py-2.5 rounded-lg transition shadow-sm active:scale-95">
+                        Reiniciar
+                    </button>
+                    <button onclick="toggleUnits()" id="unit-btn" class="flex-1 bg-gray-800 hover:bg-gray-900 text-white text-xs font-bold py-2.5 rounded-lg transition shadow-sm active:scale-95">
+                        Unidades
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Resumen cuando está colapsado -->
+            <div id="menu-collapsed-summary" class="hidden text-center py-1">
+                <span id="summary-dist" class="text-sm font-bold text-blue-600">0.00 m</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Leaflet Map Container -->
+    <div id="map"></div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <script>
+        let map;
+        let points = [];
+        let polyline;
+        let markers = [];
+        let totalDistance = 0;
+        let isMenuOpen = true;
+
+        window.onload = function() {
+            // Inicializar mapa desactivando zoom por doble clic
+            map = L.map('map', {
+                doubleClickZoom: false,
+                zoomControl: false 
+            }).setView([40.4168, -3.7038], 13);
+
+            // Añadir control de zoom en una posición más cómoda
+            L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; OpenStreetMap'
+            }).addTo(map);
+
+            // Localizar usuario
+            map.locate({setView: true, maxZoom: 16});
+
+            // Evento de Doble Clic
+            map.on('dblclick', function(e) {
+                addPoint(e.latlng);
+            });
+        };
+
+        function toggleMenu() {
+            const content = document.getElementById('menu-content');
+            const summary = document.getElementById('menu-collapsed-summary');
+            const icon = document.getElementById('chevron-icon');
+            
+            isMenuOpen = !isMenuOpen;
+
+            if (isMenuOpen) {
+                content.classList.remove('menu-collapsed');
+                content.classList.add('menu-expanded');
+                summary.classList.add('hidden');
+                icon.style.transform = 'rotate(0deg)';
+            } else {
+                content.classList.remove('menu-expanded');
+                content.classList.add('menu-collapsed');
+                summary.classList.remove('hidden');
+                // Asegurarse de actualizar el texto al colapsar
+                const formatted = formatDistance(totalDistance);
+                const summaryElem = document.getElementById('summary-dist');
+                if (summaryElem) summaryElem.innerText = formatted;
+                
+                icon.style.transform = 'rotate(180deg)';
+            }
+        }
+
+        function addPoint(latlng) {
+            points.push(latlng);
+            
+            if (!polyline) {
+                polyline = L.polyline(points, {
+                    color: '#3b82f6',
+                    weight: 5,
+                    opacity: 0.8,
+                    lineJoin: 'round'
+                }).addTo(map);
+            } else {
+                polyline.setLatLngs(points);
+            }
+
+            const marker = L.circleMarker(latlng, {
+                radius: 7,
+                fillColor: '#ffffff',
+                color: '#1d4ed8',
+                weight: 3,
+                fillOpacity: 1
+            }).addTo(map);
+            
+            markers.push(marker);
+
+            updateDistance();
+
+            const distLabel = points.length === 1 ? "Inicio" : formatDistance(totalDistance);
+            marker.bindTooltip(distLabel, {
+                permanent: true,
+                direction: 'top',
+                className: 'distance-tooltip',
+                offset: [0, -5]
+            }).openTooltip();
+        }
+
+        function updateDistance() {
+            totalDistance = 0;
+            for (let i = 0; i < points.length - 1; i++) {
+                totalDistance += points[i].distanceTo(points[i+1]);
+            }
+            
+            const formatted = formatDistance(totalDistance);
+            
+            const totalElem = document.getElementById('total-distance');
+            const summaryElem = document.getElementById('summary-dist');
+            
+            if (totalElem) totalElem.innerText = formatted;
+            if (summaryElem) summaryElem.innerText = formatted;
+        }
+
+        function formatDistance(d) {
+            if (d >= 1000) return (d / 1000).toFixed(2) + " km";
+            if (d < 1) return (d * 100).toFixed(0) + " cm";
+            return d.toFixed(2) + " m";
+        }
+
+        function resetMeasurement() {
+            if (polyline) map.removeLayer(polyline);
+            markers.forEach(m => map.removeLayer(m));
+            points = [];
+            markers = [];
+            polyline = null;
+            totalDistance = 0;
+            updateDistance();
+        }
+
+        function toggleUnits() {
+            updateDistance();
+        }
+    </script>
+</body>
+  </html>
