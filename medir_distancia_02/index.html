@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Herramienta de Medición de Distancia Pro</title>
+    <title>Herramienta de Medición Cartográfica</title>
     
     <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -41,7 +41,7 @@
             margin-bottom: 0 !important;
         }
         .menu-expanded {
-            max-height: 600px !important;
+            max-height: 800px !important;
             opacity: 1;
             margin-bottom: 0.75rem !important;
         }
@@ -55,8 +55,8 @@
             <!-- Header -->
             <div class="flex items-center justify-between cursor-pointer" onclick="toggleMenu()">
                 <div class="flex items-center gap-2">
-                    <span class="text-xl">📍</span>
-                    <h1 class="text-base font-bold text-gray-800">Medidor & GPX</h1>
+                    <span class="text-xl">🗺️</span>
+                    <h1 class="text-base font-bold text-gray-800">Exportar Mapa</h1>
                 </div>
                 <button id="toggle-btn" class="p-2 hover:bg-gray-100 rounded-full transition-colors">
                     <svg id="chevron-icon" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-600 transition-transform duration-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -68,7 +68,7 @@
             <!-- Contenido Colapsable -->
             <div id="menu-content" class="menu-expanded mt-2">
                 <p class="text-[11px] text-gray-500 mb-3 leading-tight px-1">
-                    <b>Doble clic</b> para marcar. Usa <b>Deshacer</b> para borrar el último punto.
+                    Usa <b>Doble clic</b> para medir. Gestiona tus puntos y exporta el archivo.
                 </p>
                 
                 <div id="stats" class="flex justify-between items-center py-3 px-4 bg-blue-50 rounded-xl border border-blue-100 mb-4">
@@ -76,8 +76,8 @@
                     <span id="total-distance" class="text-xl font-black text-blue-900">0.00 m</span>
                 </div>
 
-                <!-- Botones de Acción Principal -->
-                <div class="grid grid-cols-2 gap-2 mb-2">
+                <!-- Botones de Edición -->
+                <div class="grid grid-cols-2 gap-2 mb-4">
                     <button onclick="undoLastPoint()" class="flex items-center justify-center gap-1 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold py-2.5 rounded-lg transition active:scale-95 shadow-sm">
                         <span>↩️</span> Deshacer
                     </button>
@@ -86,10 +86,21 @@
                     </button>
                 </div>
 
-                <!-- Botón de Exportación -->
-                <button onclick="exportToGPX()" class="w-full flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white text-xs font-bold py-3 rounded-lg transition active:scale-95 shadow-md mb-2">
-                    <span>💾</span> Guardar como GPX (Mapas)
-                </button>
+                <!-- Sección de Exportación -->
+                <div class="border-t border-gray-100 pt-3">
+                    <h2 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 px-1">Descargar Formato</h2>
+                    <div class="grid grid-cols-3 gap-2">
+                        <button onclick="exportData('gpx')" class="flex flex-col items-center justify-center gap-1 bg-slate-800 hover:bg-black text-white py-2 rounded-lg transition active:scale-95">
+                            <span class="text-[10px] font-bold">GPX</span>
+                        </button>
+                        <button onclick="exportData('kml')" class="flex flex-col items-center justify-center gap-1 bg-slate-800 hover:bg-black text-white py-2 rounded-lg transition active:scale-95">
+                            <span class="text-[10px] font-bold">KML</span>
+                        </button>
+                        <button onclick="exportData('geojson')" class="flex flex-col items-center justify-center gap-1 bg-slate-800 hover:bg-black text-white py-2 rounded-lg transition active:scale-95">
+                            <span class="text-[10px] font-bold">JSON</span>
+                        </button>
+                    </div>
+                </div>
             </div>
             
             <!-- Resumen cuando está colapsado -->
@@ -181,13 +192,10 @@
 
         function undoLastPoint() {
             if (points.length === 0) return;
-
-            // Eliminar último dato
             points.pop();
             const lastMarker = markers.pop();
             if (lastMarker) map.removeLayer(lastMarker);
 
-            // Actualizar línea
             if (points.length === 0) {
                 if (polyline) map.removeLayer(polyline);
                 polyline = null;
@@ -200,7 +208,6 @@
         }
 
         function refreshTooltips() {
-            // Actualizar el texto del tooltip del último marcador disponible
             markers.forEach((m, idx) => {
                 m.unbindTooltip();
                 if (idx === 0) {
@@ -243,38 +250,88 @@
             updateUIStrings();
         }
 
-        function exportToGPX() {
+        // Función Maestra de Exportación
+        function exportData(format) {
             if (points.length < 2) {
-                alert("Necesitas al menos 2 puntos para exportar una ruta.");
+                alert("Agrega al menos 2 puntos para exportar.");
                 return;
             }
 
-            let gpxContent = `<?xml version="1.0" encoding="UTF-8"?>
-<gpx version="1.1" creator="Medidor de Distancias Web" xmlns="http://www.topografix.com/GPX/1/1">
-  <trk>
-    <name>Ruta Medida - ${new Date().toLocaleDateString()}</name>
-    <trkseg>`;
+            let content = '';
+            let filename = `ruta_${new Date().getTime()}.${format}`;
+            let mimeType = '';
 
-            points.forEach(p => {
-                gpxContent += `
-      <trkpt lat="${p.lat}" lon="${p.lng}"></trkpt>`;
-            });
+            switch(format) {
+                case 'gpx':
+                    mimeType = 'application/gpx+xml';
+                    content = generateGPX();
+                    break;
+                case 'kml':
+                    mimeType = 'application/vnd.google-earth.kml+xml';
+                    content = generateKML();
+                    break;
+                case 'geojson':
+                    mimeType = 'application/json';
+                    content = generateGeoJSON();
+                    break;
+            }
 
-            gpxContent += `
-    </trkseg>
-  </trk>
-</gpx>`;
-
-            const blob = new Blob([gpxContent], { type: 'application/gpx+xml' });
+            const blob = new Blob([content], { type: mimeType });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `ruta_${new Date().getTime()}.gpx`;
+            a.download = filename;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
         }
+
+        function generateGPX() {
+            let gpx = `<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="Medidor Web" xmlns="http://www.topografix.com/GPX/1/1">
+  <trk><name>Ruta Medida</name><trkseg>`;
+            points.forEach(p => {
+                gpx += `\n    <trkpt lat="${p.lat}" lon="${p.lng}"></trkpt>`;
+            });
+            gpx += `\n  </trkseg></trk></gpx>`;
+            return gpx;
+        }
+
+        function generateKML() {
+            let kml = `<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>Ruta Medida</name>
+    <Placemark>
+      <name>Trayecto</name>
+      <LineString>
+        <coordinates>`;
+            points.forEach(p => {
+                kml += `${p.lng},${p.lat},0 `;
+            });
+            kml += `</coordinates>
+      </LineString>
+    </Placemark>
+  </Document>
+</kml>`;
+            return kml;
+        }
+
+        function generateGeoJSON() {
+            const coords = points.map(p => [p.lng, p.lat]);
+            return JSON.stringify({
+                "type": "FeatureCollection",
+                "features": [{
+                    "type": "Feature",
+                    "properties": { "name": "Ruta Medida", "distance": totalDistance },
+                    "geometry": {
+                        "type": "LineString",
+                        "coordinates": coords
+                    }
+                }]
+            }, null, 2);
+        }
     </script>
 </body>
-  </html>
+    </html>
