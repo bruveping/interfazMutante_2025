@@ -2,255 +2,311 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Explorador GPS y Capas Optimizado</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visor Geográfico de Rutas</title>
     
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
     <style>
-        body, html { height: 100%; margin: 0; padding: 0; overflow: hidden; }
-        #map { height: 100%; width: 100%; z-index: 1; }
-        
-        #sidebar {
-            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            z-index: 2000;
-        }
+        #map { height: 100vh; width: 100%; z-index: 1; }
+        .sidebar { transition: transform 0.3s ease-in-out; z-index: 50; }
         .sidebar-closed { transform: translateX(-100%); }
         .sidebar-open { transform: translateX(0); }
-
-        .gps-marker {
-            width: 18px;
-            height: 18px;
-            background: #10b981;
-            border: 3px solid white;
+        
+        /* Estilos para el marcador de posición */
+        .location-marker {
+            background-color: #2563eb;
+            border: 2px solid white;
             border-radius: 50%;
             box-shadow: 0 0 10px rgba(0,0,0,0.3);
-            animation: pulse-green 2s infinite;
-        }
-        @keyframes pulse-green {
-            0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
-            70% { box-shadow: 0 0 0 15px rgba(16, 185, 129, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
-        }
-
-        .menu-toggle {
-            position: absolute;
-            top: 15px;
-            left: 15px;
-            z-index: 3000;
         }
     </style>
 </head>
-<body class="bg-gray-50 text-gray-900">
+<body class="bg-gray-100 overflow-hidden">
 
-    <!-- Botón Flotante -->
-    <button id="toggleBtn" class="menu-toggle bg-white p-3 rounded-full shadow-xl border border-gray-200 active:scale-95 transition-all">
-        <svg id="iconMenu" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path id="menuPath" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+    <!-- Botón de Menú (Hamburguesa) -->
+    <button id="menu-toggle" class="fixed top-4 left-4 z-[100] bg-blue-600 text-white p-3 rounded-full shadow-xl hover:bg-blue-700 transition-all focus:outline-none">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
         </svg>
     </button>
 
-    <!-- Menú Lateral -->
-    <div id="sidebar" class="sidebar-open fixed top-0 left-0 h-full w-80 bg-white shadow-2xl flex flex-col">
-        <div class="p-6 pt-20 bg-gradient-to-br from-blue-600 to-blue-800 text-white">
-            <h1 class="text-2xl font-bold">Geovisor Pro</h1>
-            <p class="text-xs opacity-80 uppercase tracking-widest mt-1">Navegación Personalizada</p>
-        </div>
-
-        <div class="flex-1 overflow-y-auto p-5 space-y-6">
-            <!-- Sección de Carga -->
-            <div class="space-y-3">
-                <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider">Importar Datos</label>
-                <div class="relative group">
-                    <label class="flex flex-col items-center justify-center w-full h-28 border-2 border-dashed border-gray-300 rounded-2xl hover:bg-blue-50 hover:border-blue-400 transition-all cursor-pointer">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8 text-gray-400 group-hover:text-blue-500 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                        </svg>
-                        <span class="mt-2 text-sm font-medium text-gray-600">Subir KML, GPX o JSON</span>
-                        <input type="file" id="geoInput" class="hidden" accept=".kml,.gpx,.geojson,.json">
-                    </label>
-                </div>
-            </div>
-
-            <!-- Navegación -->
-            <div class="space-y-3">
-                <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider">Controles</label>
-                <button id="btnLocate" class="w-full flex items-center gap-3 px-4 py-3 bg-blue-50 text-blue-700 rounded-xl font-semibold hover:bg-blue-100 active:bg-blue-200 transition-all">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+    <!-- Sidebar Lateral -->
+    <aside id="sidebar" class="sidebar sidebar-closed fixed inset-y-0 left-0 w-full sm:w-80 bg-white shadow-2xl flex flex-col">
+        <div class="p-6 flex flex-col h-full">
+            <div class="flex justify-between items-center mb-8">
+                <h1 class="text-2xl font-bold text-gray-800">Rutas GPS</h1>
+                <button id="menu-close" class="text-gray-500 hover:text-gray-700">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                     </svg>
-                    Centrar en mi ubicación
                 </button>
             </div>
 
-            <!-- Listado de capas -->
-            <div class="space-y-3">
-                <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider">Capas en Mapa</label>
-                <div id="layersContainer" class="space-y-2">
-                    <div id="emptyMsg" class="text-sm text-gray-400 text-center py-4 bg-gray-50 rounded-xl italic">
-                        Sin capas cargadas
-                    </div>
+            <!-- Botón Centrar Ubicación -->
+            <button id="center-location" class="mb-6 w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-lg shadow-md transition-all">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd" />
+                </svg>
+                Centrar Ubicación
+            </button>
+
+            <!-- Zona de Carga de Archivos -->
+            <div class="mb-8">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Cargar archivo (KML, GPX, GeoJSON)</label>
+                <div id="drop-zone" class="border-2 border-dashed border-blue-200 rounded-xl p-6 text-center hover:border-blue-400 transition-colors cursor-pointer bg-blue-50">
+                    <input type="file" id="file-input" class="hidden" accept=".kml,.gpx,.geojson,.json">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="mx-auto h-10 w-10 text-blue-400 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                    </svg>
+                    <p class="text-xs text-blue-600 font-medium">Click o arrastra archivos aquí</p>
                 </div>
             </div>
-        </div>
-        
-        <div class="p-4 border-t border-gray-100 text-center bg-gray-50">
-            <span class="text-[10px] text-gray-400 font-medium">GPS ACTIVO</span>
-        </div>
-    </div>
 
-    <!-- Feedback Visual -->
-    <div id="statusToast" class="fixed bottom-6 left-1/2 -translate-x-1/2 z-[5000] hidden">
-        <div class="bg-gray-900 text-white px-6 py-3 rounded-2xl shadow-2xl text-sm font-medium flex items-center gap-3">
-            <div id="statusLoader" class="animate-spin h-4 w-4 border-2 border-white/20 border-t-white rounded-full"></div>
-            <span id="statusText">Cargando...</span>
+            <!-- Lista de Capas Activas -->
+            <div class="flex-grow overflow-y-auto">
+                <h2 class="text-sm font-bold uppercase tracking-wider text-gray-400 mb-4">Capas Activas</h2>
+                <ul id="layers-list" class="space-y-3">
+                    <!-- Las capas se inyectarán aquí -->
+                    <p id="empty-layers" class="text-sm text-gray-400 italic">No hay archivos cargados</p>
+                </ul>
+            </div>
+            
+            <div class="mt-4 pt-4 border-t border-gray-100">
+                <p class="text-[10px] text-center text-gray-400">Visor Geográfico v1.0</p>
+            </div>
         </div>
-    </div>
+    </aside>
 
-    <div id="map"></div>
+    <!-- Mapa -->
+    <main id="map"></main>
 
+    <!-- Scripts -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="https://api.mapbox.com/mapbox.js/plugins/leaflet-omnivore/v0.3.1/leaflet-omnivore.min.js"></script>
+    <script src="https://api.tiles.mapbox.com/mapbox.js/plugins/leaflet-omnivore/v0.3.1/leaflet-omnivore.min.js"></script>
 
     <script>
-        // --- Setup ---
-        const map = L.map('map', { zoomControl: false }).setView([0, 0], 2);
-        L.control.zoom({ position: 'bottomright' }).addTo(map);
+        // --- CONFIGURACIÓN INICIAL DEL MAPA ---
+        const map = L.map('map', {
+            zoomControl: false // Deshabilitado para UI personalizada
+        }).setView([0, 0], 2);
 
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '&copy; OpenStreetMap'
+            attribution: '© OpenStreetMap contributors'
         }).addTo(map);
 
-        // --- Sidebar Logic ---
-        let sidebarOpen = true;
+        // --- ESTADO DE LA APLICACIÓN ---
+        let userMarker = null;
+        let userCircle = null;
+        const activeLayers = new Map(); // Para rastrear objetos de capa por ID único
+
+        // --- GESTIÓN DE LA INTERFAZ (SIDEBAR) ---
         const sidebar = document.getElementById('sidebar');
-        const toggleBtn = document.getElementById('toggleBtn');
-        const menuPath = document.getElementById('menuPath');
+        const menuToggle = document.getElementById('menu-toggle');
+        const menuClose = document.getElementById('menu-close');
 
         function toggleMenu() {
-            sidebarOpen = !sidebarOpen;
-            sidebar.classList.toggle('sidebar-closed', !sidebarOpen);
-            menuPath.setAttribute('d', sidebarOpen ? 'M6 18L18 6M6 6l12 12' : 'M4 6h16M4 12h16M4 18h16');
+            sidebar.classList.toggle('sidebar-closed');
+            sidebar.classList.toggle('sidebar-open');
         }
-        toggleBtn.addEventListener('click', toggleMenu);
 
-        // --- GPS Logic ---
-        let userMarker, accuracyCircle;
-
-        map.on('locationfound', (e) => {
-            if (!userMarker) {
-                userMarker = L.marker(e.latlng, {
-                    icon: L.divIcon({ className: 'gps-wrap', html: '<div class="gps-marker"></div>', iconSize: [18, 18], iconAnchor: [9, 9] })
-                }).addTo(map);
-                accuracyCircle = L.circle(e.latlng, { radius: e.accuracy / 2, color: '#10b981', weight: 1, fillOpacity: 0.1 }).addTo(map);
-                map.setView(e.latlng, 15);
-            } else {
-                userMarker.setLatLng(e.latlng);
-                accuracyCircle.setLatLng(e.latlng);
-                accuracyCircle.setRadius(e.accuracy / 2);
-            }
+        menuToggle.addEventListener('click', (e) => {
+            e.stopPropagation();
+            toggleMenu();
         });
 
-        map.locate({ watch: true, enableHighAccuracy: true });
+        menuClose.addEventListener('click', toggleMenu);
 
-        document.getElementById('btnLocate').addEventListener('click', () => {
+        // Evitar que clicks dentro del sidebar cierren el menú si se implementara cierre por clic fuera
+        sidebar.addEventListener('click', (e) => e.stopPropagation());
+
+        // --- GEOLOCALIZACIÓN ---
+        function onLocationFound(e) {
+            const radius = e.accuracy / 2;
+
             if (userMarker) {
-                map.flyTo(userMarker.getLatLng(), 17);
-                if (window.innerWidth < 768) toggleMenu();
+                userMarker.setLatLng(e.latlng);
+                userCircle.setLatLng(e.latlng).setRadius(radius);
+            } else {
+                userMarker = L.circleMarker(e.latlng, {
+                    radius: 8,
+                    fillColor: "#2563eb",
+                    color: "white",
+                    weight: 2,
+                    opacity: 1,
+                    fillOpacity: 0.8
+                }).addTo(map);
+
+                userCircle = L.circle(e.latlng, radius, {
+                    color: '#2563eb',
+                    fillColor: '#2563eb',
+                    fillOpacity: 0.1,
+                    weight: 1
+                }).addTo(map);
+                
+                map.setView(e.latlng, 15);
+            }
+        }
+
+        function onLocationError(e) {
+            console.warn("Error obteniendo ubicación:", e.message);
+        }
+
+        map.on('locationfound', onLocationFound);
+        map.on('locationerror', onLocationError);
+
+        // Iniciar seguimiento
+        map.locate({ setView: false, watch: true, enableHighAccuracy: true });
+
+        document.getElementById('center-location').addEventListener('click', () => {
+            if (userMarker) {
+                map.setView(userMarker.getLatLng(), 15);
+                if (window.innerWidth < 640) toggleMenu();
+            } else {
+                map.locate({ setView: true, maxZoom: 15 });
             }
         });
 
-        // --- File Loading Logic (Optimized) ---
-        const geoInput = document.getElementById('geoInput');
-        const toast = document.getElementById('statusToast');
-        const statusText = document.getElementById('statusText');
-        const layersContainer = document.getElementById('layersContainer');
-        const emptyMsg = document.getElementById('emptyMsg');
+        // --- CARGA DE ARCHIVOS ---
+        const fileInput = document.getElementById('file-input');
+        const dropZone = document.getElementById('drop-zone');
+        const layersList = document.getElementById('layers-list');
+        const emptyLayersHint = document.getElementById('empty-layers');
 
-        function showStatus(msg, isLoading = true) {
-            statusText.innerText = msg;
-            toast.classList.remove('hidden');
-            document.getElementById('statusLoader').classList.toggle('hidden', !isLoading);
-            if (!isLoading) setTimeout(() => toast.classList.add('hidden'), 3000);
-        }
+        dropZone.addEventListener('click', () => fileInput.click());
 
-        geoInput.addEventListener('change', async (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
-
-            const name = file.name;
-            const ext = name.split('.').pop().toLowerCase();
-            showStatus("Procesando " + name.toUpperCase() + "...");
-
-            const reader = new FileReader();
-            reader.onload = (event) => {
-                const content = event.target.result;
-                let layer;
-
-                try {
-                    // OPTIMIZACIÓN CRUCIAL: Parsear el KML como XML antes de dárselo a omnivore
-                    if (ext === 'kml') {
-                        const parser = new DOMParser();
-                        const xmlDoc = parser.parseFromString(content, "text/xml");
-                        layer = omnivore.kml.parse(xmlDoc);
-                    } else if (ext === 'gpx') {
-                        const parser = new DOMParser();
-                        const xmlDoc = parser.parseFromString(content, "text/xml");
-                        layer = omnivore.gpx.parse(xmlDoc);
-                    } else {
-                        layer = omnivore.geojson.parse(content);
-                    }
-
-                    layer.on('ready', () => {
-                        layer.addTo(map);
-                        const bounds = layer.getBounds();
-                        if (bounds.isValid()) map.fitBounds(bounds, { padding: [50, 50] });
-                        
-                        addLayerControl(name, layer);
-                        showStatus("¡Cargado con éxito!", false);
-                        if (window.innerWidth < 768) toggleMenu();
-                    });
-
-                    layer.on('error', () => {
-                        showStatus("Error: El archivo no es válido", false);
-                    });
-
-                } catch (err) {
-                    showStatus("Error de lectura", false);
-                }
-            };
-
-            reader.readAsText(file);
-            geoInput.value = '';
+        fileInput.addEventListener('change', (e) => {
+            handleFiles(e.target.files);
+            // Bug Fix: Limpiar valor para permitir re-subida del mismo archivo
+            fileInput.value = '';
         });
 
-        function addLayerControl(name, layer) {
-            emptyMsg.classList.add('hidden');
-            const div = document.createElement('div');
-            div.className = "flex items-center justify-between p-3 bg-white border border-gray-100 rounded-xl shadow-sm animate-in slide-in-from-left duration-300";
-            div.innerHTML = `
-                <div class="flex flex-col min-w-0">
-                    <span class="text-sm font-semibold truncate text-gray-700">${name}</span>
-                    <span class="text-[10px] text-gray-400 uppercase font-bold tracking-tighter">Capa Activa</span>
+        // Drag and drop logic
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('border-blue-500', 'bg-blue-100');
+        });
+
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('border-blue-500', 'bg-blue-100');
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('border-blue-500', 'bg-blue-100');
+            handleFiles(e.dataTransfer.files);
+        });
+
+        function handleFiles(files) {
+            Array.from(files).forEach(file => {
+                const reader = new FileReader();
+                const fileName = file.name;
+                const extension = fileName.split('.').pop().toLowerCase();
+
+                reader.onload = (event) => {
+                    const data = event.target.result;
+                    processFileData(data, extension, fileName);
+                };
+
+                reader.readAsText(file);
+            });
+        }
+
+        function processFileData(data, extension, fileName) {
+            let layer;
+            const layerId = Date.now() + Math.random().toString(36).substr(2, 9);
+
+            try {
+                // Configuración de estilo por defecto para las rutas
+                const customStyle = {
+                    color: '#2563eb',
+                    weight: 4,
+                    opacity: 0.8
+                };
+
+                if (extension === 'kml') {
+                    layer = omnivore.kml.parse(data);
+                } else if (extension === 'gpx') {
+                    layer = omnivore.gpx.parse(data);
+                } else if (extension === 'geojson' || extension === 'json') {
+                    // IMPORTANTE: Según prompt, usar omnivore.geojson(data) directamente para evitar problemas de tipos
+                    // Convertimos string a objeto si es necesario para el parser de geojson
+                    const jsonData = JSON.parse(data);
+                    layer = omnivore.geojson(jsonData);
+                } else {
+                    alert('Formato no soportado: .' + extension);
+                    return;
+                }
+
+                layer.setStyle(customStyle);
+                layer.addTo(map);
+
+                // Zoom automático al cargar
+                layer.on('ready', () => {
+                    map.fitBounds(layer.getBounds(), { padding: [20, 20] });
+                });
+                
+                // Si ya estaba listo (geojson suele estarlo inmediatamente)
+                if (layer.getBounds().isValid()) {
+                    map.fitBounds(layer.getBounds(), { padding: [20, 20] });
+                }
+
+                addLayerToUI(layerId, fileName, layer);
+                
+                // Cerrar menú en móvil tras cargar
+                if (window.innerWidth < 640) toggleMenu();
+
+            } catch (err) {
+                console.error('Error procesando archivo:', err);
+                alert('Error al procesar el archivo ' + fileName);
+            }
+        }
+
+        function addLayerToUI(id, name, layerInstance) {
+            activeLayers.set(id, layerInstance);
+            emptyLayersHint.classList.add('hidden');
+
+            const li = document.createElement('li');
+            li.id = `layer-item-${id}`;
+            li.className = "flex items-center justify-between bg-white p-3 rounded-lg border border-gray-100 shadow-sm hover:shadow-md transition-shadow";
+            li.innerHTML = `
+                <div class="flex items-center gap-3 overflow-hidden">
+                    <div class="w-2 h-2 rounded-full bg-blue-600 flex-shrink-0"></div>
+                    <span class="text-sm font-medium text-gray-700 truncate" title="${name}">${name}</span>
                 </div>
-                <button class="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all">
+                <button class="remove-layer text-red-400 hover:text-red-600 p-1" data-id="${id}">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                     </svg>
                 </button>
             `;
-            
-            div.querySelector('button').onclick = () => {
-                map.removeLayer(layer);
-                div.remove();
-                if (layersContainer.querySelectorAll('div:not(#emptyMsg)').length === 0) {
-                    emptyMsg.classList.remove('hidden');
+
+            li.querySelector('.remove-layer').addEventListener('click', function() {
+                const layerId = this.getAttribute('data-id');
+                const layerToRemove = activeLayers.get(layerId);
+                if (layerToRemove) {
+                    map.removeLayer(layerToRemove);
+                    activeLayers.delete(layerId);
+                    document.getElementById(`layer-item-${layerId}`).remove();
+                    
+                    if (activeLayers.size === 0) {
+                        emptyLayersHint.classList.remove('hidden');
+                    }
                 }
-            };
-            
-            layersContainer.appendChild(div);
+            });
+
+            layersList.appendChild(li);
         }
+
+        // Ajustar mapa al redimensionar ventana (especialmente importante en móviles)
+        window.addEventListener('resize', () => {
+            map.invalidateSize();
+        });
+
     </script>
 </body>
-                                                </html>
+                        </html>
