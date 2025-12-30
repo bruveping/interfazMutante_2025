@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Explorador GPS y Capas Optimizado</title>
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <style>
+        body, html { height: 100%; margin: 0; padding: 0; overflow: hidden; }
+        #map { height: 100%; width: 100%; z-index: 1; }
+        
+        #sidebar {
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: 2000;
+        }
+        .sidebar-closed { transform: translateX(-100%); }
+        .sidebar-open { transform: translateX(0); }
+
+        .gps-marker {
+            width: 18px;
+            height: 18px;
+            background: #10b981;
+            border: 3px solid white;
+            border-radius: 50%;
+            box-shadow: 0 0 10px rgba(0,0,0,0.3);
+            animation: pulse-green 2s infinite;
+        }
+        @keyframes pulse-green {
+            0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+            70% { box-shadow: 0 0 0 15px rgba(16, 185, 129, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+        }
+
+        .menu-toggle {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            z-index: 3000;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-900">
+
+    <!-- Botón Flotante -->
+    <button id="toggleBtn" class="menu-toggle bg-white p-3 rounded-full shadow-xl border border-gray-200 active:scale-95 transition-all">
+        <svg id="iconMenu" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path id="menuPath" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+    </button>
+
+    <!-- Menú Lateral -->
+    <div id="sidebar" class="sidebar-open fixed top-0 left-0 h-full w-80 bg-white shadow-2xl flex flex-col">
+        <div class="p-6 pt-20 bg-gradient-to-br from-blue-600 to-blue-800 text-white">
+            <h1 class="text-2xl font-bold">Geovisor Pro</h1>
+            <p class="text-xs opacity-80 uppercase tracking-widest mt-1">Navegación Personalizada</p>
+        </div>
+
+        <div class="flex-1 overflow-y-auto p-5 space-y-6">
+            <!-- Sección de Carga -->
+            <div class="space-y-3">
+                <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider">Importar Datos</label>
+                <div class="relative group">
+                    <label class="flex flex-col items-center justify-center w-full h-28 border-2 border-dashed border-gray-300 rounded-2xl hover:bg-blue-50 hover:border-blue-400 transition-all cursor-pointer">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8 text-gray-400 group-hover:text-blue-500 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                        </svg>
+                        <span class="mt-2 text-sm font-medium text-gray-600">Subir KML, GPX o JSON</span>
+                        <input type="file" id="geoInput" class="hidden" accept=".kml,.gpx,.geojson,.json">
+                    </label>
+                </div>
+            </div>
+
+            <!-- Navegación -->
+            <div class="space-y-3">
+                <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider">Controles</label>
+                <button id="btnLocate" class="w-full flex items-center gap-3 px-4 py-3 bg-blue-50 text-blue-700 rounded-xl font-semibold hover:bg-blue-100 active:bg-blue-200 transition-all">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                    </svg>
+                    Centrar en mi ubicación
+                </button>
+            </div>
+
+            <!-- Listado de capas -->
+            <div class="space-y-3">
+                <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider">Capas en Mapa</label>
+                <div id="layersContainer" class="space-y-2">
+                    <div id="emptyMsg" class="text-sm text-gray-400 text-center py-4 bg-gray-50 rounded-xl italic">
+                        Sin capas cargadas
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="p-4 border-t border-gray-100 text-center bg-gray-50">
+            <span class="text-[10px] text-gray-400 font-medium">GPS ACTIVO</span>
+        </div>
+    </div>
+
+    <!-- Feedback Visual -->
+    <div id="statusToast" class="fixed bottom-6 left-1/2 -translate-x-1/2 z-[5000] hidden">
+        <div class="bg-gray-900 text-white px-6 py-3 rounded-2xl shadow-2xl text-sm font-medium flex items-center gap-3">
+            <div id="statusLoader" class="animate-spin h-4 w-4 border-2 border-white/20 border-t-white rounded-full"></div>
+            <span id="statusText">Cargando...</span>
+        </div>
+    </div>
+
+    <div id="map"></div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://api.mapbox.com/mapbox.js/plugins/leaflet-omnivore/v0.3.1/leaflet-omnivore.min.js"></script>
+
+    <script>
+        // --- Setup ---
+        const map = L.map('map', { zoomControl: false }).setView([0, 0], 2);
+        L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap'
+        }).addTo(map);
+
+        // --- Sidebar Logic ---
+        let sidebarOpen = true;
+        const sidebar = document.getElementById('sidebar');
+        const toggleBtn = document.getElementById('toggleBtn');
+        const menuPath = document.getElementById('menuPath');
+
+        function toggleMenu() {
+            sidebarOpen = !sidebarOpen;
+            sidebar.classList.toggle('sidebar-closed', !sidebarOpen);
+            menuPath.setAttribute('d', sidebarOpen ? 'M6 18L18 6M6 6l12 12' : 'M4 6h16M4 12h16M4 18h16');
+        }
+        toggleBtn.addEventListener('click', toggleMenu);
+
+        // --- GPS Logic ---
+        let userMarker, accuracyCircle;
+
+        map.on('locationfound', (e) => {
+            if (!userMarker) {
+                userMarker = L.marker(e.latlng, {
+                    icon: L.divIcon({ className: 'gps-wrap', html: '<div class="gps-marker"></div>', iconSize: [18, 18], iconAnchor: [9, 9] })
+                }).addTo(map);
+                accuracyCircle = L.circle(e.latlng, { radius: e.accuracy / 2, color: '#10b981', weight: 1, fillOpacity: 0.1 }).addTo(map);
+                map.setView(e.latlng, 15);
+            } else {
+                userMarker.setLatLng(e.latlng);
+                accuracyCircle.setLatLng(e.latlng);
+                accuracyCircle.setRadius(e.accuracy / 2);
+            }
+        });
+
+        map.locate({ watch: true, enableHighAccuracy: true });
+
+        document.getElementById('btnLocate').addEventListener('click', () => {
+            if (userMarker) {
+                map.flyTo(userMarker.getLatLng(), 17);
+                if (window.innerWidth < 768) toggleMenu();
+            }
+        });
+
+        // --- File Loading Logic (Optimized) ---
+        const geoInput = document.getElementById('geoInput');
+        const toast = document.getElementById('statusToast');
+        const statusText = document.getElementById('statusText');
+        const layersContainer = document.getElementById('layersContainer');
+        const emptyMsg = document.getElementById('emptyMsg');
+
+        function showStatus(msg, isLoading = true) {
+            statusText.innerText = msg;
+            toast.classList.remove('hidden');
+            document.getElementById('statusLoader').classList.toggle('hidden', !isLoading);
+            if (!isLoading) setTimeout(() => toast.classList.add('hidden'), 3000);
+        }
+
+        geoInput.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const name = file.name;
+            const ext = name.split('.').pop().toLowerCase();
+            showStatus("Procesando " + name.toUpperCase() + "...");
+
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const content = event.target.result;
+                let layer;
+
+                try {
+                    // OPTIMIZACIÓN CRUCIAL: Parsear el KML como XML antes de dárselo a omnivore
+                    if (ext === 'kml') {
+                        const parser = new DOMParser();
+                        const xmlDoc = parser.parseFromString(content, "text/xml");
+                        layer = omnivore.kml.parse(xmlDoc);
+                    } else if (ext === 'gpx') {
+                        const parser = new DOMParser();
+                        const xmlDoc = parser.parseFromString(content, "text/xml");
+                        layer = omnivore.gpx.parse(xmlDoc);
+                    } else {
+                        layer = omnivore.geojson.parse(content);
+                    }
+
+                    layer.on('ready', () => {
+                        layer.addTo(map);
+                        const bounds = layer.getBounds();
+                        if (bounds.isValid()) map.fitBounds(bounds, { padding: [50, 50] });
+                        
+                        addLayerControl(name, layer);
+                        showStatus("¡Cargado con éxito!", false);
+                        if (window.innerWidth < 768) toggleMenu();
+                    });
+
+                    layer.on('error', () => {
+                        showStatus("Error: El archivo no es válido", false);
+                    });
+
+                } catch (err) {
+                    showStatus("Error de lectura", false);
+                }
+            };
+
+            reader.readAsText(file);
+            geoInput.value = '';
+        });
+
+        function addLayerControl(name, layer) {
+            emptyMsg.classList.add('hidden');
+            const div = document.createElement('div');
+            div.className = "flex items-center justify-between p-3 bg-white border border-gray-100 rounded-xl shadow-sm animate-in slide-in-from-left duration-300";
+            div.innerHTML = `
+                <div class="flex flex-col min-w-0">
+                    <span class="text-sm font-semibold truncate text-gray-700">${name}</span>
+                    <span class="text-[10px] text-gray-400 uppercase font-bold tracking-tighter">Capa Activa</span>
+                </div>
+                <button class="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                </button>
+            `;
+            
+            div.querySelector('button').onclick = () => {
+                map.removeLayer(layer);
+                div.remove();
+                if (layersContainer.querySelectorAll('div:not(#emptyMsg)').length === 0) {
+                    emptyMsg.classList.remove('hidden');
+                }
+            };
+            
+            layersContainer.appendChild(div);
+        }
+    </script>
+</body>
+                                                </html>
