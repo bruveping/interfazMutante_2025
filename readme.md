@@ -40,6 +40,9 @@ medir distacia 02 [medir distacia 02](https://bruveping.github.io/interfazMutant
 
 navegar con el GPS [navegar con el GPS](https://bruveping.github.io/interfazMutante_2025/Navegar_con_el_GPS_01)
 
+Mapear_con_clics [Mapear_con_clics] (https://bruveping.github.io/interfazMutante_2025/Mapear_con_clics)
+
+
 
 
 
