@@ -1,1 +1,251 @@
-Hola, Pampi! Feliz año!!
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mapeador de Rutas - Estilo Claro</title>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <style>
+        #map { height: 55vh; width: 100%; }
+        .active-pulse {
+            animation: shadow-pulse 2s infinite;
+        }
+        @keyframes shadow-pulse {
+            0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.5); }
+            70% { box-shadow: 0 0 0 15px rgba(59, 130, 246, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800 font-sans min-h-screen">
+
+    <div class="max-w-md mx-auto flex flex-col min-h-screen bg-white shadow-2xl">
+        <!-- Header -->
+        <header class="p-4 bg-white border-b flex justify-between items-center">
+            <div>
+                <h1 class="text-xl font-bold text-blue-600">Mapeador Bus</h1>
+                <p class="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">Modo: Manual por Nodos</p>
+            </div>
+            <div id="gps-indicator" class="flex items-center space-x-1 px-2 py-1 bg-gray-100 rounded-full text-[10px] font-bold text-gray-400">
+                <span id="gps-dot" class="h-2 w-2 rounded-full bg-gray-400"></span>
+                <span id="gps-text">SIN GPS</span>
+            </div>
+        </header>
+
+        <!-- Stats Bar -->
+        <div class="flex border-b text-center bg-gray-50">
+            <div class="flex-1 p-2 border-r">
+                <span class="block text-[10px] text-gray-400 uppercase">Puntos</span>
+                <span id="node-count" class="text-lg font-bold">0</span>
+            </div>
+            <div class="flex-1 p-2">
+                <span class="block text-[10px] text-gray-400 uppercase">Precisión</span>
+                <span id="accuracy-val" class="text-lg font-bold">--</span>
+            </div>
+        </div>
+
+        <!-- Map Container -->
+        <div class="relative flex-grow">
+            <div id="map"></div>
+            <!-- Botón flotante para recentrar -->
+            <button id="recenter-btn" class="absolute bottom-4 right-4 z-[1000] bg-white p-3 rounded-full shadow-md border border-gray-200 active:bg-gray-100">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+        </div>
+
+        <!-- Controls Area -->
+        <div class="p-4 bg-white space-y-3">
+            <button id="add-node-btn" class="w-full bg-blue-600 hover:bg-blue-700 active:scale-95 text-white py-5 rounded-xl shadow-lg transition-all flex flex-col items-center justify-center">
+                <span class="text-lg font-black tracking-widest">MARCAR NODO</span>
+                <span class="text-[10px] opacity-80 mt-1">PRESIONA EN CADA PARADA O GIRO</span>
+            </button>
+
+            <div class="grid grid-cols-2 gap-2">
+                <button id="undo-btn" class="bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-3 rounded-lg border border-gray-300 text-sm">
+                    DESHACER
+                </button>
+                <button id="export-btn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-lg shadow text-sm">
+                    GUARDAR GPX
+                </button>
+            </div>
+            
+            <button id="clear-btn" class="w-full py-1 text-[10px] text-gray-400 hover:text-red-500 uppercase font-bold transition-colors">
+                Limpiar todo el recorrido
+            </button>
+        </div>
+    </div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <script>
+        let map, polyline, userDot;
+        let nodes = [];
+        let markers = [];
+        let currentPos = null;
+
+        function initMap() {
+            // Inicializar mapa con el estilo estándar de OSM
+            map = L.map('map', { zoomControl: false }).setView([0, 0], 2);
+
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+            }).addTo(map);
+
+            // Línea del recorrido (azul sólido y claro)
+            polyline = L.polyline([], {
+                color: '#2563eb', 
+                weight: 5,
+                opacity: 0.8
+            }).addTo(map);
+
+            // Marcador de posición actual (punto azul con borde blanco)
+            userDot = L.circleMarker([0,0], {
+                radius: 7,
+                fillColor: '#3b82f6',
+                color: '#fff',
+                weight: 3,
+                fillOpacity: 1
+            }).addTo(map);
+
+            if ("geolocation" in navigator) {
+                navigator.geolocation.watchPosition(
+                    (pos) => {
+                        const { latitude, longitude, accuracy } = pos.coords;
+                        currentPos = { lat: latitude, lon: longitude };
+                        
+                        // Actualizar indicador visual
+                        userDot.setLatLng([latitude, longitude]);
+                        document.getElementById('gps-dot').classList.remove('bg-gray-400', 'bg-red-500');
+                        document.getElementById('gps-dot').classList.add('bg-green-500');
+                        document.getElementById('gps-text').innerText = "GPS ACTIVO";
+                        document.getElementById('gps-text').className = "text-green-600";
+                        document.getElementById('accuracy-val').innerText = `±${Math.round(accuracy)}m`;
+
+                        // Auto-centrar solo al inicio
+                        if (nodes.length === 0 && !map._hasCentered) {
+                            map.setView([latitude, longitude], 17);
+                            map._hasCentered = true;
+                        }
+                    },
+                    (err) => {
+                        document.getElementById('gps-dot').classList.replace('bg-green-500', 'bg-red-500');
+                        document.getElementById('gps-text').innerText = "ERROR GPS";
+                        document.getElementById('gps-text').className = "text-red-600";
+                    },
+                    { enableHighAccuracy: true }
+                );
+            }
+        }
+
+        function addNode() {
+            if (!currentPos) {
+                alert("Esperando señal de GPS válida...");
+                return;
+            }
+
+            const timestamp = new Date().toISOString();
+            const newNode = { ...currentPos, time: timestamp };
+            nodes.push(newNode);
+            
+            const latLng = [newNode.lat, newNode.lon];
+            polyline.addLatLng(latLng);
+            
+            // Crear marcador visual de nodo (círculo naranja para resaltar paradas)
+            const marker = L.circleMarker(latLng, {
+                radius: 5,
+                fillColor: '#f97316',
+                color: '#fff',
+                weight: 2,
+                fillOpacity: 1
+            }).addTo(map);
+            
+            markers.push(marker);
+            updateUI();
+            map.panTo(latLng);
+        }
+
+        function undoLast() {
+            if (nodes.length === 0) return;
+            nodes.pop();
+            const lastMarker = markers.pop();
+            if (lastMarker) map.removeLayer(lastMarker);
+            polyline.setLatLngs(nodes.map(n => [n.lat, n.lon]));
+            updateUI();
+        }
+
+        function updateUI() {
+            document.getElementById('node-count').innerText = nodes.length;
+        }
+
+        function exportGPX() {
+            if (nodes.length < 2) {
+                alert("Crea al menos 2 nodos para poder generar un archivo.");
+                return;
+            }
+
+            const confirmSave = confirm("¿Quieres generar el archivo GPX con los " + nodes.length + " puntos marcados?");
+            if (!confirmSave) return;
+
+            let gpx = `<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="MapeadorClaro" xmlns="http://www.topografix.com/GPX/1/1">
+  <metadata>
+    <name>Recorrido Colectivo - ${new Date().toLocaleDateString()}</name>
+  </metadata>
+  <trk>
+    <name>Trazado Manual</name>
+    <trkseg>`;
+
+            nodes.forEach(n => {
+                gpx += `
+      <trkpt lat="${n.lat}" lon="${n.lon}">
+        <time>${n.time}</time>
+      </trkpt>`;
+            });
+
+            gpx += `
+    </trkseg>
+  </trk>
+</gpx>`;
+
+            const blob = new Blob([gpx], { type: 'application/gpx+xml' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            
+            const fileName = prompt("Nombre del recorrido:", "linea_colectivo");
+            if (fileName === null) return; // Cancelado
+
+            a.download = `${fileName || 'recorrido'}.gpx`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        // Listeners
+        document.getElementById('add-node-btn').onclick = addNode;
+        document.getElementById('undo-btn').onclick = undoLast;
+        document.getElementById('export-btn').onclick = exportGPX;
+        document.getElementById('recenter-btn').onclick = () => {
+            if (currentPos) map.setView([currentPos.lat, currentPos.lon], 17);
+        };
+        document.getElementById('clear-btn').onclick = () => {
+            if (confirm("¿Estás seguro de que quieres borrar todo el trazado actual?")) {
+                nodes = [];
+                markers.forEach(m => map.removeLayer(m));
+                markers = [];
+                polyline.setLatLngs([]);
+                updateUI();
+            }
+        };
+
+        window.onload = initMap;
+    </script>
+</body>
+                                                </html>
