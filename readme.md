@@ -43,6 +43,7 @@ navegar con el GPS [navegar con el GPS](https://bruveping.github.io/interfazMuta
 Mapear_con_clics [Mapear_con_clics](https://bruveping.github.io/interfazMutante_2025/Mapear_con_clics)
 
 
+Medidor de ruido [medidor de ruido](https://bruveping.github.io/interfazMutante_2025/medidor_de_ruido)
 
 
 
