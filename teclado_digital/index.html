@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Piano Touch – 24 notas con selector de octava</title>
+<style>
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: linear-gradient(135deg, #0b0b10 0%, #1a1a2e 100%);
+  color: white;
+  font-family: system-ui, -apple-system, sans-serif;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+#top {
+  padding: 12px 16px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  background: rgba(17, 17, 17, 0.95);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+  flex-wrap: wrap;
+}
+
+button {
+  background: linear-gradient(145deg, #2a2a2a, #1f1f1f);
+  color: white;
+  border: 1px solid #333;
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-size: 15px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-weight: 500;
+}
+
+button:hover {
+  background: linear-gradient(145deg, #333, #252525);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+button:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+#octave {
+  min-width: 60px;
+  text-align: center;
+  font-weight: bold;
+  font-size: 18px;
+  color: #4CAF50;
+}
+
+.control-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#piano {
+  flex: 1;
+  display: flex;
+  touch-action: none;
+  padding: 20px 10px 10px 10px;
+  position: relative;
+}
+
+.key {
+  flex: 1;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: 12px;
+  user-select: none;
+  cursor: pointer;
+  position: relative;
+  transition: all 0.1s ease;
+  border-radius: 0 0 8px 8px;
+}
+
+.white {
+  background: linear-gradient(180deg, #ffffff 0%, #f5f5f5 100%);
+  color: #333;
+  margin: 0 1px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2), inset 0 -2px 4px rgba(0, 0, 0, 0.1);
+  border: 1px solid #ddd;
+}
+
+.white:active,
+.white.active {
+  background: linear-gradient(180deg, #e8e8e8 0%, #d5d5d5 100%);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3), inset 0 2px 8px rgba(0, 0, 0, 0.15);
+  transform: translateY(2px);
+}
+
+.black {
+  background: linear-gradient(180deg, #1a1a1a 0%, #000000 100%);
+  color: white;
+  margin-left: -18px;
+  margin-right: -18px;
+  z-index: 2;
+  flex: 0.6;
+  height: 60%;
+  align-self: flex-start;
+  box-shadow: 0 6px 10px rgba(0, 0, 0, 0.5), inset 0 -1px 2px rgba(255, 255, 255, 0.1);
+  border: 1px solid #000;
+}
+
+.black:active,
+.black.active {
+  background: linear-gradient(180deg, #0a0a0a 0%, #000000 100%);
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.6), inset 0 2px 6px rgba(0, 0, 0, 0.3);
+  transform: translateY(2px);
+}
+
+#label {
+  font-size: 11px;
+  font-weight: 600;
+  opacity: 0.7;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.volume-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#volume {
+  width: 80px;
+  height: 4px;
+  cursor: pointer;
+}
+
+#volumeValue {
+  min-width: 35px;
+  font-size: 13px;
+  opacity: 0.8;
+}
+
+@media (max-width: 768px) {
+  #top {
+    padding: 8px;
+    gap: 8px;
+  }
+  
+  button {
+    padding: 6px 12px;
+    font-size: 14px;
+  }
+  
+  #piano {
+    padding: 10px 5px 5px 5px;
+  }
+}
+</style>
+</head>
+<body>
+<div id="top">
+  <div class="control-group">
+    <button id="down" aria-label="Disminuir octava">◀</button>
+    <div>Octava: <span id="octave">3</span></div>
+    <button id="up" aria-label="Aumentar octava">▶</button>
+  </div>
+  
+  <button id="wave">SAWTOOTH</button>
+  
+  <div class="volume-control">
+    <label for="volume">🔊</label>
+    <input type="range" id="volume" min="0" max="100" value="30">
+    <span id="volumeValue">30%</span>
+  </div>
+</div>
+
+<div id="piano"></div>
+
+<script>
+'use strict';
+
+// Configuración y estado
+const config = {
+  minOctave: 0,
+  maxOctave: 7,
+  waveTypes: ['sawtooth', 'sine', 'square', 'triangle'],
+  attackTime: 0.01,
+  releaseTime: 0.1
+};
+
+const state = {
+  baseOctave: 3,
+  currentWaveIndex: 0,
+  volume: 0.3,
+  activeNotes: new Map()
+};
+
+// Inicializar contexto de audio
+const AudioContext = window.AudioContext || window.webkitAudioContext;
+const ctx = new AudioContext();
+
+// Definición de notas
+const notes = [
+  { n: 'C', f: 0 }, { n: 'C#', f: 1 }, { n: 'D', f: 2 }, { n: 'D#', f: 3 },
+  { n: 'E', f: 4 }, { n: 'F', f: 5 }, { n: 'F#', f: 6 }, { n: 'G', f: 7 },
+  { n: 'G#', f: 8 }, { n: 'A', f: 9 }, { n: 'A#', f: 10 }, { n: 'B', f: 11 }
+];
+
+// Elementos DOM
+const elements = {
+  piano: document.getElementById('piano'),
+  octaveDisplay: document.getElementById('octave'),
+  downButton: document.getElementById('down'),
+  upButton: document.getElementById('up'),
+  waveButton: document.getElementById('wave'),
+  volumeSlider: document.getElementById('volume'),
+  volumeValue: document.getElementById('volumeValue')
+};
+
+// Utilidades
+const midiToFreq = (midi) => 440 * Math.pow(2, (midi - 69) / 12);
+
+// Sistema de audio mejorado
+class NotePlayer {
+  constructor(midi, waveType, volume) {
+    this.midi = midi;
+    this.osc = ctx.createOscillator();
+    this.gainNode = ctx.createGain();
+    
+    this.osc.type = waveType;
+    this.osc.frequency.value = midiToFreq(midi);
+    
+    this.gainNode.gain.value = 0;
+    this.osc.connect(this.gainNode).connect(ctx.destination);
+    this.osc.start();
+    
+    // Attack
+    this.gainNode.gain.linearRampToValueAtTime(
+      volume,
+      ctx.currentTime + config.attackTime
+    );
+  }
+  
+  stop() {
+    const releaseTime = ctx.currentTime + config.releaseTime;
+    this.gainNode.gain.linearRampToValueAtTime(0, releaseTime);
+    this.osc.stop(releaseTime);
+  }
+}
+
+// Manejo de notas
+function startNote(keyElement, midi) {
+  if (ctx.state === 'suspended') {
+    ctx.resume();
+  }
+  
+  if (!state.activeNotes.has(midi)) {
+    const waveType = config.waveTypes[state.currentWaveIndex];
+    const player = new NotePlayer(midi, waveType, state.volume);
+    state.activeNotes.set(midi, player);
+    keyElement.classList.add('active');
+  }
+}
+
+function stopNote(keyElement, midi) {
+  const player = state.activeNotes.get(midi);
+  if (player) {
+    player.stop();
+    state.activeNotes.delete(midi);
+    keyElement.classList.remove('active');
+  }
+}
+
+// Construcción del piano
+function buildPiano() {
+  elements.piano.innerHTML = '';
+  
+  for (let octaveOffset = 0; octaveOffset < 2; octaveOffset++) {
+    notes.forEach(note => {
+      const key = document.createElement('div');
+      const isBlack = note.n.includes('#');
+      
+      key.className = `key ${isBlack ? 'black' : 'white'}`;
+      key.innerHTML = `<div id="label">${note.n}${state.baseOctave + octaveOffset}</div>`;
+      
+      const midi = (state.baseOctave + octaveOffset) * 12 + note.f;
+      
+      // Event listeners optimizados
+      const handleStart = (e) => {
+        e.preventDefault();
+        startNote(key, midi);
+      };
+      
+      const handleEnd = () => stopNote(key, midi);
+      
+      // Touch events
+      key.addEventListener('touchstart', handleStart, { passive: false });
+      key.addEventListener('touchend', handleEnd);
+      key.addEventListener('touchcancel', handleEnd);
+      
+      // Mouse events
+      key.addEventListener('mousedown', handleStart);
+      key.addEventListener('mouseup', handleEnd);
+      key.addEventListener('mouseleave', handleEnd);
+      
+      elements.piano.appendChild(key);
+    });
+  }
+}
+
+// Controles de octava
+elements.downButton.addEventListener('click', () => {
+  if (state.baseOctave > config.minOctave) {
+    state.baseOctave--;
+    elements.octaveDisplay.textContent = state.baseOctave;
+    buildPiano();
+  }
+});
+
+elements.upButton.addEventListener('click', () => {
+  if (state.baseOctave < config.maxOctave) {
+    state.baseOctave++;
+    elements.octaveDisplay.textContent = state.baseOctave;
+    buildPiano();
+  }
+});
+
+// Control de forma de onda
+elements.waveButton.addEventListener('click', () => {
+  state.currentWaveIndex = (state.currentWaveIndex + 1) % config.waveTypes.length;
+  elements.waveButton.textContent = config.waveTypes[state.currentWaveIndex].toUpperCase();
+});
+
+// Control de volumen
+elements.volumeSlider.addEventListener('input', (e) => {
+  const value = parseInt(e.target.value);
+  state.volume = value / 100;
+  elements.volumeValue.textContent = `${value}%`;
+});
+
+// Atajos de teclado
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowLeft' && state.baseOctave > config.minOctave) {
+    elements.downButton.click();
+  } else if (e.key === 'ArrowRight' && state.baseOctave < config.maxOctave) {
+    elements.upButton.click();
+  }
+});
+
+// Inicialización
+buildPiano();
+</script>
+</body>
+</html>
