@@ -45,7 +45,8 @@ Mapear_con_clics [Mapear_con_clics](https://bruveping.github.io/interfazMutante_
 
 Medidor de ruido [medidor de ruido](https://bruveping.github.io/interfazMutante_2025/medidor_de_ruido)
 
-teclado_digital [teclado_digital](medidor de ruido](https://bruveping.github.io/interfazMutante_2025/teclado_digital)
+teclado_digital [teclado_digital](https://bruveping.github.io/interfazMutante_2025/teclado_digital)
+
 
 
 
