@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>Piano Touch – Sawtooth Low Latency</title>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;background:#000;color:#fff;font-family:system-ui;display:flex;flex-direction:column;height:100vh;overflow:hidden;user-select:none}
+#top{padding:8px 12px;display:flex;gap:12px;align-items:center;background:#000;border-bottom:1px solid #222}
+button{background:#222;color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:14px}
+#octave{font-weight:bold;color:#4caf50}
+#piano{flex:1;display:flex;padding:6px 4px;touch-action:none;background:#000}
+.key{flex:1;display:flex;align-items:flex-end;justify-content:center;padding-bottom:10px;border-radius:0 0 6px 6px;transition:background .03s}
+.white{background:#fff;color:#222;margin:1px;z-index:1}
+.white.active{background:#ccc}
+.black{background:#000;color:#fff;margin-left:-2%;margin-right:-2%;z-index:2;flex:.65;height:60%}
+.black.active{background:#333}
+.key span{font-size:9px;pointer-events:none;opacity:.5}
+input[type=range]{width:90px}
+</style>
+</head>
+<body>
+<div id="top">
+<button id="down">◀</button>
+Oct <span id="octave">3</span>
+<button id="up">▶</button>
+Vol <input type="range" id="volume" min="0" max="100" value="30">
+</div>
+<div id="piano"></div>
+<script>
+'use strict';
+
+// CONFIG MINIMA
+const attack=.003;
+const release=.08;
+
+const state={baseOctave:3,vol:.3,active:new Map()};
+
+let ctx;
+function audio(){
+ if(!ctx) ctx=new (window.AudioContext||webkitAudioContext)({latencyHint:'interactive'});
+ if(ctx.state==='suspended') ctx.resume();
+ return ctx;
+}
+
+const notes=[0,1,2,3,4,5,6,7,8,9,10,11];
+const names=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+const freq=m=>440*Math.pow(2,(m-69)/12);
+
+class Voice{
+ constructor(m){
+  const c=audio();
+  this.o=c.createOscillator();
+  this.g=c.createGain();
+  this.o.type='sawtooth';
+  this.o.frequency.value=freq(m);
+  this.g.gain.setValueAtTime(0,c.currentTime);
+  this.g.gain.linearRampToValueAtTime(state.vol,c.currentTime+attack);
+  this.o.connect(this.g).connect(c.destination);
+  this.o.start();
+ }
+ stop(){
+  const c=audio();
+  const t=c.currentTime+release;
+  this.g.gain.cancelScheduledValues(c.currentTime);
+  this.g.gain.setValueAtTime(this.g.gain.value,c.currentTime);
+  this.g.gain.exponentialRampToValueAtTime(.001,t);
+  this.o.stop(t);
+ }
+}
+
+const piano=document.getElementById('piano');
+
+function build(){
+ let h='';
+ for(let o=0;o<2;o++){
+  notes.forEach(n=>{
+   const m=(state.baseOctave+o)*12+n;
+   const b=names[n].includes('#');
+   h+=`<div class="key ${b?'black':'white'}" data-m="${m}"><span>${names[n]}</span></div>`;
+  });
+ }
+ piano.innerHTML=h;
+}
+
+function start(e){
+ e.preventDefault();
+ const k=e.target.closest('.key');
+ if(!k) return;
+ const m=k.dataset.m;
+ if(!state.active.has(m)){
+  k.classList.add('active');
+  state.active.set(m,new Voice(m));
+ }
+}
+
+function end(e){
+ const k=e.target.closest('.key');
+ if(!k) return;
+ const m=k.dataset.m;
+ const v=state.active.get(m);
+ if(v){v.stop();state.active.delete(m);k.classList.remove('active');}
+}
+
+piano.addEventListener('touchstart',start,{passive:false});
+piano.addEventListener('touchend',end,{passive:false});
+piano.addEventListener('touchcancel',end,{passive:false});
+piano.addEventListener('mousedown',start);
+window.addEventListener('mouseup',()=>{state.active.forEach(v=>v.stop());state.active.clear();document.querySelectorAll('.active').forEach(k=>k.classList.remove('active'))});
+
+volume.oninput=e=>state.vol=e.target.value/100;
+up.onclick=()=>{if(state.baseOctave<7){state.baseOctave++;octave.textContent=state.baseOctave;build();}};
+down.onclick=()=>{if(state.baseOctave>0){state.baseOctave--;octave.textContent=state.baseOctave;build();}};
+
+build();
+</script>
+</body>
+</html>
