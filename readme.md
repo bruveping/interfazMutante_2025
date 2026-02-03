@@ -47,6 +47,10 @@ Medidor de ruido [medidor de ruido](https://bruveping.github.io/interfazMutante_
 
 teclado_digital [teclado_digital](https://bruveping.github.io/interfazMutante_2025/teclado_digital)
 
+teclado_digital2 [teclado_digital2](https://bruveping.github.io/interfazMutante_2025/piano_virtual_2)
+
+
+
 
 
 
