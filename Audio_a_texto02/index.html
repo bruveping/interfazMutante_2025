@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voice Markdown + Mermaid Pro</title>
+    <!-- Librerías Externas -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.23.4/ace.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    
+    <style>
+        :root {
+            --bg-color: #f8f9fa;
+            --header-bg: #202124;
+            --accent: #1a73e8;
+            --recording: #d93025;
+        }
+
+        body {
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: var(--bg-color);
+        }
+
+        header {
+            background: var(--header-bg);
+            color: white;
+            padding: 12px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        #main-container {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+
+        @media (max-width: 768px) {
+            #main-container { flex-direction: column; }
+        }
+
+        #editor {
+            flex: 1;
+            font-size: 16px;
+            border-right: 1px solid #ccc;
+        }
+
+        #preview-pane {
+            flex: 1;
+            padding: 30px;
+            overflow-y: auto;
+            background: white;
+        }
+
+        /* Estilos Markdown */
+        #preview-pane h1 { border-bottom: 2px solid #eee; padding-bottom: 10px; }
+        #preview-pane pre { background: #f4f4f4; padding: 10px; border-radius: 5px; overflow-x: auto; }
+        .mermaid { display: flex; justify-content: center; margin: 20px 0; background: #fff; padding: 10px; border-radius: 8px; }
+        .mermaid-error { color: #d93025; background: #fce8e6; padding: 10px; border-radius: 5px; font-size: 0.9rem; }
+
+        .controls {
+            background: white;
+            padding: 15px 25px;
+            border-top: 1px solid #ddd;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            padding: 10px 20px;
+            border-radius: 8px;
+            border: 1px solid #dadce0;
+            cursor: pointer;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s;
+        }
+
+        .btn-primary { background: var(--accent); color: white; border: none; }
+        .btn-primary:hover { background: #1557b0; }
+
+        #btn-mic {
+            background: white;
+            color: #3c4043;
+        }
+
+        #btn-mic.active {
+            background: var(--recording);
+            color: white;
+            border-color: var(--recording);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(217, 48, 37, 0.4); }
+            70% { box-shadow: 0 0 0 10px rgba(217, 48, 37, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(217, 48, 37, 0); }
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #ccc;
+            display: inline-block;
+        }
+        .status-dot.on { background: #34a853; }
+    </style>
+</head>
+<body>
+
+<header>
+    <div><strong>CreativeVoice</strong> | Markdown & Mermaid</div>
+    <div>
+        <span id="mic-label">Micrófono Listo</span>
+        <span id="status-indicator" class="status-dot"></span>
+    </div>
+</header>
+
+<div id="main-container">
+    <div id="editor"># Mi Proyecto Increíble
+
+Presiona el botón de dictado para empezar a hablar. El primer título de arriba será el nombre del archivo.
+
+## Prueba de Mermaid
+```mermaid
+graph LR
+    Pensar --> Dictar
+    Dictar --> Renderizar
+    Renderizar --> Sonreír
+```</div>
+    <div id="preview-pane"></div>
+</div>
+
+<div class="controls">
+    <button id="btn-mic">
+        <span id="mic-icon">🎤</span> <span id="mic-text">Empezar a Dictar</span>
+    </button>
+    <button class="btn-primary" id="btn-render">
+        <span>🔄</span> Renderizar Todo
+    </button>
+    <button onclick="saveFile()">
+        <span>💾</span> Guardar .md
+    </button>
+</div>
+
+<script>
+    // --- ACE EDITOR ---
+    const editor = ace.edit("editor");
+    editor.setTheme("ace/theme/chrome");
+    editor.session.setMode("ace/mode/markdown");
+    editor.setOptions({
+        wrap: true,
+        useSoftTabs: true,
+        showPrintMargin: false
+    });
+
+    // --- MERMAID ---
+    mermaid.initialize({ 
+        startOnLoad: false,
+        theme: 'default',
+        securityLevel: 'loose',
+        suppressErrorReporting: true // Evita que Mermaid ensucie la consola
+    });
+
+    // --- RENDERIZADO ---
+    async function fullRender() {
+        const preview = document.getElementById('preview-pane');
+        const content = editor.getValue();
+        
+        // Renderizar Markdown primero
+        preview.innerHTML = marked.parse(content);
+        
+        // Buscar bloques de código mermaid
+        const codeBlocks = preview.querySelectorAll('pre code.language-mermaid');
+        
+        for (let i = 0; i < codeBlocks.length; i++) {
+            const block = codeBlocks[i];
+            const pre = block.parentElement;
+            const code = block.innerText.trim();
+            
+            const mDiv = document.createElement('div');
+            mDiv.className = 'mermaid';
+            const uniqueId = 'mermaid-graph-' + i + '-' + Date.now();
+            mDiv.id = uniqueId;
+
+            try {
+                // Verificación básica de sintaxis antes de intentar renderizar
+                const { svg } = await mermaid.render(uniqueId + '-svg', code);
+                mDiv.innerHTML = svg;
+                pre.parentNode.replaceChild(mDiv, pre);
+            } catch (e) {
+                console.warn("Error en sintaxis de Mermaid:", e);
+                const errorDiv = document.createElement('div');
+                errorDiv.className = 'mermaid-error';
+                errorDiv.innerHTML = "<strong>Error en Diagrama:</strong> Revisa la sintaxis de Mermaid.";
+                pre.parentNode.replaceChild(errorDiv, pre);
+            }
+        }
+    }
+
+    document.getElementById('btn-render').onclick = fullRender;
+    fullRender();
+
+    // --- VOZ ---
+    const btnMic = document.getElementById('btn-mic');
+    const micText = document.getElementById('mic-text');
+    const statusDot = document.getElementById('status-indicator');
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    let isRecording = false;
+
+    if (SpeechRecognition) {
+        const recognition = new SpeechRecognition();
+        recognition.lang = 'es-ES';
+        recognition.continuous = true;
+        recognition.interimResults = false;
+
+        btnMic.onclick = () => {
+            if (!isRecording) recognition.start();
+            else recognition.stop();
+        };
+
+        recognition.onstart = () => {
+            isRecording = true;
+            btnMic.classList.add('active');
+            micText.innerText = "Escuchando...";
+            statusDot.classList.add('on');
+        };
+
+        recognition.onend = () => {
+            isRecording = false;
+            btnMic.classList.remove('active');
+            micText.innerText = "Empezar a Dictar";
+            statusDot.classList.remove('on');
+        };
+
+        recognition.onresult = (event) => {
+            let finalTranscript = '';
+            for (let i = event.resultIndex; i < event.results.length; ++i) {
+                if (event.results[i].isFinal) {
+                    finalTranscript += event.results[i][0].transcript;
+                }
+            }
+
+            if (finalTranscript !== '') {
+                // Inyectar en el cursor
+                editor.insert(finalTranscript + " "); 
+                
+                // Solo renderizamos automáticamente si NO estamos dentro de un bloque de código
+                // para evitar que errores parciales de Mermaid bloqueen la vista
+                const cursor = editor.getCursorPosition();
+                const line = editor.session.getLine(cursor.row);
+                
+                // Si la línea actual no parece ser parte crítica de un diagrama, renderizamos
+                if (!line.includes('-->') && !line.includes('graph')) {
+                    fullRender(); 
+                }
+            }
+        };
+
+        recognition.onerror = (event) => {
+            console.error("Error de reconocimiento:", event.error);
+            recognition.stop();
+        };
+    }
+
+    // --- LÓGICA DE GUARDADO ---
+    function getFileNameFromContent() {
+        const content = editor.getValue();
+        const match = content.match(/^#\s+(.+)$/m);
+        if (match && match[1]) {
+            let title = match[1].trim();
+            title = title.replace(/[^a-zA-Z0-9\sáéíóúÁÉÍÓÚñÑ]/g, '');
+            title = title.replace(/\s+/g, '_');
+            return title.substring(0, 30) + ".md";
+        }
+        return "nota_sin_titulo.md";
+    }
+
+    function saveFile() {
+        const filename = getFileNameFromContent();
+        const blob = new Blob([editor.getValue()], {type: "text/markdown"});
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = filename;
+        a.click();
+    }
+</script>
+
+</body>
+</html>
