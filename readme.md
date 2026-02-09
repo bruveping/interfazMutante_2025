@@ -49,6 +49,9 @@ teclado_digital [teclado_digital](https://bruveping.github.io/interfazMutante_20
 
 teclado_digital2 [teclado_digital2](https://bruveping.github.io/interfazMutante_2025/piano_virtual_2)
 
+Audio_a_texto [Audio_a_texto](https://bruveping.github.io/interfazMutante_2025/Audio_a_texto02/)
+
+
 
 
 
