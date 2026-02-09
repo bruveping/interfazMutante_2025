@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Voice Markdown + Mermaid Ace</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.23.4/ace.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <style>
+        body { margin: 0; display: flex; flex-direction: column; height: 100vh; font-family: sans-serif; }
+        header { background: #202124; color: white; padding: 10px 20px; display: flex; justify-content: space-between; align-items: center; }
+        
+        #main-container { flex: 1; display: flex; overflow: hidden; }
+        #editor { flex: 1; font-size: 16px; } /* Aquí vive Ace */
+        
+        #preview { flex: 1; padding: 20px; overflow-y: auto; background: white; border-left: 2px solid #ddd; }
+        
+        .controls { background: #f1f3f4; padding: 15px; border-top: 1px solid #ccc; display: flex; gap: 10px; }
+        button { padding: 10px 20px; border-radius: 4px; border: 1px solid #ccc; cursor: pointer; font-weight: bold; }
+        .btn-mic { background: #ea4335; color: white; border: none; }
+        .btn-render { background: #1a73e8; color: white; border: none; }
+    </style>
+</head>
+<body>
+
+<header>
+    <div>Editor Ace + Mermaid</div>
+    <div id="mic-status">🔴 Micrófono Apagado</div>
+</header>
+
+<div id="main-container">
+    <div id="editor"># Título del Proyecto
+Dita algo o escribe un diagrama de Mermaid:
+
+graph TD;
+    A-->B;
+    A-->C;
+    B-->D;
+    C-->D;</div>
+    <div id="preview" class="mermaid"></div>
+</div>
+
+<div class="controls">
+    <button class="btn-mic" id="start-record">🎤 Dictar al Cursor</button>
+    <button class="btn-render" id="render-btn">🔄 Renderizar Mermaid</button>
+    <button onclick="downloadFile()">💾 Descargar .md</button>
+</div>
+
+<script>
+    // 1. Inicializar Ace Editor
+    const editor = ace.edit("editor");
+    editor.setTheme("ace/theme/monokai");
+    editor.session.setMode("ace/mode/markdown");
+
+    // 2. Inicializar Mermaid
+    mermaid.initialize({ startOnLoad: false });
+
+    async function renderMermaid() {
+        const preview = document.getElementById('preview');
+        const code = editor.getValue();
+        preview.innerHTML = code; // Aquí puedes usar marked.js también si quieres ver HTML
+        
+        // Buscamos bloques de mermaid o renderizamos todo el contenido
+        preview.removeAttribute('data-processed');
+        await mermaid.run({
+            nodes: [preview],
+        });
+    }
+
+    document.getElementById('render-btn').onclick = renderMermaid;
+
+    // 3. Reconocimiento de Voz
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SpeechRecognition) {
+        const recognition = new SpeechRecognition();
+        recognition.lang = 'es-ES';
+
+        document.getElementById('start-record').onclick = () => {
+            recognition.start();
+            document.getElementById('mic-status').innerText = "🟢 Escuchando...";
+        };
+
+        recognition.onresult = (event) => {
+            const text = event.results[0][0].transcript;
+            // Ace inserta directamente donde esté el cursor
+            editor.insert(text + " "); 
+            document.getElementById('mic-status').innerText = "🔴 Micrófono Apagado";
+        };
+    }
+
+    // 4. Descarga Local (No disco hasta que tú quieras)
+    function downloadFile() {
+        const blob = new Blob([editor.getValue()], {type: "text/markdown"});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "mi_proyecto.md";
+        a.click();
+    }
+</script>
+</body>
+</html>
