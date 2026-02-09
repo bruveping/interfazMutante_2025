@@ -55,7 +55,6 @@
             background: white;
         }
 
-        /* Estilos para el contenido renderizado */
         #preview-pane h1 { border-bottom: 2px solid #eee; padding-bottom: 10px; }
         #preview-pane pre { background: #f4f4f4; padding: 10px; border-radius: 5px; }
         .mermaid { display: flex; justify-content: center; margin: 20px 0; }
@@ -123,9 +122,9 @@
 </header>
 
 <div id="main-container">
-    <div id="editor"># Bienvenido al Editor Creativo
+    <div id="editor"># Mi Proyecto Increíble
 
-Presiona el botón de dictado para empezar a hablar. 
+Presiona el botón de dictado para empezar a hablar. El primer título de arriba será el nombre del archivo.
 
 ## Prueba de Mermaid
 ```mermaid
@@ -133,9 +132,7 @@ graph LR
     Pensar --> Dictar
     Dictar --> Renderizar
     Renderizar --> Sonreír
-```
-
-Ponte en cualquier parte del texto y **dicta algo**.</div>
+```</div>
     <div id="preview-pane"></div>
 </div>
 
@@ -152,7 +149,7 @@ Ponte en cualquier parte del texto y **dicta algo**.</div>
 </div>
 
 <script>
-    // --- CONFIGURACIÓN ACE EDITOR ---
+    // --- ACE EDITOR ---
     const editor = ace.edit("editor");
     editor.setTheme("ace/theme/chrome");
     editor.session.setMode("ace/mode/markdown");
@@ -162,78 +159,57 @@ Ponte en cualquier parte del texto y **dicta algo**.</div>
         showPrintMargin: false
     });
 
-    // --- CONFIGURACIÓN MERMAID ---
+    // --- MERMAID ---
     mermaid.initialize({ 
         startOnLoad: false,
         theme: 'default',
         securityLevel: 'loose'
     });
 
-    // --- LÓGICA DE RENDERIZADO (MARKDOWN + MERMAID) ---
+    // --- RENDERIZADO ---
     async function fullRender() {
         const preview = document.getElementById('preview-pane');
         const content = editor.getValue();
-        
-        // 1. Convertir Markdown a HTML usando Marked
         preview.innerHTML = marked.parse(content);
-
-        // 2. Identificar bloques de código que digan 'mermaid'
         const codeBlocks = preview.querySelectorAll('pre code.language-mermaid');
-        
         for (let i = 0; i < codeBlocks.length; i++) {
             const block = codeBlocks[i];
             const pre = block.parentElement;
             const code = block.innerText;
-            
-            // Crear un div para Mermaid
             const mDiv = document.createElement('div');
             mDiv.className = 'mermaid';
             mDiv.id = 'mermaid-svg-' + i;
             mDiv.innerHTML = code;
-            
             pre.parentNode.replaceChild(mDiv, pre);
         }
-
-        // 3. Renderizar todos los divs de Mermaid creados
-        try {
-            await mermaid.run();
-        } catch (e) {
-            console.error("Error en Mermaid:", e);
-        }
+        try { await mermaid.run(); } catch (e) { console.error(e); }
     }
 
     document.getElementById('btn-render').onclick = fullRender;
-    // Render inicial
     fullRender();
 
-    // --- LÓGICA DE VOZ (PENSADA PARA EL USUARIO) ---
+    // --- VOZ ---
     const btnMic = document.getElementById('btn-mic');
     const micText = document.getElementById('mic-text');
     const statusDot = document.getElementById('status-indicator');
-    
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     let isRecording = false;
 
     if (SpeechRecognition) {
         const recognition = new SpeechRecognition();
-        
-        // PROPIEDADES PARA PERMITIR PENSAR:
         recognition.lang = 'es-ES';
-        recognition.continuous = true; // No se detiene automáticamente en silencios cortos
-        recognition.interimResults = true; // Permite ver resultados parciales
+        recognition.continuous = true;
+        recognition.interimResults = true;
 
         btnMic.onclick = () => {
-            if (!isRecording) {
-                recognition.start();
-            } else {
-                recognition.stop();
-            }
+            if (!isRecording) recognition.start();
+            else recognition.stop();
         };
 
         recognition.onstart = () => {
             isRecording = true;
             btnMic.classList.add('active');
-            micText.innerText = "Escuchando... (Pausa para pensar)";
+            micText.innerText = "Escuchando...";
             statusDot.classList.add('on');
         };
 
@@ -246,37 +222,40 @@ Ponte en cualquier parte del texto y **dicta algo**.</div>
 
         recognition.onresult = (event) => {
             let finalTranscript = '';
-            
-            // Recorremos los resultados desde el último cambio
             for (let i = event.resultIndex; i < event.results.length; ++i) {
-                if (event.results[i].isFinal) {
-                    finalTranscript += event.results[i][0].transcript;
-                }
+                if (event.results[i].isFinal) finalTranscript += event.results[i][0].transcript;
             }
-
-            // Si tenemos texto final (después de una pausa lo suficientemente larga)
             if (finalTranscript !== '') {
                 editor.insert(finalTranscript.trim() + " ");
                 editor.focus();
-                // Opcional: Renderizar automáticamente al terminar frase
-                // fullRender(); 
-            }
-        };
-
-        recognition.onerror = (event) => {
-            console.error("Error de reconocimiento:", event.error);
-            if(event.error === 'no-speech') {
-                // Si no hay voz por mucho tiempo, el navegador puede cortar. 
-                // Aquí podrías reiniciar si quisieras, pero es mejor que el usuario decida.
             }
         };
     }
 
+    // --- LÓGICA DE GUARDADO DINÁMICO ---
+    function getFileNameFromContent() {
+        const content = editor.getValue();
+        // Busca la primera línea que empiece con # (Markdown H1)
+        const match = content.match(/^#\s+(.+)$/m);
+        
+        if (match && match[1]) {
+            let title = match[1].trim();
+            // Limpieza: quitar caracteres no permitidos en nombres de archivo
+            title = title.replace(/[^a-zA-Z0-9\sáéíóúÁÉÍÓÚñÑ]/g, '');
+            // Reemplazar espacios por guiones bajos
+            title = title.replace(/\s+/g, '_');
+            // Limitar a 30 caracteres para legibilidad en VS Code / Exploradores
+            return title.substring(0, 30) + ".md";
+        }
+        return "nota_sin_titulo.md";
+    }
+
     function saveFile() {
+        const filename = getFileNameFromContent();
         const blob = new Blob([editor.getValue()], {type: "text/markdown"});
         const a = document.createElement("a");
         a.href = URL.createObjectURL(blob);
-        a.download = "nota_creativa.md";
+        a.download = filename;
         a.click();
     }
 </script>
