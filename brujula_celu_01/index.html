@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Brújula Náutica</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Courier+Prime:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0a0a08;
+            --paper: #12110d;
+            --brass: #b8860b;
+            --brass-light: #d4a017;
+            --brass-dim: #6b4f0a;
+            --cream: #e8dcc8;
+            --cream-dim: #9a8a72;
+            --red: #8b1a1a;
+            --red-bright: #c0392b;
+            --glow: rgba(184, 134, 11, 0.15);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            background-color: var(--bg);
+            color: var(--cream);
+            font-family: 'Playfair Display', Georgia, serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* Grain texture overlay */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.08'/%3E%3C/svg%3E");
+            pointer-events: none;
+            z-index: 1000;
+            opacity: 0.4;
+        }
+
+        /* Vignette */
+        body::after {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background: radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.7) 100%);
+            pointer-events: none;
+            z-index: 999;
+        }
+
+        /* Header */
+        .header {
+            text-align: center;
+            margin-bottom: 2.5rem;
+            animation: fadeDown 1.2s ease both;
+        }
+
+        .header-label {
+            font-family: 'Courier Prime', monospace;
+            font-size: 0.6rem;
+            letter-spacing: 0.4em;
+            color: var(--brass);
+            text-transform: uppercase;
+            margin-bottom: 0.5rem;
+            opacity: 0.8;
+        }
+
+        .header h1 {
+            font-size: 2.2rem;
+            font-weight: 900;
+            letter-spacing: 0.05em;
+            color: var(--cream);
+            line-height: 1;
+        }
+
+        .header-sub {
+            font-family: 'Courier Prime', monospace;
+            font-size: 0.55rem;
+            letter-spacing: 0.35em;
+            color: var(--brass-dim);
+            margin-top: 0.4rem;
+            text-transform: uppercase;
+        }
+
+        /* ── Compass shell ── */
+        .compass-shell {
+            position: relative;
+            width: 300px;
+            height: 300px;
+            animation: fadeIn 1.4s ease both 0.3s;
+        }
+
+        /* Outer decorative ring */
+        .ring-outer {
+            position: absolute;
+            inset: 0;
+            border-radius: 50%;
+            background: conic-gradient(
+                var(--brass-dim) 0deg,
+                var(--brass-light) 45deg,
+                var(--brass-dim) 90deg,
+                var(--brass) 135deg,
+                var(--brass-light) 180deg,
+                var(--brass-dim) 225deg,
+                var(--brass) 270deg,
+                var(--brass-light) 315deg,
+                var(--brass-dim) 360deg
+            );
+            box-shadow:
+                0 0 0 2px var(--bg),
+                0 0 40px rgba(184,134,11,0.2),
+                inset 0 0 30px rgba(0,0,0,0.6);
+        }
+
+        /* Tick marks on outer ring */
+        .ring-outer::after {
+            content: '';
+            position: absolute;
+            inset: 6px;
+            border-radius: 50%;
+            background: var(--bg);
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.8);
+        }
+
+        /* Middle brass ring */
+        .ring-mid {
+            position: absolute;
+            inset: 10px;
+            border-radius: 50%;
+            background: radial-gradient(ellipse at 35% 30%, var(--brass) 0%, var(--brass-dim) 50%, #3a2a04 100%);
+            box-shadow:
+                0 4px 12px rgba(0,0,0,0.5),
+                inset 0 1px 3px rgba(255,220,100,0.3);
+        }
+
+        /* Inner compass face */
+        .compass-face {
+            position: absolute;
+            inset: 22px;
+            border-radius: 50%;
+            background: radial-gradient(ellipse at 40% 35%, #1a1810 0%, #0d0c09 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow:
+                inset 0 2px 8px rgba(0,0,0,0.9),
+                inset 0 0 30px rgba(0,0,0,0.5);
+            transition: transform 0.25s cubic-bezier(0.2, 0.4, 0.3, 1);
+            overflow: hidden;
+        }
+
+        /* Subtle rose des vents pattern on face */
+        .compass-face::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: 50%;
+            background: 
+                repeating-conic-gradient(
+                    rgba(184,134,11,0.04) 0deg 45deg,
+                    transparent 45deg 90deg
+                );
+        }
+
+        /* Degree tick marks */
+        .ticks {
+            position: absolute;
+            inset: 0;
+            border-radius: 50%;
+        }
+
+        /* Cardinal letters */
+        .cardinal {
+            position: absolute;
+            font-family: 'Playfair Display', serif;
+            font-weight: 700;
+            font-size: 1.1rem;
+            line-height: 1;
+            user-select: none;
+        }
+
+        .cardinal.n { top: 10px; left: 50%; transform: translateX(-50%); color: var(--red-bright); }
+        .cardinal.s { bottom: 10px; left: 50%; transform: translateX(-50%); color: var(--cream-dim); }
+        .cardinal.e { right: 10px; top: 50%; transform: translateY(-50%); color: var(--cream-dim); }
+        .cardinal.o { left: 10px; top: 50%; transform: translateY(-50%); color: var(--cream-dim); }
+
+        /* Intercardinal — smaller */
+        .cardinal.ne { top: 22px; right: 22px; font-size: 0.6rem; color: var(--brass-dim); letter-spacing: 0.05em; }
+        .cardinal.se { bottom: 22px; right: 22px; font-size: 0.6rem; color: var(--brass-dim); }
+        .cardinal.so { bottom: 22px; left: 22px; font-size: 0.6rem; color: var(--brass-dim); }
+        .cardinal.no { top: 22px; left: 22px; font-size: 0.6rem; color: var(--brass-dim); }
+
+        /* Needle */
+        .needle-wrap {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+        }
+
+        .needle {
+            position: absolute;
+            width: 8px;
+            height: 80%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .needle-north {
+            flex: 1;
+            width: 100%;
+            background: linear-gradient(to bottom, var(--red-bright), var(--red));
+            clip-path: polygon(50% 0%, 100% 100%, 0% 100%);
+        }
+
+        .needle-south {
+            flex: 1;
+            width: 100%;
+            background: linear-gradient(to top, var(--cream), var(--cream-dim));
+            clip-path: polygon(0% 0%, 100% 0%, 50% 100%);
+        }
+
+        /* Center jewel */
+        .center-jewel {
+            position: absolute;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: radial-gradient(circle at 35% 30%, var(--brass-light), var(--brass-dim));
+            border: 2px solid var(--brass);
+            z-index: 20;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.6);
+        }
+
+        /* ── Data section ── */
+        .data-section {
+            margin-top: 2rem;
+            text-align: center;
+            animation: fadeUp 1.4s ease both 0.5s;
+        }
+
+        .degrees-display {
+            font-family: 'Courier Prime', monospace;
+            font-size: 3.5rem;
+            font-weight: 700;
+            color: var(--cream);
+            line-height: 1;
+            letter-spacing: -0.02em;
+            text-shadow: 0 0 20px rgba(184,134,11,0.3);
+        }
+
+        .degrees-display span {
+            font-size: 1.5rem;
+            color: var(--brass);
+            vertical-align: super;
+        }
+
+        .direction-name {
+            font-family: 'Playfair Display', serif;
+            font-size: 0.8rem;
+            letter-spacing: 0.3em;
+            color: var(--brass);
+            text-transform: uppercase;
+            margin-top: 0.3rem;
+        }
+
+        /* ── Status ── */
+        .status-row {
+            margin-top: 1.8rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-family: 'Courier Prime', monospace;
+            font-size: 0.65rem;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            animation: fadeUp 1.4s ease both 0.7s;
+        }
+
+        .status-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: var(--brass-dim);
+            transition: background 0.4s;
+        }
+
+        .status-dot.active {
+            background: #4ade80;
+            box-shadow: 0 0 8px #4ade80;
+            animation: pulse 2s infinite;
+        }
+
+        .status-dot.error {
+            background: var(--red-bright);
+            box-shadow: 0 0 8px var(--red-bright);
+        }
+
+        .status-text {
+            color: var(--cream-dim);
+        }
+
+        /* iOS Button */
+        #btn-request {
+            display: none;
+            margin-top: 1.2rem;
+            padding: 0.65rem 1.8rem;
+            background: transparent;
+            border: 1px solid var(--brass);
+            color: var(--brass);
+            font-family: 'Courier Prime', monospace;
+            font-size: 0.7rem;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: all 0.2s;
+            animation: fadeUp 1.4s ease both 0.8s;
+        }
+
+        #btn-request:hover {
+            background: var(--brass);
+            color: var(--bg);
+        }
+
+        /* Error overlay */
+        #error-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(5, 4, 2, 0.92);
+            z-index: 200;
+            backdrop-filter: blur(6px);
+            align-items: center;
+            justify-content: center;
+        }
+
+        .error-box {
+            border: 1px solid var(--brass-dim);
+            padding: 2.5rem;
+            max-width: 340px;
+            text-align: center;
+            background: var(--paper);
+            position: relative;
+        }
+
+        .error-box::before, .error-box::after {
+            content: '';
+            position: absolute;
+            width: 12px;
+            height: 12px;
+            border-color: var(--brass);
+            border-style: solid;
+        }
+        .error-box::before { top: -1px; left: -1px; border-width: 2px 0 0 2px; }
+        .error-box::after  { bottom: -1px; right: -1px; border-width: 0 2px 2px 0; }
+
+        .error-icon {
+            font-size: 2rem;
+            color: var(--red-bright);
+            margin-bottom: 1rem;
+        }
+
+        .error-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--cream);
+            margin-bottom: 0.75rem;
+        }
+
+        .error-msg {
+            font-family: 'Courier Prime', monospace;
+            font-size: 0.72rem;
+            line-height: 1.7;
+            color: var(--cream-dim);
+        }
+
+        /* Animated degree ring ticks */
+        .tick-ring {
+            position: absolute;
+            inset: 0;
+            border-radius: 50%;
+        }
+
+        .tick {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 1px;
+            transform-origin: 0 0;
+        }
+
+        /* Animations */
+        @keyframes fadeDown {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(15px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.9); }
+            to { opacity: 1; transform: scale(1); }
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+        @keyframes spin-slow {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        /* Subtle ambient glow ring around compass */
+        .glow-ring {
+            position: absolute;
+            inset: -15px;
+            border-radius: 50%;
+            background: radial-gradient(ellipse at center, transparent 60%, rgba(184,134,11,0.06) 100%);
+            pointer-events: none;
+            animation: pulse 4s infinite;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Error Overlay -->
+    <div id="error-overlay">
+        <div class="error-box">
+            <div class="error-icon">✕</div>
+            <div class="error-title">Sensor no disponible</div>
+            <p class="error-msg" id="error-msg">Este dispositivo no cuenta con brújula interna o el navegador no permite el acceso.</p>
+        </div>
+    </div>
+
+    <!-- Header -->
+    <div class="header">
+        <p class="header-label">Instrumento de Navegación</p>
+        <h1>Brújula</h1>
+        <p class="header-sub">Lectura de hardware directo</p>
+    </div>
+
+    <!-- Compass -->
+    <div class="compass-shell">
+        <div class="glow-ring"></div>
+        <div class="ring-outer"></div>
+        <div class="ring-mid"></div>
+
+        <div class="compass-face" id="compass">
+            <!-- Tick marks drawn by JS -->
+            <svg class="ticks" viewBox="0 0 256 256" id="tick-svg"></svg>
+
+            <!-- Cardinals -->
+            <span class="cardinal n">N</span>
+            <span class="cardinal s">S</span>
+            <span class="cardinal e">E</span>
+            <span class="cardinal o">O</span>
+            <span class="cardinal ne">NE</span>
+            <span class="cardinal se">SE</span>
+            <span class="cardinal so">SO</span>
+            <span class="cardinal no">NO</span>
+
+            <!-- Needle -->
+            <div class="needle-wrap">
+                <div class="needle">
+                    <div class="needle-north"></div>
+                    <div class="needle-south"></div>
+                </div>
+            </div>
+
+            <!-- Center -->
+            <div class="center-jewel"></div>
+        </div>
+    </div>
+
+    <!-- Data -->
+    <div class="data-section">
+        <div class="degrees-display" id="degrees">--<span>°</span></div>
+        <div class="direction-name" id="direction-name">Esperando señal</div>
+    </div>
+
+    <!-- Status -->
+    <div class="status-row">
+        <div class="status-dot" id="status-dot"></div>
+        <span class="status-text" id="status-text">Buscando sensor...</span>
+    </div>
+
+    <button id="btn-request">Activar brújula (iOS)</button>
+
+    <script>
+        // Draw SVG tick marks on the face
+        (function drawTicks() {
+            const svg = document.getElementById('tick-svg');
+            const cx = 128, cy = 128, r = 115;
+            for (let i = 0; i < 72; i++) {
+                const angle = (i * 5) * Math.PI / 180;
+                const isMajor = i % 9 === 0;
+                const isMid   = i % 3 === 0;
+                const len = isMajor ? 14 : isMid ? 9 : 5;
+                const x1 = cx + (r - len) * Math.sin(angle);
+                const y1 = cy - (r - len) * Math.cos(angle);
+                const x2 = cx + r * Math.sin(angle);
+                const y2 = cy - r * Math.cos(angle);
+                const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                line.setAttribute('x1', x1); line.setAttribute('y1', y1);
+                line.setAttribute('x2', x2); line.setAttribute('y2', y2);
+                line.setAttribute('stroke', isMajor ? '#b8860b' : '#4a3a0a');
+                line.setAttribute('stroke-width', isMajor ? '1.5' : '0.8');
+                svg.appendChild(line);
+            }
+        })();
+
+        const compass     = document.getElementById('compass');
+        const degreesEl   = document.getElementById('degrees');
+        const directionEl = document.getElementById('direction-name');
+        const statusDot   = document.getElementById('status-dot');
+        const statusText  = document.getElementById('status-text');
+        const btnRequest  = document.getElementById('btn-request');
+        const errorOverlay = document.getElementById('error-overlay');
+        const errorMsg     = document.getElementById('error-msg');
+
+        let sensorDetected = false;
+        let currentHeading = 0;
+        let targetHeading  = 0;
+        let animFrame;
+        let detectionTimeout;
+
+        function showError(msg) {
+            errorOverlay.style.display = 'flex';
+            errorMsg.innerText = msg;
+            statusDot.className = 'status-dot error';
+            statusText.innerText = 'Error de sensor';
+        }
+
+        // Smooth needle interpolation
+        function lerp(a, b, t) {
+            let diff = b - a;
+            if (diff > 180) diff -= 360;
+            if (diff < -180) diff += 360;
+            return a + diff * t;
+        }
+
+        function animateNeedle() {
+            currentHeading = lerp(currentHeading, targetHeading, 0.12);
+            compass.style.transform = `rotate(${-currentHeading}deg)`;
+            animFrame = requestAnimationFrame(animateNeedle);
+        }
+
+        function updateUI(heading) {
+            if (!sensorDetected) {
+                sensorDetected = true;
+                clearTimeout(detectionTimeout);
+                statusDot.className = 'status-dot active';
+                statusText.innerText = 'Sensor activo';
+                animateNeedle();
+            }
+
+            targetHeading = heading;
+
+            const deg = Math.round(heading);
+            degreesEl.innerHTML = `${deg}<span>°</span>`;
+
+            const directions = ['Norte','Nornoreste','Noreste','Estenoreste','Este','Estesureste','Sureste','Sursureste','Sur','Sursuroeste','Suroeste','Oestesuroeste','Oeste','Oestenoroeste','Noroeste','Nornoroeste'];
+            const index = Math.round(deg / 22.5) % 16;
+            directionEl.innerText = directions[index];
+        }
+
+        function handleOrientation(event) {
+            let heading = null;
+            if (event.webkitCompassHeading !== undefined) {
+                heading = event.webkitCompassHeading;
+            } else if (event.alpha !== null) {
+                heading = (360 - event.alpha) % 360;
+            }
+            if (heading !== null) updateUI(heading);
+        }
+
+        function init() {
+            detectionTimeout = setTimeout(() => {
+                if (!sensorDetected) showError('No se detectó sensor de brújula en este dispositivo.');
+            }, 4000);
+
+            if (!window.DeviceOrientationEvent) {
+                showError('Tu navegador no soporta acceso a la brújula interna.');
+                return;
+            }
+
+            if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+                // iOS
+                btnRequest.style.display = 'inline-block';
+                statusText.innerText = 'Requiere permiso de acceso';
+                btnRequest.onclick = async () => {
+                    try {
+                        const perm = await DeviceOrientationEvent.requestPermission();
+                        if (perm === 'granted') {
+                            window.addEventListener('deviceorientation', handleOrientation);
+                            btnRequest.style.display = 'none';
+                        } else {
+                            showError('Permiso denegado para usar el sensor.');
+                        }
+                    } catch (e) {
+                        showError('Error al solicitar acceso al sensor.');
+                    }
+                };
+            } else {
+                window.addEventListener('deviceorientationabsolute', handleOrientation, true);
+                window.addEventListener('deviceorientation', handleOrientation, true);
+            }
+        }
+
+        window.addEventListener('load', init);
+    </script>
+</body>
+</html>
