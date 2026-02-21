@@ -52,6 +52,9 @@ teclado_digital2 [teclado_digital2](https://bruveping.github.io/interfazMutante_
 Audio_a_texto [Audio_a_texto](https://bruveping.github.io/interfazMutante_2025/Audio_a_texto02/)
 
 
+brujula_celu_00[brujula_celu_00](https://bruveping.github.io/interfazMutante_2025/brujula_celu_00/)
+
+
 
 
 
