@@ -54,6 +54,9 @@ Audio_a_texto [Audio_a_texto](https://bruveping.github.io/interfazMutante_2025/A
 
 brujula_celu_00[brujula_celu_00](https://bruveping.github.io/interfazMutante_2025/brujula_celu_00/)
 
+brujula_celu_01[brujula_celu_01](https://bruveping.github.io/interfazMutante_2025/brujula_celu_01/)
+
+
 
 
 
