@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Brújula de Hardware</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        :root {
+            --bg-color: #f8fafc;
+            --compass-bg: #ffffff;
+            --text-primary: #0f172a;
+            --text-secondary: #64748b;
+            --accent: #dc2626;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg-color: #0f172a;
+                --compass-bg: #1e293b;
+                --text-primary: #f8fafc;
+                --text-secondary: #94a3b8;
+            }
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            overflow: hidden;
+        }
+
+        .compass-ring {
+            position: relative;
+            width: 280px;
+            height: 280px;
+            border-radius: 50%;
+            background: var(--compass-bg);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.2s cubic-bezier(0.1, 0.3, 0.3, 1);
+        }
+
+        .needle {
+            position: absolute;
+            width: 6px;
+            height: 85%;
+            background: linear-gradient(to bottom, var(--accent) 50%, #cbd5e1 50%);
+            border-radius: 99px;
+            z-index: 10;
+        }
+
+        .center-dot {
+            position: absolute;
+            width: 16px;
+            height: 16px;
+            background: var(--text-primary);
+            border-radius: 50%;
+            border: 3px solid var(--compass-bg);
+            z-index: 20;
+        }
+
+        .cardinal {
+            position: absolute;
+            font-weight: 800;
+            font-size: 1.5rem;
+        }
+
+        .n { top: 15px; color: var(--accent); }
+        .e { right: 15px; }
+        .s { bottom: 15px; }
+        .o { left: 15px; }
+
+        .status-badge {
+            margin-top: 2.5rem;
+            padding: 0.75rem 1.5rem;
+            border-radius: 9999px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            text-align: center;
+            max-width: 80%;
+        }
+
+        .status-checking { background: #e2e8f0; color: #475569; }
+        .status-error { background: #fee2e2; color: #991b1b; }
+        .status-ok { background: #dcfce7; color: #166534; }
+
+        #error-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(15, 23, 42, 0.9);
+            z-index: 100;
+            backdrop-filter: blur(4px);
+            padding: 2rem;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="error-overlay">
+        <div class="bg-white dark:bg-slate-800 p-8 rounded-2xl shadow-2xl max-w-sm">
+            <div class="text-red-500 mb-4">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+            </div>
+            <h2 class="text-xl font-bold mb-2" id="error-title">Brújula no disponible</h2>
+            <p class="text-slate-500 dark:text-slate-400 mb-6" id="error-msg">Este dispositivo no cuenta con sensor de brújula interna o el navegador no permite el acceso.</p>
+        </div>
+    </div>
+
+    <div class="text-center mb-10">
+        <h1 class="text-3xl font-black tracking-tight mb-2">BRÚJULA REAL</h1>
+        <p class="text-slate-500 uppercase tracking-widest text-xs font-bold">Hardware Directo</p>
+    </div>
+
+    <div class="compass-ring" id="compass">
+        <div class="needle"></div>
+        <div class="center-dot"></div>
+        <span class="cardinal n">N</span>
+        <span class="cardinal e">E</span>
+        <span class="cardinal s">S</span>
+        <span class="cardinal o">O</span>
+    </div>
+
+    <div class="mt-12 text-center">
+        <div id="degrees" class="text-5xl font-mono font-bold tracking-tighter">--°</div>
+        <div id="direction-name" class="text-slate-400 font-bold mt-1 uppercase">Esperando...</div>
+    </div>
+
+    <div id="status-label" class="status-badge status-checking">
+        Buscando sensor de hardware...
+    </div>
+
+    <button id="btn-request" class="mt-6 px-6 py-3 bg-blue-600 text-white rounded-xl font-bold hidden shadow-lg active:scale-95 transition-transform">
+        Permitir Brújula (iOS)
+    </button>
+
+    <script>
+        const compass = document.getElementById('compass');
+        const degreesText = document.getElementById('degrees');
+        const directionName = document.getElementById('direction-name');
+        const statusLabel = document.getElementById('status-label');
+        const btnRequest = document.getElementById('btn-request');
+        const errorOverlay = document.getElementById('error-overlay');
+        const errorMsg = document.getElementById('error-msg');
+
+        let sensorDetected = false;
+        let detectionTimeout;
+
+        function showError(msg) {
+            errorOverlay.style.display = 'flex';
+            errorMsg.innerText = msg;
+            statusLabel.className = 'status-badge status-error';
+            statusLabel.innerText = 'Error de Hardware';
+        }
+
+        function updateUI(heading) {
+            sensorDetected = true;
+            clearTimeout(detectionTimeout);
+            
+            const deg = Math.round(heading);
+            compass.style.transform = `rotate(${-deg}deg)`;
+            degreesText.innerText = `${deg}°`;
+
+            // Lógica de nombres
+            const directions = ["NORTE", "NORESTE", "ESTE", "SURESTE", "SUR", "SUROESTE", "OESTE", "NOROESTE"];
+            const index = Math.round(deg / 45) % 8;
+            directionName.innerText = directions[index];
+
+            statusLabel.className = 'status-badge status-ok';
+            statusLabel.innerText = 'Sensor activo y conectado';
+        }
+
+        function handleOrientation(event) {
+            let heading = null;
+
+            if (event.webkitCompassHeading !== undefined) {
+                // iOS
+                heading = event.webkitCompassHeading;
+            } else if (event.absolute && event.alpha !== null) {
+                // Android Absolute
+                heading = 360 - event.alpha;
+            } else if (event.alpha !== null) {
+                // Android Fallback
+                heading = 360 - event.alpha;
+            }
+
+            if (heading !== null) {
+                updateUI(heading);
+            }
+        }
+
+        function init() {
+            // Tiempo límite para detectar el sensor (3 segundos)
+            detectionTimeout = setTimeout(() => {
+                if (!sensorDetected) {
+                    showError("No hay dispositivo de brújula disponible en este equipo.");
+                }
+            }, 3000);
+
+            if (!window.DeviceOrientationEvent) {
+                showError("Tu navegador no soporta el acceso a la brújula interna.");
+                return;
+            }
+
+            // Caso iOS
+            if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+                btnRequest.classList.remove('hidden');
+                statusLabel.innerText = "Se requiere permiso de acceso.";
+                
+                btnRequest.onclick = async () => {
+                    try {
+                        const permission = await DeviceOrientationEvent.requestPermission();
+                        if (permission === 'granted') {
+                            window.addEventListener('deviceorientation', handleOrientation);
+                            btnRequest.classList.add('hidden');
+                        } else {
+                            showError("Permiso denegado para usar el sensor.");
+                        }
+                    } catch (e) {
+                        showError("Error al solicitar acceso al sensor.");
+                    }
+                };
+            } else {
+                // Caso Android / Otros
+                window.addEventListener('deviceorientationabsolute', handleOrientation);
+                window.addEventListener('deviceorientation', handleOrientation);
+            }
+        }
+
+        // Ejecutar al cargar
+        window.addEventListener('load', init);
+    </script>
+</body>
+</html>
