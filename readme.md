@@ -60,6 +60,9 @@ generar_partituras[generar_partituras](https://bruveping.github.io/interfazMutan
 
 generar_partituras[generar_partituras01](https://bruveping.github.io/interfazMutante_2025/generar_partituras_0001/)
 
+generar_partituras[generar_partituras01](https://bruveping.github.io/interfazMutante_2025/generar_partituras_0002/)
+
+
 
 
 
