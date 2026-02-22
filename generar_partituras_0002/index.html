@@ -139,14 +139,18 @@
     const CONTAINER = document.getElementById('staff-output');
 
     const CHROMATIC = [
-        ['g/5', null], ['g/5', 'b'], ['f/5', null], ['e/5', null], ['e/5', 'b'],
-        ['d/5', null], ['d/5', 'b'], ['c/5', null], ['b/4', null], ['b/4', 'b'],
-        ['a/4', null], ['a/4', 'b'], ['g/4', null], ['g/4', 'b'], ['f/4', null],
-        ['e/4', null], ['e/4', 'b'], ['d/4', null], ['d/4', 'b'], ['c/4', null],
-        ['b/3', null], ['b/3', 'b'], ['a/3', null], ['a/3', 'b'], ['g/3', null],
-    ];
+    ['e/6', null], ['e/6', 'b'], ['d/6', null], ['d/6', 'b'], ['c/6', null], // Octava 6
+    ['b/5', null], ['b/5', 'b'], ['a/5', null], ['a/5', 'b'], ['g/5', null], ['g/5', 'b'], ['f/5', null], ['e/5', null], ['e/5', 'b'], ['d/5', null], ['d/5', 'b'], ['c/5', null], // Octava 5
+    ['b/4', null], ['b/4', 'b'], ['a/4', null], ['a/4', 'b'], ['g/4', null], ['g/4', 'b'], ['f/4', null], ['e/4', null], ['e/4', 'b'], ['d/4', null], ['d/4', 'b'], ['c/4', null], // Octava 4
+    ['b/3', null], ['b/3', 'b'], ['a/3', null], ['a/3', 'b'], ['g/3', null], ['g/3', 'b'], ['f/3', null], ['e/3', null], ['e/3', 'b'], ['d/3', null], ['d/3', 'b'], ['c/3', null], // Octava 3
+];
 
-    const DIATONIC = ['g/5','f/5','e/5','d/5','c/5','b/4','a/4','g/4','f/4','e/4','d/4','c/4','b/3','a/3','g/3'];
+const DIATONIC = [
+    'e/6','d/6','c/6',                                     // Octava 6
+    'b/5','a/5','g/5','f/5','e/5','d/5','c/5',             // Octava 5
+    'b/4','a/4','g/4','f/4','e/4','d/4','c/4',             // Octava 4
+    'b/3','a/3','g/3','f/3','e/3','d/3','c/3',             // Octava 3
+];
 
     // ─── Estado ──────────────────────────────────────────────────────────────────
     const state = {
@@ -407,8 +411,9 @@
         const svg = CONTAINER.querySelector('svg');
         const rect = (svg || CONTAINER).getBoundingClientRect();
         const y = e.clientY - rect.top;
-        const rawIdx = Math.round((y - 58) / 5);
-        const key = DIATONIC[Math.max(0, Math.min(DIATONIC.length - 1, rawIdx))];
+        const rawIdx = Math.round((y-10) / 12);
+        const key = DIATONIC[Math.max(0, Math.min(DIATONIC.length - 1, rawIdx + 4))];
+        // aquí se ajusta manualmente la sensibilidad del pentagrama
 
         const createNote = () => ({
             keys: [key],
