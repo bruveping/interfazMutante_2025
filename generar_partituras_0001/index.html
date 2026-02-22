@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MIDI Sketcher Pro</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2280%22>🎹</text></svg>">
+    
+    <!-- Librerías Externas -->
+    <script src="https://cdn.jsdelivr.net/npm/vexflow@4.2.2/build/cjs/vexflow.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tonaljs/tonal/browser/tonal.min.js"></script>
+
+    <style>
+        :root { --accent: #3b82f6; }
+        body { touch-action: none; overflow: hidden; }
+        .no-select { user-select: none; -webkit-user-select: none; }
+        
+        #staff-container::-webkit-scrollbar { height: 8px; }
+        #staff-container::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
+        
+        .vf-stavenote { cursor: pointer; transition: opacity 0.2s; }
+        .vf-stavenote:hover { opacity: 0.7; }
+        .active-note { filter: drop-shadow(0 0 4px var(--accent)); stroke: var(--accent); }
+        
+        /* Grid de fondo para ayudar a posicionar */
+        #staff-output {
+            background-image: linear-gradient(#f8fafc 1px, transparent 1px);
+            background-size: 100% 10px;
+        }
+
+        .tool-active { background-color: var(--accent) !important; color: white !important; }
+    </style>
+</head>
+<body class="bg-slate-50 flex flex-col h-screen font-sans no-select">
+
+    <!-- Header Principal -->
+    <header class="bg-white border-b border-slate-200 p-3 flex justify-between items-center shadow-sm z-30">
+        <div class="flex items-center gap-4">
+            <div class="flex items-center gap-2">
+                <div class="bg-blue-600 p-1.5 rounded-lg text-white">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>
+                </div>
+                <h1 class="font-bold text-slate-800 hidden sm:block">MIDI Sketcher <span class="text-blue-600 text-xs font-black uppercase">Pro</span></h1>
+            </div>
+
+            <div class="h-6 w-[1px] bg-slate-200"></div>
+
+            <div class="flex items-center gap-2">
+                <select id="time-signature" class="bg-slate-100 text-xs font-bold p-1.5 rounded outline-none border-none">
+                    <option value="4/4">4/4</option>
+                    <option value="3/4">3/4</option>
+                    <option value="2/4">2/4</option>
+                    <option value="6/8">6/8</option>
+                </select>
+                <div class="flex items-center gap-1 bg-slate-100 rounded p-1">
+                    <span class="text-[10px] font-bold text-slate-400 px-1">BPM</span>
+                    <input type="number" id="bpm-input" value="120" min="40" max="240" class="w-10 bg-transparent text-xs font-bold text-center outline-none">
+                </div>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-3">
+            <div class="hidden md:flex items-center gap-2 mr-4">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-slate-400"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
+                <input type="range" id="volume-slider" min="0" max="1" step="0.01" value="0.5" class="w-20 h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer">
+            </div>
+
+            <button id="btn-play" class="flex items-center gap-2 px-4 py-1.5 bg-green-600 hover:bg-green-500 text-white rounded-full text-xs font-bold transition-all shadow-md active:scale-95">
+                <span id="play-text">PLAY</span>
+                <svg id="icon-play" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+            </button>
+            
+            <button id="btn-export" class="p-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors" title="Exportar MIDI">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+            </button>
+        </div>
+    </header>
+
+    <!-- Área Principal de Edición -->
+    <main id="staff-container" class="flex-grow overflow-x-auto overflow-y-hidden relative bg-white flex flex-col items-center">
+        <div id="staff-output" class="pt-20 pb-10 min-w-full"></div>
+        
+        <div id="empty-msg" class="absolute inset-0 flex flex-col items-center justify-center text-slate-300 pointer-events-none transition-opacity duration-500">
+            <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" class="mb-4 opacity-20"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>
+            <p class="text-sm font-semibold tracking-wide uppercase">Haz clic en el pentagrama para añadir notas</p>
+        </div>
+    </main>
+
+    <!-- Barra de Herramientas Inferior -->
+    <footer class="bg-white border-t border-slate-200 p-4 shadow-[0_-10px_30px_rgba(0,0,0,0.05)] z-30">
+        <div class="max-w-4xl mx-auto flex flex-col md:flex-row gap-6">
+            
+            <!-- Selector de Duración -->
+            <div class="flex-1">
+                <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Duración de nota</label>
+                <div id="duration-selector" class="flex bg-slate-100 p-1 rounded-xl">
+                    <button data-val="1" class="dur-btn flex-1 py-2 text-2xl rounded-lg transition-all text-slate-400">𝅝</button>
+                    <button data-val="2" class="dur-btn flex-1 py-2 text-2xl rounded-lg transition-all text-slate-400">𝅗𝅥</button>
+                    <button data-val="4" class="dur-btn flex-1 py-2 text-2xl rounded-lg transition-all tool-active shadow-sm">𝅘𝅥</button>
+                    <button data-val="8" class="dur-btn flex-1 py-2 text-2xl rounded-lg transition-all text-slate-400">𝅘𝅥𝅮</button>
+                    <button data-val="16" class="dur-btn flex-1 py-2 text-2xl rounded-lg transition-all text-slate-400">𝅘𝅥𝅯</button>
+                </div>
+            </div>
+
+            <!-- Herramientas de Edición -->
+            <div class="flex-1 flex gap-2 items-end">
+                <div class="flex-grow grid grid-cols-4 gap-2">
+                    <button id="tool-rest" class="h-10 rounded-xl text-[9px] font-black border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors uppercase">Silencio</button>
+                    <button id="tool-sharp" class="h-10 rounded-xl text-lg font-black border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors">♯</button>
+                    <button id="tool-flat" class="h-10 rounded-xl text-lg font-black border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors">♭</button>
+                    <button id="btn-clear" class="h-10 rounded-xl text-[9px] font-black border border-red-100 text-red-400 hover:bg-red-50 transition-colors uppercase">Limpiar</button>
+                </div>
+            </div>
+        </div>
+        <div class="mt-4 text-center">
+            <p class="text-[10px] text-slate-400 font-medium italic">Tip: Arrastra las notas verticalmente para cambiar su tono después de colocarlas.</p>
+        </div>
+    </footer>
+
+    <script>
+        /**
+         * LÓGICA DEL MOTOR MUSICAL
+         */
+        const VF = Vex.Flow;
+        const state = {
+            notes: [], // Estructura: { keys: ['c/4'], duration: '4', accidental: null, isRest: false }
+            currentDuration: '4',
+            accidental: null, // 's', 'b', null
+            isRest: false,
+            bpm: 120,
+            isPlaying: false,
+            draggingIdx: null,
+            startY: 0,
+            synth: null
+        };
+
+        const POSITIONS = ['g/5', 'f/5', 'e/5', 'd/5', 'c/5', 'b/4', 'a/4', 'g/4', 'f/4', 'e/4', 'd/4', 'c/4', 'b/3', 'a/3', 'g/3'];
+        const CONTAINER = document.getElementById('staff-output');
+
+        // --- Audio Setup ---
+        async function initAudio() {
+            if (!state.synth) {
+                state.synth = new Tone.PolySynth(Tone.Synth).toDestination();
+                updateVolume();
+            }
+            if (Tone.context.state !== 'running') await Tone.start();
+        }
+
+        function updateVolume() {
+            if (state.synth) {
+                const vol = parseFloat(document.getElementById('volume-slider').value);
+                state.synth.volume.value = vol === 0 ? -100 : 20 * Math.log10(vol);
+            }
+        }
+
+        // --- Core Rendering ---
+        function render() {
+            CONTAINER.innerHTML = '';
+            const timeSig = document.getElementById('time-signature').value;
+            const [num, den] = timeSig.split('/').map(Number);
+            const totalBeatsPerMeasure = num * (4 / den);
+
+            // 1. Organizar notas en compases rítmicamente correctos
+            let measures = [[]];
+            let measureCount = 0;
+            
+            state.notes.forEach((note, idx) => {
+                let noteVal = 4 / parseInt(note.duration);
+                if (measureCount + noteVal > totalBeatsPerMeasure + 0.01) {
+                    measures.push([]);
+                    measureCount = 0;
+                }
+                measures[measures.length - 1].push({ ...note, originalIdx: idx });
+                measureCount += noteVal;
+            });
+
+            // 2. Dibujar VexFlow
+            const staveWidth = 300;
+            const renderer = new VF.Renderer(CONTAINER, VF.Renderer.Backends.SVG);
+            const totalWidth = Math.max(window.innerWidth, (measures.length * staveWidth) + 100);
+            renderer.resize(totalWidth, 300);
+            const context = renderer.getContext();
+
+            let xOffset = 40;
+            measures.forEach((mNotes, mIdx) => {
+                const stave = new VF.Stave(xOffset, 80, staveWidth);
+                if (mIdx === 0) {
+                    stave.addClef('treble').addTimeSignature(timeSig);
+                }
+                stave.setContext(context).draw();
+
+                if (mNotes.length > 0) {
+                    const vfNotes = mNotes.map(n => {
+                        let durString = n.duration;
+                        if (n.isRest) durString += 'r';
+                        
+                        const keys = n.keys.map(k => {
+                            if (!n.isRest && n.accidental) {
+                                return k.replace('/', (n.accidental === 's' ? '#' : 'b') + '/');
+                            }
+                            return k;
+                        });
+
+                        const sn = new VF.StaveNote({ clef: 'treble', keys: keys, duration: durString });
+                        
+                        if (!n.isRest && n.accidental) {
+                            sn.addModifier(new VF.Accidental(n.accidental === 's' ? '#' : 'b'), 0);
+                        }
+
+                        sn.setAttribute('id', 'note-' + n.originalIdx);
+                        return sn;
+                    });
+
+                    try {
+                        const voice = new VF.Voice({ num_beats: num, beat_value: den }).setStrict(false);
+                        voice.addTickables(vfNotes);
+                        new VF.Formatter().joinVoices([voice]).format([voice], staveWidth - 50);
+                        voice.draw(context, stave);
+                    } catch (e) {
+                        console.warn("Rhythm error in measure", mIdx);
+                    }
+                }
+                xOffset += staveWidth;
+            });
+
+            document.getElementById('empty-msg').style.opacity = state.notes.length > 0 ? '0' : '1';
+            attachInteractivity();
+        }
+
+        function attachInteractivity() {
+            // Manejo de arrastre y clics en notas existentes
+            state.notes.forEach((_, idx) => {
+                const el = document.getElementById('vf-note-' + idx);
+                if (el) {
+                    el.onmousedown = (e) => startDrag(e, idx);
+                    el.ontouchstart = (e) => startDrag(e.touches[0], idx);
+                    
+                    el.onclick = (e) => {
+                        e.stopPropagation();
+                        // Borrar nota si se hace clic con una herramienta de borrado o similar
+                        // Por ahora, solo seleccionamos o auditamos
+                        playNote(state.notes[idx]);
+                    };
+                }
+            });
+        }
+
+        // --- Drag & Drop Logic ---
+        function startDrag(e, idx) {
+            state.draggingIdx = idx;
+            state.startY = e.clientY;
+            document.body.style.cursor = 'grabbing';
+            const el = document.getElementById('vf-note-' + idx);
+            if(el) el.classList.add('active-note');
+            
+            window.addEventListener('mousemove', handleDrag);
+            window.addEventListener('touchmove', handleDrag);
+            window.addEventListener('mouseup', endDrag);
+            window.addEventListener('touchend', endDrag);
+        }
+
+        function handleDrag(e) {
+            if (state.draggingIdx === null) return;
+            const clientY = e.clientY || e.touches[0].clientY;
+            const diff = clientY - state.startY;
+
+            if (Math.abs(diff) > 10) {
+                const step = diff > 0 ? 1 : -1;
+                const note = state.notes[state.draggingIdx];
+                const currentPos = POSITIONS.indexOf(note.keys[0]);
+                let newPos = currentPos + step;
+                
+                if (newPos >= 0 && newPos < POSITIONS.length) {
+                    note.keys = [POSITIONS[newPos]];
+                    state.startY = clientY;
+                    render();
+                    playNote(note);
+                }
+            }
+        }
+
+        function endDrag() {
+            if (state.draggingIdx !== null) {
+                const el = document.getElementById('vf-note-' + state.draggingIdx);
+                if(el) el.classList.remove('active-note');
+            }
+            state.draggingIdx = null;
+            document.body.style.cursor = 'default';
+            window.removeEventListener('mousemove', handleDrag);
+            window.removeEventListener('mouseup', endDrag);
+        }
+
+        // --- UI Interactions ---
+        CONTAINER.onclick = async (e) => {
+            if (state.draggingIdx !== null) return;
+            await initAudio();
+
+            const rect = CONTAINER.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+
+            // Calcular nota según posición Y (80px es el offset superior del stave)
+            const relativeY = y - 80; 
+            const index = Math.round(relativeY / 5) - 2; 
+            const key = POSITIONS[Math.max(0, Math.min(index, POSITIONS.length - 1))];
+
+            const newNote = {
+                keys: [key],
+                duration: state.currentDuration,
+                accidental: state.accidental,
+                isRest: state.isRest
+            };
+
+            state.notes.push(newNote);
+            render();
+            playNote(newNote);
+        };
+
+        // Selectores de Herramientas
+        document.querySelectorAll('.dur-btn').forEach(btn => {
+            btn.onclick = () => {
+                document.querySelectorAll('.dur-btn').forEach(b => b.classList.remove('tool-active'));
+                btn.classList.add('tool-active');
+                state.currentDuration = btn.dataset.val;
+                state.isRest = false;
+                document.getElementById('tool-rest').classList.remove('tool-active');
+            };
+        });
+
+        document.getElementById('tool-rest').onclick = (e) => {
+            state.isRest = !state.isRest;
+            e.target.classList.toggle('tool-active', state.isRest);
+        };
+
+        document.getElementById('tool-sharp').onclick = (e) => {
+            state.accidental = state.accidental === 's' ? null : 's';
+            e.target.classList.toggle('tool-active', state.accidental === 's');
+            document.getElementById('tool-flat').classList.remove('tool-active');
+        };
+
+        document.getElementById('tool-flat').onclick = (e) => {
+            state.accidental = state.accidental === 'b' ? null : 'b';
+            e.target.classList.toggle('tool-active', state.accidental === 'b');
+            document.getElementById('tool-sharp').classList.remove('tool-active');
+        };
+
+        document.getElementById('btn-clear').onclick = () => {
+            state.notes = [];
+            render();
+        };
+
+        document.getElementById('volume-slider').oninput = updateVolume;
+
+        // --- Playback Logic ---
+        function playNote(note) {
+            if (note.isRest || !state.synth) return;
+            const pitch = note.keys[0].replace('/', (note.accidental === 's' ? '#' : note.accidental === 'b' ? 'b' : ''));
+            state.synth.triggerAttackRelease(pitch, "8n");
+        }
+
+        document.getElementById('btn-play').onclick = async () => {
+            if (state.isPlaying) {
+                Tone.Transport.stop();
+                Tone.Transport.cancel();
+                state.isPlaying = false;
+                updatePlayUI();
+                return;
+            }
+
+            if (state.notes.length === 0) return;
+            await initAudio();
+
+            state.isPlaying = true;
+            updatePlayUI();
+
+            const bpm = parseInt(document.getElementById('bpm-input').value) || 120;
+            Tone.Transport.bpm.value = bpm;
+            
+            let currentTime = 0;
+            state.notes.forEach((n, idx) => {
+                const durationSeconds = (4 / parseInt(n.duration)) * (60 / bpm);
+                if (!n.isRest) {
+                    const pitch = n.keys[0].replace('/', (n.accidental === 's' ? '#' : n.accidental === 'b' ? 'b' : ''));
+                    Tone.Transport.schedule((time) => {
+                        state.synth.triggerAttackRelease(pitch, durationSeconds * 0.9, time);
+                        // Feedback visual opcional
+                        drawPlaybackCursor(idx);
+                    }, currentTime);
+                }
+                currentTime += durationSeconds;
+            });
+
+            Tone.Transport.schedule((time) => {
+                Tone.Draw.schedule(() => {
+                    state.isPlaying = false;
+                    updatePlayUI();
+                }, time);
+            }, currentTime);
+
+            Tone.Transport.start();
+        };
+
+        function updatePlayUI() {
+            const btn = document.getElementById('btn-play');
+            const text = document.getElementById('play-text');
+            const icon = document.getElementById('icon-play');
+            
+            if (state.isPlaying) {
+                btn.classList.replace('bg-green-600', 'bg-red-600');
+                text.innerText = "STOP";
+                icon.innerHTML = '<rect x="6" y="6" width="12" height="12"></rect>';
+            } else {
+                btn.classList.replace('bg-red-600', 'bg-green-600');
+                text.innerText = "PLAY";
+                icon.innerHTML = '<polygon points="5 3 19 12 5 21 5 3"></polygon>';
+            }
+        }
+
+        function drawPlaybackCursor(idx) {
+            Tone.Draw.schedule(() => {
+                document.querySelectorAll('.vf-stavenote').forEach(el => el.style.opacity = "1");
+                const current = document.getElementById('vf-note-' + idx);
+                if (current) current.style.opacity = "0.3";
+            }, Tone.now());
+        }
+
+        // --- Exportación MIDI (Simplificada) ---
+        document.getElementById('btn-export').onclick = () => {
+            // En un entorno real, usaríamos una librería como MidiWriterJS
+            // Aquí simulamos la intención mostrando un mensaje de éxito con el log
+            console.log("Exportando secuencia:", state.notes);
+            const msg = "MIDI generado: " + state.notes.length + " eventos musicales.";
+            
+            const toast = document.createElement('div');
+            toast.className = "fixed bottom-24 left-1/2 -translate-x-1/2 bg-slate-800 text-white px-6 py-3 rounded-full text-xs font-bold shadow-2xl z-50 animate-bounce";
+            toast.innerText = msg + " (Enviado a consola)";
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 3000);
+        };
+
+        window.onload = render;
+        window.onresize = render;
+
+    </script>
+</body>
+</html>
