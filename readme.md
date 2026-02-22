@@ -56,6 +56,10 @@ brujula_celu_00[brujula_celu_00](https://bruveping.github.io/interfazMutante_202
 
 brujula_celu_01[brujula_celu_01](https://bruveping.github.io/interfazMutante_2025/brujula_celu_01/)
 
+generar_partituras[generar_partituras](https://bruveping.github.io/interfazMutante_2025/generar_partituras_0006/)
+
+
+
 
 
 
