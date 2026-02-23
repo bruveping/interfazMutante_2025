@@ -62,6 +62,9 @@ generar_partituras01[generar_partituras01](https://bruveping.github.io/interfazM
 
 generar_partituras02[generar_partituras02](https://bruveping.github.io/interfazMutante_2025/generar_partituras_0002/)
 
+anotador_con_resaltadores[anotador_con_resaltadores](https://bruveping.github.io/interfazMutante_2025/anotador_con_resaltadores/)
+
+
 
 
 
