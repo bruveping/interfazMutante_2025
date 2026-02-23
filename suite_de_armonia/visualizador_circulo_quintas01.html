@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mapa de Armonía Concéntrico</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background-color: #0a0a0c;
+            color: #e2e8f0;
+            font-family: 'Inter', system-ui, sans-serif;
+            overflow: hidden;
+            margin: 0;
+        }
+
+        .node-circle {
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            stroke-width: 2;
+        }
+        
+        .node-circle:hover {
+            filter: brightness(1.4);
+            stroke-width: 4;
+        }
+
+        .node-label {
+            font-weight: 700;
+            pointer-events: none;
+            fill: white;
+            font-size: 11px;
+            text-shadow: 0 0 4px rgba(0,0,0,0.8);
+        }
+
+        .resolution-arrow {
+            fill: none;
+            stroke-width: 1.5;
+            stroke-opacity: 0.3;
+            marker-end: url(#arrowhead);
+            transition: all 0.4s;
+        }
+
+        .resolution-arrow.active {
+            stroke-opacity: 1;
+            stroke-width: 3;
+        }
+
+        .glass-panel {
+            background: rgba(20, 20, 25, 0.85);
+            backdrop-filter: blur(14px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        #chord-monitor {
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .active-node {
+            stroke: #fff !important;
+            stroke-width: 4px;
+            filter: drop-shadow(0 0 12px currentColor);
+        }
+    </style>
+</head>
+<body>
+
+<div class="absolute inset-0 flex items-center justify-center">
+    <div id="canvas-container"></div>
+</div>
+
+<!-- Header e Info -->
+<div class="absolute top-8 left-8 z-10 flex flex-col gap-4">
+    <div class="glass-panel px-6 py-4 rounded-2xl">
+        <h1 class="text-sky-400 font-black text-xl uppercase italic tracking-tighter">Harmonic Map Pro</h1>
+        <p class="text-slate-500 text-[10px] font-bold uppercase tracking-widest">Navegador de Tensiones y Resoluciones</p>
+    </div>
+    
+    <div id="info-card" class="glass-panel p-5 rounded-2xl w-64 opacity-0 transition-opacity duration-300">
+        <h3 id="chord-name" class="text-2xl font-black text-white mb-1">Cmaj7</h3>
+        <p id="chord-function" class="text-sky-400 text-[10px] font-bold uppercase mb-3">Tónica (I)</p>
+        <div id="chord-desc" class="text-slate-400 text-xs leading-relaxed">
+            Acorde estable de reposo.
+        </div>
+    </div>
+</div>
+
+<!-- Selector de Tonalidad -->
+<div class="absolute bottom-8 left-8 z-10">
+    <div class="glass-panel p-4 rounded-xl flex items-center gap-4">
+        <label class="text-[10px] font-black text-slate-500 uppercase">Key:</label>
+        <select id="key-select" onchange="updateKey()" class="bg-slate-900 border border-slate-700 text-sky-400 font-bold px-3 py-1 rounded outline-none">
+            <option value="0">C</option><option value="7">G</option><option value="2">D</option>
+            <option value="9">A</option><option value="4">E</option><option value="11">B</option>
+            <option value="6">F#</option><option value="1">Db</option><option value="8">Ab</option>
+            <option value="3">Eb</option><option value="10">Bb</option><option value="5">F</option>
+        </select>
+    </div>
+</div>
+
+<script>
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    let currentKeyOffset = 0;
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+    const center = { x: width / 2, y: height / 2 };
+
+    const svg = d3.select("#canvas-container").append("svg")
+        .attr("width", width)
+        .attr("height", height);
+
+    // Definición de flecha
+    svg.append("defs").append("marker")
+        .attr("id", "arrowhead")
+        .attr("viewBox", "0 -5 10 10")
+        .attr("refX", 25)
+        .attr("refY", 0)
+        .attr("markerWidth", 6)
+        .attr("markerHeight", 6)
+        .attr("orient", "auto")
+        .append("path")
+        .attr("d", "M0,-5L10,0L0,5")
+        .attr("fill", "#444");
+
+    const layersGroup = svg.append("g");
+    const arrowsGroup = svg.append("g");
+    const nodesGroup = svg.append("g");
+
+    // Datos de los acordes (Estructura de círculos concéntricos)
+    // r: radio, angle: 0-11 (reloj), label, rootOffset, notes, color, type
+    function getMapData(key) {
+        return [
+            // CAPA EXTERIOR (Diatónicos)
+            { id: 'I', r: 240, a: 0, label: 'I maj7', root: 0, notes: [0,4,7,11], color: '#10b981', type: 'Diatónico' },
+            { id: 'ii', r: 240, a: 2, label: 'ii 7', root: 2, notes: [2,5,9,12], color: '#f59e0b', type: 'Diatónico' },
+            { id: 'iii', r: 240, a: 4, label: 'iii 7', root: 4, notes: [4,7,11,14], color: '#10b981', type: 'Diatónico' },
+            { id: 'IV', r: 240, a: 5, label: 'IV maj7', root: 5, notes: [5,9,12,16], color: '#f59e0b', type: 'Diatónico' },
+            { id: 'V', r: 240, a: 7, label: 'V 7', root: 7, notes: [7,11,14,17], color: '#ef4444', type: 'Diatónico' },
+            { id: 'vi', r: 240, a: 9, label: 'vi 7', root: 9, notes: [9,12,16,19], color: '#10b981', type: 'Diatónico' },
+            { id: 'vii', r: 240, a: 11, label: 'vii ø7', root: 11, notes: [11,14,17,21], color: '#ef4444', type: 'Diatónico' },
+
+            // CAPA MEDIA (Dominantes Secundarios)
+            { id: 'V/ii', r: 160, a: 1.5, label: 'V7/ii', root: 9, notes: [9,1,4,7], color: '#a855f7', target: 'ii', type: 'Secundario' },
+            { id: 'V/iii', r: 160, a: 3.5, label: 'V7/iii', root: 11, notes: [11,15,18,21], color: '#a855f7', target: 'iii', type: 'Secundario' },
+            { id: 'V/V', r: 160, a: 6.5, label: 'V7/V', root: 2, notes: [2,6,9,0], color: '#a855f7', target: 'V', type: 'Secundario' },
+            { id: 'V/vi', r: 160, a: 8.5, label: 'V7/vi', root: 4, notes: [4,8,11,14], color: '#a855f7', target: 'vi', type: 'Secundario' },
+            { id: 'V/IV', r: 160, a: 0.5, label: 'V7/IV', root: 0, notes: [0,4,7,10], color: '#a855f7', target: 'IV', type: 'Secundario' },
+
+            // CAPA INTERIOR (Sustitutos y Diminuidos)
+            { id: 'subV', r: 90, a: 1, label: 'subV/I', root: 1, notes: [1,5,8,11], color: '#ec4899', target: 'I', type: 'Tritonal' },
+            { id: 'ivm', r: 90, a: 5.5, label: 'iv m7', root: 5, notes: [5,8,12,15], color: '#3b82f6', target: 'I', type: 'Préstamo' },
+            { id: 'bVII', r: 90, a: 10, label: 'bVII 7', root: 10, notes: [10,14,17,20], color: '#3b82f6', target: 'I', type: 'Backdoor' },
+            { id: 'dim_ii', r: 90, a: 2, label: '#I°7', root: 1, notes: [1,4,7,10], color: '#94a3b8', target: 'ii', type: 'Paso' }
+        ];
+    }
+
+    function playChord(notes) {
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        const now = audioCtx.currentTime;
+        notes.forEach((n, i) => {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = i === 0 ? 'sine' : 'triangle';
+            osc.frequency.setValueAtTime(130.81 * Math.pow(2, (n + currentKeyOffset) / 12), now);
+            gain.gain.setValueAtTime(0, now);
+            gain.gain.linearRampToValueAtTime(0.1, now + 0.02);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 1.5);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start(now);
+            osc.stop(now + 1.5);
+        });
+    }
+
+    function updateKey() {
+        currentKeyOffset = parseInt(document.getElementById('key-select').value);
+        render();
+    }
+
+    function render() {
+        const data = getMapData(currentKeyOffset);
+        
+        // Calcular posiciones X,Y
+        data.forEach(d => {
+            const angleRad = (d.a * 30 - 90) * (Math.PI / 180);
+            d.x = center.x + Math.cos(angleRad) * d.r;
+            d.y = center.y + Math.sin(angleRad) * d.r;
+        });
+
+        // Dibujar flechas de resolución
+        const arrows = arrowsGroup.selectAll(".resolution-arrow").data(data.filter(d => d.target));
+        arrows.exit().remove();
+        arrows.enter().append("path").attr("class", "resolution-arrow")
+            .merge(arrows)
+            .attr("d", d => {
+                const targetNode = data.find(t => t.id === d.target);
+                return `M${d.x},${d.y} L${targetNode.x},${targetNode.y}`;
+            })
+            .attr("stroke", d => d.color);
+
+        // Dibujar Nodos
+        const nodes = nodesGroup.selectAll(".node-container").data(data, d => d.id);
+        nodes.exit().remove();
+
+        const nodeEnter = nodes.enter().append("g").attr("class", "node-container")
+            .on("mouseenter", (e, d) => {
+                d3.select(e.currentTarget).select("circle").classed("active-node", true);
+                // Resaltar flechas de este nodo
+                arrowsGroup.selectAll(".resolution-arrow")
+                    .filter(a => a.id === d.id || a.target === d.id)
+                    .classed("active", true);
+                
+                showInfo(d);
+            })
+            .on("mouseleave", (e, d) => {
+                d3.select(e.currentTarget).select("circle").classed("active-node", false);
+                arrowsGroup.selectAll(".resolution-arrow").classed("active", false);
+                document.getElementById('info-card').style.opacity = '0';
+            })
+            .on("click", (e, d) => playChord(d.notes));
+
+        nodeEnter.append("circle").attr("class", "node-circle").attr("r", 22);
+        nodeEnter.append("text").attr("class", "node-label").attr("text-anchor", "middle").attr("dy", ".35em");
+
+        const nodeUpdate = nodeEnter.merge(nodes);
+        nodeUpdate.select("circle")
+            .attr("cx", d => d.x).attr("cy", d => d.y)
+            .attr("fill", d => d.color)
+            .attr("stroke", d => d.color)
+            .attr("stroke-opacity", 0.3);
+        
+        nodeUpdate.select("text")
+            .attr("x", d => d.x).attr("y", d => d.y)
+            .text(d => d.label);
+    }
+
+    function showInfo(d) {
+        const info = document.getElementById('info-card');
+        const keyNames = ["C", "Db", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B"];
+        const rootName = keyNames[(d.root + currentKeyOffset) % 12];
+        
+        document.getElementById('chord-name').innerText = rootName + (d.label.includes('m') ? 'm7' : '7');
+        document.getElementById('chord-function').innerText = `${d.type} (${d.label})`;
+        
+        let desc = "";
+        if(d.target) {
+            const targetNode = getMapData(0).find(t => t.id === d.target);
+            desc = `Acorde de tensión que busca resolver cromáticamente hacia el ${targetNode.label}.`;
+        } else {
+            desc = "Grado diatónico estable dentro de la tonalidad.";
+        }
+        document.getElementById('chord-desc').innerText = desc;
+        
+        info.style.opacity = '1';
+    }
+
+    // Dibujar círculos guía de fondo
+    layersGroup.append("circle").attr("cx", center.x).attr("cy", center.y).attr("r", 240).attr("fill", "none").attr("stroke", "#1e293b").attr("stroke-dasharray", "4");
+    layersGroup.append("circle").attr("cx", center.x).attr("cy", center.y).attr("r", 160).attr("fill", "none").attr("stroke", "#1e293b").attr("stroke-dasharray", "4");
+    layersGroup.append("circle").attr("cx", center.x).attr("cy", center.y).attr("r", 90).attr("fill", "none").attr("stroke", "#1e293b").attr("stroke-dasharray", "4");
+
+    render();
+    window.addEventListener('resize', () => location.reload());
+</script>
+</body>
+</html>

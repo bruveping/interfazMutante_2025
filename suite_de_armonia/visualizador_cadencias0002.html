@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Armonía Pro - Intercambio Modal & Paso</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background-color: #020617;
+            color: #f8fafc;
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            overflow: hidden;
+        }
+
+        .cadence-node {
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .tension-line {
+            fill: none;
+            stroke-width: 4;
+            stroke-linecap: round;
+            filter: drop-shadow(0 0 8px rgba(56, 189, 248, 0.4));
+            transition: all 0.5s;
+        }
+
+        .ui-panel {
+            background: rgba(15, 23, 42, 0.95);
+            backdrop-filter: blur(16px);
+            border: 1px solid #1e293b;
+            border-radius: 16px;
+        }
+
+        .node-label {
+            font-weight: 800;
+            font-size: 10px;
+            text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+            pointer-events: none;
+        }
+
+        .active-step {
+            stroke: white !important;
+            stroke-width: 4px;
+            filter: drop-shadow(0 0 15px currentColor);
+        }
+
+        .btn-harmony {
+            @apply text-[9px] py-1 px-0.5 rounded border transition-all font-bold uppercase truncate hover:scale-105 active:scale-95;
+        }
+
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        
+        details > summary { list-style: none; outline: none; }
+        details > summary::-webkit-details-marker { display: none; }
+    </style>
+</head>
+<body>
+
+<!-- Panel Lateral Desplegable -->
+<div id="side-menu" class="absolute top-6 left-6 z-50 flex flex-col gap-4 w-80 transition-all duration-500 transform">
+    <div class="ui-panel p-5 shadow-2xl">
+        <div class="flex justify-between items-center mb-4">
+            <h1 class="text-sky-400 font-black text-xl uppercase italic leading-none">Armonía Pro</h1>
+            <button onclick="toggleMenu()" class="text-slate-500 hover:text-white">
+                <svg id="menu-icon" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15 19l-7-7 7-7"></path></svg>
+            </button>
+        </div>
+
+        <div id="menu-content" class="space-y-3 overflow-y-auto max-h-[75vh] pr-2 no-scrollbar">
+            <!-- Configuración -->
+            <div class="flex gap-2 bg-slate-900/50 p-2 rounded-lg border border-slate-800">
+                <div class="flex-1">
+                    <label class="text-[8px] text-slate-500 font-black uppercase mb-1 block">Tonalidad</label>
+                    <select id="key-selector" onchange="updateKey()" class="w-full bg-slate-800 border border-slate-700 text-sky-400 text-[10px] font-bold px-1 py-1 rounded outline-none">
+                        <option value="0">C / Do</option><option value="1">C#</option><option value="2">D</option>
+                        <option value="3">Eb</option><option value="4">E</option><option value="5">F</option>
+                        <option value="6">F#</option><option value="7">G</option><option value="8">Ab</option>
+                        <option value="9">A</option><option value="10">Bb</option><option value="11">B</option>
+                    </select>
+                </div>
+                <div class="flex-1">
+                    <label class="text-[8px] text-slate-500 font-black uppercase mb-1 block">Ritmo (Div)</label>
+                    <select id="division-selector" class="w-full bg-slate-800 border border-slate-700 text-emerald-400 text-[10px] font-bold px-1 py-1 rounded outline-none">
+                        <option value="4">1 Compás</option>
+                        <option value="2">1/2 Compás</option>
+                        <option value="1">1/4 Compás</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Diatónicos -->
+            <details open class="group">
+                <summary class="text-[9px] text-slate-400 uppercase font-black mb-1.5 cursor-pointer flex items-center gap-2">
+                    <span class="group-open:rotate-90 transition-transform">▶</span> Funciones Diatónicas
+                </summary>
+                <div class="grid grid-cols-4 gap-1 mb-3">
+                    <button onclick="addChord('Imaj7', 0, 'T', [0,4,7,11])" class="btn-harmony bg-emerald-900/30 border-emerald-500/40 text-emerald-400">I</button>
+                    <button onclick="addChord('ii7', 2, 'SD', [2,5,9,12])" class="btn-harmony bg-amber-900/30 border-amber-500/40 text-amber-400">ii</button>
+                    <button onclick="addChord('iii7', 4, 'T', [4,7,11,14])" class="btn-harmony bg-emerald-900/30 border-emerald-500/40 text-emerald-400">iii</button>
+                    <button onclick="addChord('IVmaj7', 5, 'SD', [5,9,12,16])" class="btn-harmony bg-amber-900/30 border-amber-500/40 text-amber-400">IV</button>
+                    <button onclick="addChord('V7', 7, 'D', [7,11,14,17])" class="btn-harmony bg-rose-900/30 border-rose-500/40 text-rose-400">V</button>
+                    <button onclick="addChord('vi7', 9, 'T', [9,12,16,19])" class="btn-harmony bg-emerald-900/30 border-emerald-500/40 text-emerald-400">vi</button>
+                    <button onclick="addChord('viiø7', 11, 'D', [11,14,17,21])" class="btn-harmony bg-rose-900/30 border-rose-500/40 text-rose-400">viiø</button>
+                </div>
+            </details>
+
+            <!-- Intercambio Modal -->
+            <details class="group">
+                <summary class="text-[9px] text-blue-400 uppercase font-black mb-1.5 cursor-pointer flex items-center gap-2">
+                    <span class="group-open:rotate-90 transition-transform">▶</span> Intercambio Modal
+                </summary>
+                <div class="grid grid-cols-3 gap-1 mb-3">
+                    <button onclick="addChord('ivm7', 5, 'MODAL', [5,8,12,15])" class="btn-harmony bg-blue-900/30 border-blue-500/40 text-blue-300">ivm7</button>
+                    <button onclick="addChord('bVImaj7', 8, 'MODAL', [8,12,15,19])" class="btn-harmony bg-blue-900/30 border-blue-500/40 text-blue-300">bVI maj7</button>
+                    <button onclick="addChord('bVII7', 10, 'MODAL', [10,14,17,20])" class="btn-harmony bg-blue-900/30 border-blue-500/40 text-blue-300">bVII7</button>
+                    <button onclick="addChord('bIIImaj7', 3, 'MODAL', [3,7,10,14])" class="btn-harmony bg-blue-900/30 border-blue-500/40 text-blue-300">bIII maj7</button>
+                    <button onclick="addChord('v7', 7, 'MODAL', [7,10,14,17])" class="btn-harmony bg-blue-900/30 border-blue-500/40 text-blue-300">v m7</button>
+                    <button onclick="addChord('bIImaj7', 1, 'MODAL', [1,5,8,12])" class="btn-harmony bg-cyan-900/30 border-cyan-500/40 text-cyan-300">bII maj7</button>
+                    <button onclick="addChord('II7', 2, 'MODAL', [2,6,9,12])" class="btn-harmony bg-cyan-900/30 border-cyan-500/40 text-cyan-300">II7 (Lidio)</button>
+                    <button onclick="addChord('IVm6', 5, 'MODAL', [5,8,12,14])" class="btn-harmony bg-blue-900/30 border-blue-500/40 text-blue-300">iv m6</button>
+                    <button onclick="addChord('bVI7', 8, 'MODAL', [8,12,15,18])" class="btn-harmony bg-blue-900/30 border-blue-500/40 text-blue-300">bVI 7</button>
+                </div>
+            </details>
+
+            <!-- Diminuidos de Paso -->
+            <details class="group">
+                <summary class="text-[9px] text-slate-400 uppercase font-black mb-1.5 cursor-pointer flex items-center gap-2">
+                    <span class="group-open:rotate-90 transition-transform">▶</span> Diminuidos de Paso
+                </summary>
+                <div class="grid grid-cols-2 gap-1 mb-3">
+                    <button onclick="addChord('#I°7', 1, 'PASS', [1,4,7,10])" class="btn-harmony bg-slate-700/40 border-slate-400/40 text-slate-200">#I°7 (→ ii)</button>
+                    <button onclick="addChord('#II°7', 3, 'PASS', [3,6,9,12])" class="btn-harmony bg-slate-700/40 border-slate-400/40 text-slate-200">#II°7 (→ iii)</button>
+                    <button onclick="addChord('#IV°7', 6, 'PASS', [6,9,12,15])" class="btn-harmony bg-slate-700/40 border-slate-400/40 text-slate-200">#IV°7 (→ V)</button>
+                    <button onclick="addChord('#V°7', 8, 'PASS', [8,11,14,17])" class="btn-harmony bg-slate-700/40 border-slate-400/40 text-slate-200">#V°7 (→ vi)</button>
+                    <button onclick="addChord('I°7', 0, 'PASS', [0,3,6,9])" class="btn-harmony bg-slate-700/40 border-slate-400/40 text-slate-200">I°7 (Aux)</button>
+                    <button onclick="addChord('V°7', 7, 'PASS', [7,10,13,16])" class="btn-harmony bg-slate-700/40 border-slate-400/40 text-slate-200">V°7 (Aux)</button>
+                </div>
+            </details>
+
+            <!-- Dominantes & SubV -->
+            <details class="group">
+                <summary class="text-[9px] text-pink-400 uppercase font-black mb-1.5 cursor-pointer flex items-center gap-2">
+                    <span class="group-open:rotate-90 transition-transform">▶</span> Dominantes & SubV
+                </summary>
+                <div class="grid grid-cols-3 gap-1 mb-3">
+                    <button onclick="addChord('V7/V', 2, 'D_SEC', [2,6,9,0])" class="btn-harmony bg-purple-900/30 border-purple-500/40 text-purple-300">V/V</button>
+                    <button onclick="addChord('V7/vi', 4, 'D_SEC', [4,8,11,14])" class="btn-harmony bg-purple-900/30 border-purple-500/40 text-purple-300">V/vi</button>
+                    <button onclick="addChord('subV/I', 1, 'D_ALT', [1,5,8,11])" class="btn-harmony bg-pink-900/30 border-pink-500/40 text-pink-200">subV/I</button>
+                    <button onclick="addChord('subV/ii', 3, 'D_ALT', [3,7,10,13])" class="btn-harmony bg-pink-900/30 border-pink-500/40 text-pink-200">subV/ii</button>
+                    <button onclick="addChord('subV/V', 8, 'D_ALT', [8,12,15,18])" class="btn-harmony bg-pink-900/30 border-pink-500/40 text-pink-200">subV/V</button>
+                </div>
+            </details>
+
+            <div class="grid grid-cols-2 gap-2 pt-2 border-t border-slate-800">
+                <button id="btn-play-all" onclick="playFullCadence()" class="bg-sky-600 hover:bg-sky-500 text-white font-bold py-2 rounded-lg flex items-center justify-center gap-2 text-[10px] transition-all">
+                    REPRODUCIR
+                </button>
+                <button onclick="exportMIDI()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2 rounded-lg flex items-center justify-center gap-2 text-[10px] transition-all">
+                    MIDI
+                </button>
+            </div>
+            <button onclick="clearCadence()" class="w-full py-1 text-[9px] bg-slate-800 hover:bg-rose-900/50 rounded-lg text-slate-400 transition-all uppercase font-bold border border-slate-700">BORRAR TODO</button>
+        </div>
+    </div>
+</div>
+
+<!-- Output de Texto para Improvisar -->
+<div class="absolute bottom-6 left-1/2 -translate-x-1/2 w-[90%] max-w-5xl z-50">
+    <div class="ui-panel p-4 flex flex-col items-center">
+        <label class="text-[9px] text-slate-500 uppercase font-black mb-2 tracking-widest">Monitor de Cifrado Pro</label>
+        <div id="chord-display" class="text-xl md:text-3xl font-black text-white italic tracking-tighter flex flex-wrap justify-center items-center gap-x-4 gap-y-1 opacity-90">
+            <span class="text-slate-700 text-lg">Crea una progresión para visualizar el cifrado...</span>
+        </div>
+    </div>
+</div>
+
+<div id="visualizer" class="w-full h-full"></div>
+
+<script>
+    let progression = [];
+    let currentKeyOffset = 0;
+    let menuOpen = true;
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+    const BPM = 120;
+    const TICKS_PER_BEAT = 128; 
+
+    const svg = d3.select("#visualizer").append("svg")
+        .attr("width", width)
+        .attr("height", height);
+
+    const lineGroup = svg.append("g");
+    const nodeGroup = svg.append("g");
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+    function toggleMenu() {
+        menuOpen = !menuOpen;
+        const menu = document.getElementById('side-menu');
+        const icon = document.getElementById('menu-icon');
+        const content = document.getElementById('menu-content');
+        
+        if (menuOpen) {
+            menu.style.transform = 'translateX(0)';
+            icon.style.transform = 'rotate(0deg)';
+            content.style.opacity = '1';
+        } else {
+            menu.style.transform = 'translateX(-265px)';
+            icon.style.transform = 'rotate(180deg)';
+            content.style.opacity = '0';
+        }
+    }
+
+    function updateKey() {
+        currentKeyOffset = parseInt(document.getElementById('key-selector').value);
+        updateChordDisplay();
+    }
+
+    function playComplexChord(notes, durationMs = 1500) {
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        const now = audioCtx.currentTime;
+        const durationSec = durationMs / 1000;
+        
+        notes.forEach((interval, i) => {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            const freq = 130.81 * Math.pow(2, (interval + currentKeyOffset) / 12);
+            
+            osc.frequency.setValueAtTime(freq, now);
+            osc.type = i === 0 ? 'sine' : 'triangle';
+            
+            gain.gain.setValueAtTime(0, now);
+            gain.gain.linearRampToValueAtTime(i === 0 ? 0.12 : 0.06, now + 0.02);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + durationSec);
+            
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start(now);
+            osc.stop(now + durationSec);
+        });
+    }
+
+    function addChord(label, root, functionType, notes) {
+        if (progression.length >= 32) return;
+        
+        const div = parseInt(document.getElementById('division-selector').value);
+        const tensionMap = { 'T':0.1, 'SD':0.4, 'MODAL':0.7, 'D_SEC':0.8, 'D':0.9, 'D_ALT':1.0, 'PASS':0.5 };
+        const colorMap = { 'T':'#10b981', 'SD':'#f59e0b', 'MODAL':'#3b82f6', 'D_SEC':'#a855f7', 'D':'#ef4444', 'D_ALT':'#ec4899', 'PASS':'#64748b' };
+
+        progression.push({
+            id: Date.now() + Math.random(),
+            label, root, notes,
+            duration: div,
+            tension: tensionMap[functionType],
+            color: colorMap[functionType]
+        });
+        
+        render();
+        updateChordDisplay();
+        playComplexChord(notes, (60/BPM) * div * 1000 * 0.8);
+    }
+
+    function updateChordDisplay() {
+        const container = document.getElementById('chord-display');
+        if (progression.length === 0) {
+            container.innerHTML = '<span class="text-slate-700 text-lg italic">Crea una progresión para visualizar el cifrado...</span>';
+            return;
+        }
+
+        container.innerHTML = progression.map((c, i) => {
+            let durMark = c.duration === 4 ? '' : (c.duration === 2 ? '<span class="text-[10px] ml-1 opacity-50">½</span>' : '<span class="text-[10px] ml-1 opacity-50">¼</span>');
+            return `<div class="flex items-baseline">
+                <span class="text-sky-400 font-black">${c.label}</span>
+                ${durMark}
+            </div>`;
+        }).join('<span class="text-slate-800 font-light mx-2">|</span>');
+    }
+
+    function clearCadence() {
+        progression = [];
+        render();
+        updateChordDisplay();
+    }
+
+    async function playFullCadence() {
+        if (progression.length === 0) return;
+        const btn = document.getElementById('btn-play-all');
+        btn.disabled = true;
+        btn.innerHTML = "PLAYING...";
+
+        for(let i=0; i<progression.length; i++) {
+            const chord = progression[i];
+            const nodes = d3.selectAll(".node-container");
+            const node = nodes.filter((d, idx) => idx === i).select("circle");
+            const durationMs = (60 / BPM) * chord.duration * 1000;
+
+            node.classed("active-step", true).transition().duration(100).attr("r", 35);
+            playComplexChord(chord.notes, durationMs - 50);
+            
+            await new Promise(r => setTimeout(r, durationMs));
+            node.classed("active-step", false).transition().duration(300).attr("r", 28);
+        }
+
+        btn.disabled = false;
+        btn.innerHTML = "REPRODUCIR";
+    }
+
+    function exportMIDI() {
+        if (progression.length === 0) return;
+        const tempo = Math.round(60000000 / BPM);
+
+        let bytes = [
+            0x4d, 0x54, 0x68, 0x64, 0x00, 0x00, 0x00, 0x06,
+            0x00, 0x00, 0x00, 0x01, (TICKS_PER_BEAT >> 8) & 0xff, TICKS_PER_BEAT & 0xff
+        ];
+
+        let track = [];
+        track.push(0x00, 0xff, 0x51, 0x03, (tempo >> 16) & 0xff, (tempo >> 8) & 0xff, tempo & 0xff);
+
+        progression.forEach(chord => {
+            const midiNotes = chord.notes.map(n => 48 + n + currentKeyOffset);
+            const ticks = chord.duration * TICKS_PER_BEAT;
+
+            midiNotes.forEach((midi, idx) => {
+                writeVarInt(track, idx === 0 ? 0 : 0);
+                track.push(0x90, midi, 0x60);
+            });
+
+            midiNotes.forEach((midi, idx) => {
+                writeVarInt(track, idx === 0 ? ticks : 0);
+                track.push(0x80, midi, 0x40);
+            });
+        });
+
+        track.push(0x00, 0xff, 0x2f, 0x00);
+        bytes.push(0x4d, 0x54, 0x72, 0x6b);
+        const len = track.length;
+        bytes.push((len >> 24) & 0xff, (len >> 16) & 0xff, (len >> 8) & 0xff, len & 0xff);
+        bytes = bytes.concat(track);
+
+        const blob = new Blob([new Uint8Array(bytes)], { type: 'audio/midi' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `prog_armonia.mid`;
+        link.click();
+    }
+
+    function writeVarInt(arr, value) {
+        let buffer = value & 0x7F;
+        while ((value >>= 7) > 0) {
+            buffer <<= 8;
+            buffer |= 0x80;
+            buffer |= (value & 0x7F);
+        }
+        while (true) {
+            arr.push(buffer & 0xFF);
+            if (buffer & 0x80) buffer >>= 8;
+            else break;
+        }
+    }
+
+    function render() {
+        const padding = 180;
+        const totalDuration = d3.sum(progression, d => d.duration);
+        
+        let currentX = padding;
+        const data = progression.map((d, i) => {
+            const x = currentX;
+            currentX += (d.duration / Math.max(1, totalDuration)) * (width - padding * 2);
+            return { ...d, x, y: height/2 + (d.tension * -380) + 120 };
+        });
+
+        const lineGenerator = d3.line().x(d => d.x).y(d => d.y).curve(d3.curveMonotoneX);
+
+        const path = lineGroup.selectAll(".tension-line").data([data]);
+        path.enter().append("path").attr("class", "tension-line")
+            .merge(path).transition().duration(500)
+            .attr("d", data.length > 1 ? lineGenerator : "")
+            .attr("stroke", "#38bdf8");
+        if (data.length <= 1) path.attr("d", "");
+        path.exit().remove();
+
+        const nodes = nodeGroup.selectAll(".node-container").data(data, d => d.id);
+        nodes.exit().remove();
+
+        const nodeEnter = nodes.enter().append("g").attr("class", "node-container");
+        nodeEnter.append("circle").attr("class", "cadence-node").attr("r", 28).on("click", (e, d) => playComplexChord(d.notes, 1000));
+        nodeEnter.append("text").attr("class", "node-label").attr("text-anchor", "middle").attr("dy", ".35em").attr("fill", "#fff");
+
+        const nodeUpdate = nodeEnter.merge(nodes);
+        nodeUpdate.select("circle").transition().duration(500).attr("cx", d => d.x).attr("cy", d => d.y).attr("fill", d => d.color).attr("stroke", d => d.color).attr("stroke-opacity", 0.5);
+        nodeUpdate.select("text").transition().duration(500).attr("x", d => d.x).attr("y", d => d.y).text(d => d.label);
+    }
+
+    window.addEventListener('resize', () => location.reload());
+</script>
+</body>
+</html>

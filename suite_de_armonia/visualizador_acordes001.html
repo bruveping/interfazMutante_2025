@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Análisis Armónico Avanzado</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background-color: #0f172a;
+            color: #f1f5f9;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+            height: 100vh;
+            margin: 0;
+            touch-action: none;
+        }
+
+        #graph-container {
+            width: 100%;
+            height: 100%;
+        }
+
+        .node {
+            cursor: pointer;
+            stroke: #1e293b;
+            stroke-width: 2px;
+            transition: r 0.3s ease, fill 0.3s ease;
+        }
+
+        .node:hover {
+            stroke: #38bdf8;
+            stroke-width: 3px;
+        }
+
+        .link {
+            stroke-opacity: 0.25;
+            stroke-linecap: round;
+            pointer-events: none; /* Las conexiones no bloquean los clics */
+        }
+
+        .label {
+            font-size: 11px;
+            font-weight: 600;
+            pointer-events: none;
+            fill: #f8fafc;
+            text-shadow: 0px 0px 4px rgba(0,0,0,0.8);
+        }
+
+        #ui-overlay {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 50;
+            pointer-events: none;
+        }
+
+        #ui-overlay > * {
+            pointer-events: auto;
+        }
+
+        .key {
+            width: 32px;
+            height: 100px;
+            border: 1px solid #334155;
+            display: inline-block;
+            cursor: pointer;
+            text-align: center;
+            padding-top: 70px;
+            font-size: 10px;
+            border-radius: 0 0 4px 4px;
+            user-select: none;
+            transition: background 0.2s;
+        }
+
+        .white-key { background: #f8fafc; color: #1e293b; }
+        .black-key { 
+            background: #1e293b; 
+            color: #f8fafc; 
+            height: 60px; 
+            width: 22px; 
+            margin-left: -11px; 
+            margin-right: -11px; 
+            z-index: 2; 
+            position: relative;
+        }
+        .key.active { background: #38bdf8 !important; color: white; border-color: #0ea5e9; }
+
+        .tooltip {
+            position: absolute;
+            padding: 12px;
+            background: rgba(15, 23, 42, 0.95);
+            border: 1px solid #38bdf8;
+            border-radius: 8px;
+            pointer-events: none;
+            display: none;
+            font-size: 13px;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+            z-index: 100;
+        }
+
+        .legend {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(15, 23, 42, 0.85);
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #334155;
+            backdrop-blur: sm;
+            z-index: 40;
+        }
+    </style>
+</head>
+<body>
+
+<div id="ui-overlay" class="flex flex-col gap-6">
+    <div class="bg-slate-900/90 p-6 rounded-xl border border-slate-700 backdrop-blur-md w-[420px] shadow-2xl">
+        <h1 class="text-2xl font-bold mb-1 text-sky-400">Armonía de Redes</h1>
+        <p class="text-slate-400 text-xs mb-4">Selecciona notas para filtrar la red. Haz clic en los nodos para escuchar el acorde.</p>
+        
+        <div id="keyboard" class="flex mb-4 items-start justify-center">
+            <!-- Teclado generado por JS -->
+        </div>
+
+        <div id="info-panel" class="space-y-2">
+            <div class="grid grid-cols-2 gap-3">
+                <div class="bg-slate-800/50 p-3 rounded-lg border border-slate-700">
+                    <div class="text-[10px] text-slate-500 uppercase tracking-tighter">Acordes Visibles</div>
+                    <div id="stat-nodes" class="text-xl font-mono text-sky-400">0</div>
+                </div>
+                <div class="bg-slate-800/50 p-3 rounded-lg border border-slate-700">
+                    <div class="text-[10px] text-slate-500 uppercase tracking-tighter">Relaciones</div>
+                    <div id="stat-links" class="text-xl font-mono text-sky-400">0</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="graph-container"></div>
+<div id="tooltip" class="tooltip"></div>
+
+<div class="legend text-xs space-y-2">
+    <div class="font-bold mb-1 border-b border-slate-700 pb-1 text-slate-300">Función Armónica (DoM)</div>
+    <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-emerald-500"></span> Tónica (I, iii, vi)</div>
+    <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-amber-500"></span> Pre-Dominante (ii, IV)</div>
+    <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-rose-500"></span> Dominante (V, vii°)</div>
+    <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-slate-500"></span> Otros / Modales</div>
+</div>
+
+<script>
+    /** * LÓGICA MUSICAL Y TEÓRICA
+     */
+    const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+    
+    const CHORD_TYPES = {
+        'maj': [0, 4, 7], 'min': [0, 3, 7], 'dim': [0, 3, 6], 'aug': [0, 4, 8],
+        'maj7': [0, 4, 7, 11], '7': [0, 4, 7, 10], 'min7': [0, 3, 7, 10], 'm7b5': [0, 3, 6, 10],
+        'dim7': [0, 3, 6, 9], 'maj9': [0, 4, 7, 11, 14], '9': [0, 4, 7, 10, 14], 'min9': [0, 3, 7, 10, 14],
+        '11': [0, 4, 7, 10, 14, 17], '13': [0, 4, 7, 10, 14, 17, 21]
+    };
+
+    function getFunction(root, type, keyRoot) {
+        const rel = (root - keyRoot + 12) % 12;
+        if ([0, 4, 9].includes(rel)) return 'T';
+        if ([2, 5].includes(rel)) return 'PD';
+        if ([7, 11].includes(rel)) return 'D';
+        return 'X';
+    }
+
+    const allChords = [];
+    for (let root = 0; root < 12; root++) {
+        for (const [type, intervals] of Object.entries(CHORD_TYPES)) {
+            const pitches = intervals.map(i => (root + i) % 12);
+            const id = `${NOTE_NAMES[root]}${type}`;
+            allChords.push({
+                id,
+                root,
+                name: id,
+                pitches: new Set(pitches),
+                pitchArray: pitches,
+                funcC: getFunction(root, type, 0),
+                funcF: getFunction(root, type, 5)
+            });
+        }
+    }
+
+    /**
+     * VISUALIZACIÓN D3.JS
+     */
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+    const svg = d3.select("#graph-container")
+        .append("svg")
+        .attr("viewBox", [0, 0, width, height]);
+
+    // Capas (Layers) para asegurar que los nodos queden arriba de los enlaces
+    const linkGroup = svg.append("g").attr("class", "links-layer");
+    const nodeGroup = svg.append("g").attr("class", "nodes-layer");
+
+    const simulation = d3.forceSimulation()
+        .force("link", d3.forceLink().id(d => d.id).distance(120))
+        .force("charge", d3.forceManyBody().strength(-350))
+        .force("center", d3.forceCenter(width / 2, height / 2))
+        .force("collision", d3.forceCollide().radius(50));
+
+    let selectedNotes = new Set();
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+    function playChord(pitches) {
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        const now = audioCtx.currentTime;
+        pitches.forEach((p, i) => {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            const freq = 130.81 * Math.pow(2, (p + 12) / 12); // Octava base C3
+            osc.frequency.setValueAtTime(freq, now);
+            osc.type = 'triangle';
+            gain.gain.setValueAtTime(0.12, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 2);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start(now + (i * 0.03));
+            osc.stop(now + 2);
+        });
+    }
+
+    function calculateLinks(activeNodes) {
+        const links = [];
+        for (let i = 0; i < activeNodes.length; i++) {
+            for (let j = i + 1; j < activeNodes.length; j++) {
+                const a = activeNodes[i];
+                const b = activeNodes[j];
+                const intersection = [...a.pitches].filter(p => b.pitches.has(p));
+                if (intersection.length >= 2) {
+                    links.push({
+                        source: a.id,
+                        target: b.id,
+                        value: intersection.length
+                    });
+                }
+            }
+        }
+        return links;
+    }
+
+    function updateGraph() {
+        let filteredNodes = allChords;
+        if (selectedNotes.size > 0) {
+            filteredNodes = allChords.filter(chord => 
+                [...selectedNotes].every(note => chord.pitches.has(note))
+            );
+        }
+
+        const filteredLinks = calculateLinks(filteredNodes);
+
+        document.getElementById('stat-nodes').innerText = filteredNodes.length;
+        document.getElementById('stat-links').innerText = filteredLinks.length;
+
+        // --- ENLACES (Capa inferior) ---
+        const link = linkGroup.selectAll(".link")
+            .data(filteredLinks, d => `${d.source}-${d.target}`);
+        
+        link.exit().remove();
+        link.enter().append("line")
+            .attr("class", "link")
+            .attr("stroke", "#334155")
+            .attr("stroke-width", d => d.value * 0.8);
+        
+        // --- NODOS (Capa superior) ---
+        const node = nodeGroup.selectAll(".node-wrapper")
+            .data(filteredNodes, d => d.id);
+
+        node.exit().remove();
+        
+        const nodeEnter = node.enter().append("g")
+            .attr("class", "node-wrapper")
+            .call(drag(simulation));
+
+        nodeEnter.append("circle")
+            .attr("class", "node")
+            .attr("r", 10)
+            .attr("fill", d => {
+                if (d.funcC === 'T') return '#10b981';
+                if (d.funcC === 'PD') return '#f59e0b';
+                if (d.funcC === 'D') return '#f43f5e';
+                return '#64748b';
+            })
+            .on("mouseover", showTooltip)
+            .on("mouseout", hideTooltip)
+            .on("mousedown", (e, d) => playChord(d.pitchArray));
+
+        nodeEnter.append("text")
+            .attr("class", "label")
+            .attr("dy", -16)
+            .attr("text-anchor", "middle")
+            .text(d => d.name);
+
+        simulation.nodes(filteredNodes);
+        simulation.force("link").links(filteredLinks);
+        simulation.alpha(1).restart();
+
+        simulation.on("tick", () => {
+            linkGroup.selectAll(".link")
+                .attr("x1", d => d.source.x)
+                .attr("y1", d => d.source.y)
+                .attr("x2", d => d.target.x)
+                .attr("y2", d => d.target.y);
+
+            nodeGroup.selectAll(".node-wrapper")
+                .attr("transform", d => `translate(${d.x},${d.y})`);
+        });
+    }
+
+    function showTooltip(event, d) {
+        const tt = document.getElementById('tooltip');
+        const notes = Array.from(d.pitches).map(p => NOTE_NAMES[p]).join(', ');
+        tt.style.display = 'block';
+        tt.style.left = (event.pageX + 15) + 'px';
+        tt.style.top = (event.pageY + 15) + 'px';
+        tt.innerHTML = `
+            <div class="font-bold text-sky-400 text-lg leading-tight">${d.name}</div>
+            <div class="text-slate-400 text-xs mb-2">Pitch Class Set: {${Array.from(d.pitches).sort((a,b)=>a-b).join(',')}}</div>
+            <div class="text-slate-200 text-sm">Notas: ${notes}</div>
+            <div class="mt-2 pt-2 border-t border-slate-700 text-xs space-y-1">
+                <div class="flex justify-between"><span>Función en DoM:</span> <span class="font-bold text-sky-400">${d.funcC}</span></div>
+                <div class="flex justify-between"><span>Función en FaM:</span> <span class="font-bold text-amber-400">${d.funcF}</span></div>
+            </div>
+        `;
+        d3.select(event.currentTarget).transition().attr("r", 14);
+    }
+
+    function hideTooltip(event) {
+        document.getElementById('tooltip').style.display = 'none';
+        d3.select(event.currentTarget).transition().attr("r", 10);
+    }
+
+    function drag(simulation) {
+        return d3.drag()
+            .on("start", (event) => {
+                if (!event.active) simulation.alphaTarget(0.3).restart();
+                event.subject.fx = event.subject.x;
+                event.subject.fy = event.subject.y;
+            })
+            .on("drag", (event) => {
+                event.subject.fx = event.x;
+                event.subject.fy = event.y;
+            })
+            .on("end", (event) => {
+                if (!event.active) simulation.alphaTarget(0);
+                event.subject.fx = null;
+                event.subject.fy = null;
+            });
+    }
+
+    // Inicialización Teclado
+    const keyboard = document.getElementById('keyboard');
+    NOTE_NAMES.forEach((note, i) => {
+        const key = document.createElement('div');
+        const isBlack = note.includes('#');
+        key.className = `key ${isBlack ? 'black-key' : 'white-key'}`;
+        key.innerText = note;
+        key.onclick = () => {
+            if (selectedNotes.has(i)) {
+                selectedNotes.delete(i);
+                key.classList.remove('active');
+            } else {
+                selectedNotes.add(i);
+                key.classList.add('active');
+                playChord([i]);
+            }
+            updateGraph();
+        };
+        keyboard.appendChild(key);
+    });
+
+    // Zoom & Pan
+    svg.call(d3.zoom()
+        .scaleExtent([0.2, 4])
+        .on("zoom", (event) => {
+            linkGroup.attr("transform", event.transform);
+            nodeGroup.attr("transform", event.transform);
+        }));
+
+    updateGraph();
+
+    window.addEventListener('resize', () => {
+        const w = window.innerWidth;
+        const h = window.innerHeight;
+        svg.attr("viewBox", [0, 0, w, h]);
+        simulation.force("center", d3.forceCenter(w / 2, h / 2));
+        simulation.alpha(0.3).restart();
+    });
+
+</script>
+</body>
+</html>

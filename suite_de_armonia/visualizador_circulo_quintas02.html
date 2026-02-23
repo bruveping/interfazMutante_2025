@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Círculo de Quintas - Armonía Global</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@700;900&family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        body {
+            background-color: #020408;
+            color: #f1f5f9;
+            font-family: 'Inter', sans-serif;
+            overflow: hidden;
+            margin: 0;
+        }
+
+        .node-label {
+            font-family: 'Crimson Pro', serif;
+            font-weight: 900;
+            pointer-events: none;
+            fill: white;
+            font-size: 16px;
+        }
+
+        .relation-path {
+            fill: none;
+            stroke-width: 2.5;
+            stroke-linecap: round;
+            stroke-dasharray: 8, 4;
+            animation: flow 4s linear infinite;
+            opacity: 0.8;
+            transition: opacity 0.3s;
+        }
+
+        @keyframes flow {
+            to { stroke-dashoffset: -100; }
+        }
+
+        .glass-panel {
+            background: rgba(8, 12, 22, 0.95);
+            backdrop-filter: blur(25px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s;
+        }
+
+        .glass-panel.hidden-panel {
+            transform: translateX(-120%);
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .btn-toggle {
+            @apply px-3 py-2 rounded-lg text-[9px] font-black uppercase transition-all border border-slate-800 hover:bg-slate-700 flex items-center justify-between w-full text-slate-500 mb-1;
+        }
+
+        /* Colores específicos para las relaciones */
+        .btn-active.im { color: #6366f1; border-color: #6366f1; background: rgba(99, 102, 241, 0.1); }
+        .btn-active.v7 { color: #f43f5e; border-color: #f43f5e; background: rgba(244, 63, 94, 0.1); }
+        .btn-active.iiv { color: #10b981; border-color: #10b981; background: rgba(16, 185, 129, 0.1); }
+        .btn-active.bvii { color: #f59e0b; border-color: #f43f5e; background: rgba(245, 158, 11, 0.1); }
+        .btn-active.subv { color: #d946ef; border-color: #d946ef; background: rgba(217, 70, 239, 0.1); }
+        .btn-active.biim { color: #06b6d4; border-color: #06b6d4; background: rgba(6, 182, 212, 0.1); }
+        .btn-active.bvif { color: #a855f7; border-color: #a855f7; background: rgba(168, 85, 247, 0.1); }
+        .btn-active.biiif { color: #fb7185; border-color: #fb7185; background: rgba(251, 113, 133, 0.1); }
+        .btn-active.chain { color: #2dd4bf; border-color: #2dd4bf; background: rgba(45, 212, 191, 0.1); }
+
+        .btn-active .indicator { background-color: currentColor !important; box-shadow: 0 0 8px currentColor; }
+
+        .secondary-label {
+            font-family: 'Crimson Pro', serif;
+            font-weight: 700;
+            font-size: 10px;
+            pointer-events: none;
+        }
+
+        /* Acordeón interactivo */
+        .accordion-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .accordion-item.active .accordion-content {
+            max-height: 500px;
+            margin-bottom: 1rem;
+        }
+        .accordion-header::after {
+            content: '↓';
+            font-size: 10px;
+            transition: transform 0.3s;
+        }
+        .accordion-item.active .accordion-header::after {
+            transform: rotate(180deg);
+        }
+
+        /* Botón de control de panel */
+        .menu-trigger {
+            @apply fixed top-8 left-8 z-[100] w-10 h-10 rounded-full flex items-center justify-center bg-slate-900 border border-slate-700 text-slate-400 hover:text-white transition-all shadow-xl;
+        }
+    </style>
+</head>
+<body>
+
+<div id="canvas-container" class="w-full h-screen flex items-center justify-center"></div>
+
+<!-- Gatillo para mostrar/ocultar -->
+<button onclick="togglePanel()" class="menu-trigger" title="Alternar Menú">
+    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+</button>
+
+<!-- Controles -->
+<div id="main-panel" class="absolute top-24 left-8 flex flex-col gap-4">
+    <div class="glass-panel p-5 rounded-3xl shadow-2xl w-80">
+        <div class="flex justify-between items-center mb-4">
+            <div class="flex flex-col">
+                <h2 class="text-slate-200 font-black text-[12px] uppercase tracking-[0.2em]">Mapas Armónicos</h2>
+                <span class="text-[9px] text-slate-500 font-bold tracking-widest uppercase">Jazz & Intercambio</span>
+            </div>
+            <div class="flex gap-3">
+                <button onclick="collapseAllAccordions()" class="text-[9px] font-black uppercase text-slate-500 hover:text-white transition-colors" title="Colapsar menú">Cerrar</button>
+                <button onclick="toggleAll()" class="text-[9px] font-black uppercase text-sky-500 hover:text-sky-300 transition-colors">Todo</button>
+            </div>
+        </div>
+        
+        <div class="space-y-2" id="accordion">
+            <!-- Sección 1: Diatónicos -->
+            <div class="accordion-item">
+                <div class="accordion-header cursor-pointer flex justify-between items-center text-[10px] font-black text-slate-400 py-2 border-b border-slate-800/50 uppercase tracking-widest" onclick="toggleAccordion(this)">
+                    Fundamentales
+                </div>
+                <div class="accordion-content pt-2">
+                    <button onclick="toggleRelation('im', 'im')" id="btn-im" class="btn-toggle">
+                        <span>I → Im → V</span>
+                        <span class="indicator w-1.5 h-1.5 rounded-full bg-slate-800"></span>
+                    </button>
+                    <button onclick="toggleRelation('v7', 'v7')" id="btn-v7" class="btn-toggle">
+                        <span>V7 → I</span>
+                        <span class="indicator w-1.5 h-1.5 rounded-full bg-slate-800"></span>
+                    </button>
+                    <button onclick="toggleRelation('iiv', 'iiv')" id="btn-iiv" class="btn-toggle">
+                        <span>ii → V → I</span>
+                        <span class="indicator w-1.5 h-1.5 rounded-full bg-slate-800"></span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Sección 2: Intercambio Modal -->
+            <div class="accordion-item">
+                <div class="accordion-header cursor-pointer flex justify-between items-center text-[10px] font-black text-slate-400 py-2 border-b border-slate-800/50 uppercase tracking-widest" onclick="toggleAccordion(this)">
+                    Intercambio & Jazz
+                </div>
+                <div class="accordion-content pt-2">
+                    <button onclick="toggleRelation('bvii', 'bvii')" id="btn-bvii" class="btn-toggle">
+                        <span>bVII7 → I</span>
+                        <span class="indicator w-1.5 h-1.5 rounded-full bg-slate-800"></span>
+                    </button>
+                    <button onclick="toggleRelation('subv', 'subv')" id="btn-subv" class="btn-toggle">
+                        <span>subV7 → I</span>
+                        <span class="indicator w-1.5 h-1.5 rounded-full bg-slate-800"></span>
+                    </button>
+                    <button onclick="toggleRelation('biim', 'biim')" id="btn-biim" class="btn-toggle">
+                        <span>bIImaj7#11 → I</span>
+                        <span class="indicator w-1.5 h-1.5 rounded-full bg-slate-800"></span>
+                    </button>
+                    <button onclick="toggleRelation('bvif', 'bvif')" id="btn-bvif" class="btn-toggle">
+                        <span>bVImaj7#11 → I</span>
+                        <span class="indicator w-1.5 h-1.5 rounded-full bg-slate-800"></span>
+                    </button>
+                    <button onclick="toggleRelation('biiif', 'biiif')" id="btn-biiif" class="btn-toggle">
+                        <span>bIIImaj7 → I</span>
+                        <span class="indicator w-1.5 h-1.5 rounded-full bg-slate-800"></span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Sección 3: Cadenas Específicas -->
+            <div class="accordion-item active">
+                <div class="accordion-header cursor-pointer flex justify-between items-center text-[10px] font-black text-slate-400 py-2 border-b border-slate-800/50 uppercase tracking-widest" onclick="toggleAccordion(this)">
+                    Progresión Especial
+                </div>
+                <div class="accordion-content pt-2">
+                    <button onclick="toggleRelation('chain', 'chain')" id="btn-chain" class="btn-toggle">
+                        <span>bVI → bII → I</span>
+                        <span class="indicator w-1.5 h-1.5 rounded-full bg-slate-800"></span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-6 pt-4 border-t border-slate-800/50">
+            <button onclick="clearAll()" class="w-full py-2 bg-slate-900/40 text-slate-600 text-[9px] font-black uppercase rounded-lg border border-slate-800 hover:text-white hover:bg-red-900/20 transition-all">Limpiar</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+    const radiusBase = Math.min(width, height) * 0.4;
+    const center = { x: width / 2, y: height / 2 };
+
+    const keys = ["C", "G", "D", "A", "E", "B", "F#", "Db", "Ab", "Eb", "Bb", "F"];
+    
+    let activeRelations = { 
+        im: false, v7: false, iiv: false, bvii: false, 
+        subv: false, biim: false, bvif: false, biiif: false, chain: false 
+    };
+
+    const svg = d3.select("#canvas-container").append("svg")
+        .attr("width", width)
+        .attr("height", height);
+
+    const layersGroup = svg.append("g").attr("transform", `translate(${center.x},${center.y})`);
+    const pathGroup = layersGroup.append("g");
+    const secondaryNodeGroup = layersGroup.append("g");
+    const nodeGroup = layersGroup.append("g");
+
+    function getCoords(idx, rMult = 1) {
+        const angle = (idx * 30 - 90) * (Math.PI / 180);
+        return {
+            x: Math.cos(angle) * radiusBase * rMult,
+            y: Math.sin(angle) * radiusBase * rMult
+        };
+    }
+
+    const colors = { 
+        im: "#6366f1", v7: "#f43f5e", iiv: "#10b981", bvii: "#f59e0b", 
+        subv: "#d946ef", biim: "#06b6d4", bvif: "#a855f7", biiif: "#fb7185", chain: "#2dd4bf" 
+    };
+
+    const defs = svg.append("defs");
+    Object.entries(colors).forEach(([id, color]) => {
+        defs.append("marker")
+            .attr("id", `arrow-${id}`)
+            .attr("viewBox", "0 -5 10 10")
+            .attr("refX", 20)
+            .attr("refY", 0)
+            .attr("markerWidth", 5)
+            .attr("markerHeight", 5)
+            .attr("orient", "auto")
+            .append("path")
+            .attr("d", "M0,-5L10,0L0,5")
+            .attr("fill", color);
+    });
+
+    function renderBase() {
+        const nodes = nodeGroup.selectAll(".node-container").data(keys);
+        const nodeEnter = nodes.enter().append("g").attr("class", "node-container");
+
+        nodeEnter.append("circle")
+            .attr("r", 20)
+            .attr("fill", "#05070a")
+            .attr("stroke", "#1e293b")
+            .attr("cx", (d, i) => getCoords(i).x)
+            .attr("cy", (d, i) => getCoords(i).y);
+
+        nodeEnter.append("text")
+            .attr("class", "node-label")
+            .attr("text-anchor", "middle")
+            .attr("dy", ".35em")
+            .attr("x", (d, i) => getCoords(i).x)
+            .attr("y", (d, i) => getCoords(i).y)
+            .text(d => d);
+    }
+
+    function togglePanel() {
+        const panel = document.getElementById('main-panel');
+        panel.classList.toggle('hidden-panel');
+    }
+
+    function toggleAccordion(header) {
+        const item = header.parentElement;
+        item.classList.toggle('active');
+    }
+
+    function collapseAllAccordions() {
+        const items = document.querySelectorAll('.accordion-item');
+        items.forEach(item => item.classList.remove('active'));
+    }
+
+    function toggleRelation(rel, cssClass) {
+        activeRelations[rel] = !activeRelations[rel];
+        const btn = document.getElementById(`btn-${rel}`);
+        if (btn) {
+            btn.classList.toggle('btn-active', activeRelations[rel]);
+            btn.classList.toggle(cssClass, activeRelations[rel]);
+        }
+        updateAllPaths();
+    }
+
+    function updateAllPaths() {
+        pathGroup.selectAll("*").remove();
+        secondaryNodeGroup.selectAll("*").remove();
+
+        keys.forEach((_, i) => {
+            // I -> Im -> V
+            if (activeRelations.im) {
+                const imPos = drawSecondaryNode(i, keys[i] + "m", colors.im, 0.88);
+                drawPath([getCoords(i), imPos, getCoords((i + 1) % 12)], colors.im, 'im');
+            }
+            // V7 -> I
+            if (activeRelations.v7) {
+                const v7Idx = (i + 1) % 12;
+                const v7Pos = drawSecondaryNode(v7Idx, keys[v7Idx] + "7", colors.v7, 0.80);
+                drawPath([v7Pos, getCoords(i)], colors.v7, 'v7');
+            }
+            // ii -> V -> I
+            if (activeRelations.iiv) {
+                const iiIdx = (i + 2) % 12;
+                const vIdx = (i + 1) % 12;
+                const iiPos = drawSecondaryNode(iiIdx, keys[iiIdx] + "m", colors.iiv, 0.76);
+                drawPath([iiPos, getCoords(vIdx), getCoords(i)], colors.iiv, 'iiv');
+            }
+            // bVII7 -> I
+            if (activeRelations.bvii) {
+                const bviiIdx = (i + 10) % 12;
+                const bviiPos = drawSecondaryNode(bviiIdx, keys[bviiIdx] + "7", colors.bvii, 0.72);
+                drawPath([bviiPos, getCoords(i)], colors.bvii, 'bvii');
+            }
+            // subV7 -> I
+            if (activeRelations.subv) {
+                const subvIdx = (i + 7) % 12;
+                const subvPos = drawSecondaryNode(subvIdx, keys[subvIdx] + "7", colors.subv, 0.68);
+                drawPath([subvPos, getCoords(i)], colors.subv, 'subv');
+            }
+            // bIImaj7#11 -> I
+            if (activeRelations.biim) {
+                const biimIdx = (i + 7) % 12;
+                const biimPos = drawSecondaryNode(biimIdx, keys[biimIdx] + "maj7#11", colors.biim, 0.64);
+                drawPath([biimPos, getCoords(i)], colors.biim, 'biim');
+            }
+            // bVImaj7#11 -> I
+            if (activeRelations.bvif) {
+                const bvifIdx = (i + 8) % 12;
+                const bvifPos = drawSecondaryNode(bvifIdx, keys[bvifIdx] + "maj7#11", colors.bvif, 0.60);
+                drawPath([bvifPos, getCoords(i)], colors.bvif, 'bvif');
+            }
+            // bIIImaj7 -> I
+            if (activeRelations.biiif) {
+                const biiifIdx = (i + 9) % 12;
+                const biiifPos = drawSecondaryNode(biiifIdx, keys[biiifIdx] + "maj7", colors.biiif, 0.56);
+                drawPath([biiifPos, getCoords(i)], colors.biiif, 'biiif');
+            }
+            // FIX: Cadena de Jazz Completa bIII7 -> bVImaj7 -> bIImaj7#11 -> I
+            if (activeRelations.chain) {
+                const b3Idx = (i + 9) % 12; 
+                const b6Idx = (i + 8) % 12; 
+                const b2Idx = (i + 7) % 12; 
+                
+                const p1 = drawSecondaryNode(b3Idx, keys[b3Idx] + "7", colors.chain, 0.48);
+                const p2 = drawSecondaryNode(b6Idx, keys[b6Idx] + "maj7", colors.chain, 0.40);
+                const p3 = drawSecondaryNode(b2Idx, keys[b2Idx] + "maj7#11", colors.chain, 0.32);
+                
+                // Conectamos explícitamente todos los puntos en orden para evitar el salto
+                drawPath([p1, p2, p3, getCoords(i)], colors.chain, 'chain');
+            }
+        });
+    }
+
+    function drawSecondaryNode(idx, label, color, rMult) {
+        const pos = getCoords(idx, rMult);
+        const g = secondaryNodeGroup.append("g");
+        g.append("circle").attr("cx", pos.x).attr("cy", pos.y).attr("r", 14).attr("fill", "#020408").attr("stroke", color).attr("stroke-width", 1);
+        g.append("text").attr("x", pos.x).attr("y", pos.y).attr("class", "secondary-label").attr("text-anchor", "middle").attr("dy", ".35em").attr("fill", color).text(label);
+        return pos;
+    }
+
+    function drawPath(points, color, arrowId) {
+        const line = d3.line().x(d => d.x).y(d => d.y).curve(d3.curveBasis);
+        pathGroup.append("path")
+            .attr("class", "relation-path")
+            .attr("d", line(points))
+            .attr("stroke", color)
+            .attr("marker-end", `url(#arrow-${arrowId})`);
+    }
+
+    function toggleAll() {
+        const anyOff = Object.values(activeRelations).some(v => !v);
+        Object.keys(activeRelations).forEach(k => { 
+            if (activeRelations[k] !== anyOff) toggleRelation(k, k); 
+        });
+    }
+
+    function clearAll() {
+        Object.keys(activeRelations).forEach(k => { 
+            if (activeRelations[k]) toggleRelation(k, k); 
+        });
+    }
+
+    renderBase();
+    window.addEventListener('resize', () => location.reload());
+</script>
+</body>
+</html>
+
