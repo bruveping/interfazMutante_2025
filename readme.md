@@ -52,21 +52,22 @@ teclado_digital2 [teclado_digital2](https://bruveping.github.io/interfazMutante_
 Audio_a_texto [Audio_a_texto](https://bruveping.github.io/interfazMutante_2025/Audio_a_texto02/)
 
 
-brujula_celu_00[brujula_celu_00](https://bruveping.github.io/interfazMutante_2025/brujula_celu_00/)
+brujula_celu_00 [brujula_celu_00](https://bruveping.github.io/interfazMutante_2025/brujula_celu_00/)
 
-brujula_celu_01[brujula_celu_01](https://bruveping.github.io/interfazMutante_2025/brujula_celu_01/)
+brujula_celu_01 [brujula_celu_01](https://bruveping.github.io/interfazMutante_2025/brujula_celu_01/)
 
-generar_partituras[generar_partituras](https://bruveping.github.io/interfazMutante_2025/generar_partituras_0006/)
+generar_partituras [generar_partituras](https://bruveping.github.io/interfazMutante_2025/generar_partituras_0006/)
 
-generar_partituras01[generar_partituras01](https://bruveping.github.io/interfazMutante_2025/generar_partituras_0001/)
+generar_partituras01 [generar_partituras01](https://bruveping.github.io/interfazMutante_2025/generar_partituras_0001/)
 
-generar_partituras02[generar_partituras02](https://bruveping.github.io/interfazMutante_2025/generar_partituras_0002/)
+generar_partituras02 [generar_partituras02](https://bruveping.github.io/interfazMutante_2025/generar_partituras_0002/)
 
-anotador_con_resaltadores[anotador_con_resaltadores](https://bruveping.github.io/interfazMutante_2025/anotador_con_resaltadores/)
+anotador_con_resaltadores [anotador_con_resaltadores](https://bruveping.github.io/interfazMutante_2025/anotador_con_resaltadores/)
 
 suite_de_armonia [suite_de_armonia](https://bruveping.github.io/interfazMutante_2025/suite_de_armonia/)
 
 visualizador_de_pianoroll_midi [visualizador_de_pianoroll_midi](https://bruveping.github.io/interfazMutante_2025//visualizador_de_pianoroll_midi/)
+
 
 
 
