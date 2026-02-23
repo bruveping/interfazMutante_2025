@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Anotador con Resaltadores</title>
-    <!-- Incluimos PDF.js para soportar archivos PDF -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <style>
         :root {
@@ -205,6 +204,25 @@
         #pdfModal h3 { margin-bottom: 1rem; color: #fff; }
         #pdfModal .controls { display: flex; flex-direction: column; gap: 1rem; }
         
+        .page-input-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin: 10px 0;
+        }
+
+        #pageNumberInput {
+            width: 70px;
+            background: #2a2a2a;
+            border: 1px solid #444;
+            color: white;
+            padding: 5px;
+            border-radius: 4px;
+            text-align: center;
+            font-size: 1.1rem;
+        }
+
         .overlay-bg {
             position: fixed;
             top: 0; left: 0; width: 100%; height: 100%;
@@ -221,11 +239,8 @@
 
         .file-input-wrapper input[type=file] {
             font-size: 100px;
-            position: absolute;
-            left: 0;
-            top: 0;
-            opacity: 0;
-            cursor: pointer;
+            position: absolute; left: 0; top: 0;
+            opacity: 0; cursor: pointer;
         }
     </style>
 </head>
@@ -234,14 +249,14 @@
 <header>
     <div class="tool-group">
         <div class="file-input-wrapper">
-            <button>📁 Abrir Archivo / PDF</button>
+            <button>📁 Abrir Archivo</button>
             <input type="file" id="fileInput" accept="image/*,application/pdf,.tiff,.svg">
         </div>
         <button id="downloadBtn">💾 Guardar PNG</button>
     </div>
 
     <div class="tool-group">
-        <button id="navModeBtn" class="mode-toggle" title="Alternar entre Dibujo y Navegación">🖐️ Modo Navegar</button>
+        <button id="navModeBtn" class="mode-toggle">🖐️ Modo Navegar</button>
     </div>
 
     <div class="tool-group">
@@ -279,11 +294,17 @@
 <div class="overlay-bg" id="modalOverlay"></div>
 <div id="pdfModal">
     <h3>Cargar PDF</h3>
-    <p style="font-size: 0.9rem; margin-bottom: 1rem; color: #ccc;">El documento tiene <span id="totalPagesLabel">0</span> páginas.</p>
+    <p style="font-size: 0.9rem; margin-bottom: 0.5rem; color: #ccc;">Total de páginas: <span id="totalPagesLabel">0</span></p>
+    
     <div class="controls">
-        <label>Elegir página: <span id="selectedPageLabel">1</span></label>
+        <div class="page-input-container">
+            <label for="pageNumberInput">Página:</label>
+            <input type="number" id="pageNumberInput" min="1" value="1">
+        </div>
+        
         <input type="range" id="pageSlider" min="1" max="1" value="1">
-        <button id="confirmPdfBtn" style="background: var(--accent-color); justify-content: center; font-weight: bold;">Cargar Página</button>
+        
+        <button id="confirmPdfBtn" style="background: var(--accent-color); justify-content: center; font-weight: bold; margin-top: 10px;">Cargar Página</button>
         <button id="cancelPdfBtn" style="background: transparent; justify-content: center; border-color: #555;">Cancelar</button>
     </div>
 </div>
@@ -331,7 +352,6 @@
     function setupEventListeners() {
         document.getElementById('fileInput').addEventListener('change', handleFileSelect);
 
-        // Modo Navegar / Dibujo
         const navBtn = document.getElementById('navModeBtn');
         navBtn.addEventListener('click', () => {
             state.isNavMode = !state.isNavMode;
@@ -341,7 +361,6 @@
             navBtn.innerText = state.isNavMode ? "✏️ Modo Dibujo" : "🖐️ Modo Navegar";
         });
 
-        // Mouse
         canvas.addEventListener('mousedown', (e) => {
             if (state.isNavMode) { state.isPanning = true; return; }
             startDrawing(e);
@@ -357,14 +376,12 @@
 
         window.addEventListener('mouseup', () => { state.isDrawing = false; state.isPanning = false; });
 
-        // Touch (Móvil)
         viewport.addEventListener('touchstart', handleTouchStart, { passive: false });
         viewport.addEventListener('touchmove', handleTouchMove, { passive: false });
         viewport.addEventListener('touchend', () => {
             state.isDrawing = false; state.isPanning = false; state.lastTouchDist = 0;
         });
 
-        // Zoom
         viewport.addEventListener('wheel', (e) => {
             e.preventDefault();
             adjustZoom(e.deltaY > 0 ? -0.1 : 0.1);
@@ -374,7 +391,6 @@
         document.getElementById('zoomOutBtn').addEventListener('click', () => adjustZoom(-0.1));
         document.getElementById('resetViewBtn').addEventListener('click', resetView);
         
-        // HSV & Brush
         document.getElementById('sizeSlider').addEventListener('input', (e) => {
             state.brushSize = parseInt(e.target.value);
             document.getElementById('sizeValue').innerText = state.brushSize + 'px';
@@ -394,13 +410,24 @@
 
         document.getElementById('downloadBtn').addEventListener('click', exportImage);
 
-        // PDF Modal
-        document.getElementById('pageSlider').addEventListener('input', (e) => {
-            document.getElementById('selectedPageLabel').innerText = e.target.value;
+        // PDF Sincronización entre input y slider
+        const pageSlider = document.getElementById('pageSlider');
+        const pageInput = document.getElementById('pageNumberInput');
+
+        pageSlider.addEventListener('input', (e) => {
+            pageInput.value = e.target.value;
+        });
+
+        pageInput.addEventListener('input', (e) => {
+            let val = parseInt(e.target.value);
+            const max = parseInt(pageSlider.max);
+            if (val > max) { val = max; e.target.value = max; }
+            if (val < 1) { val = 1; e.target.value = 1; }
+            pageSlider.value = val;
         });
 
         document.getElementById('confirmPdfBtn').addEventListener('click', async () => {
-            const pageNum = parseInt(document.getElementById('pageSlider').value);
+            const pageNum = parseInt(pageInput.value);
             await renderPdfPage(pageNum);
             closePdfModal();
         });
@@ -408,9 +435,6 @@
         document.getElementById('cancelPdfBtn').addEventListener('click', closePdfModal);
     }
 
-    /**
-     * GESTIÓN DE ARCHIVOS Y PDF
-     */
     async function handleFileSelect(e) {
         const file = e.target.files[0];
         if (!file) return;
@@ -419,13 +443,16 @@
             const arrayBuffer = await file.arrayBuffer();
             state.pdfDoc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
             
-            // Configurar modal
             const total = state.pdfDoc.numPages;
             document.getElementById('totalPagesLabel').innerText = total;
+            
             const slider = document.getElementById('pageSlider');
+            const input = document.getElementById('pageNumberInput');
+            
             slider.max = total;
             slider.value = 1;
-            document.getElementById('selectedPageLabel').innerText = 1;
+            input.max = total;
+            input.value = 1;
             
             showPdfModal();
         } else {
@@ -445,7 +472,7 @@
 
     async function renderPdfPage(pageNum) {
         const page = await state.pdfDoc.getPage(pageNum);
-        const vpd = page.getViewport({ scale: 2.5 }); // Escala alta para lectura clara
+        const vpd = page.getViewport({ scale: 2.5 });
         const pCanvas = document.createElement('canvas');
         pCanvas.width = vpd.width; pCanvas.height = vpd.height;
         await page.render({ canvasContext: pCanvas.getContext('2d'), viewport: vpd }).promise;
@@ -471,9 +498,6 @@
         resetView();
     }
 
-    /**
-     * NAVEGACIÓN TÁCTIL
-     */
     function handleTouchStart(e) {
         if (e.touches.length === 2) {
             state.isPanning = true; state.isDrawing = false;
@@ -504,9 +528,6 @@
         } else { draw(new MouseEvent('mousemove', { clientX: touch.clientX, clientY: touch.clientY })); }
     }
 
-    /**
-     * DIBUJO Y COLOR
-     */
     function startDrawing(e) {
         const pos = getMousePos(e);
         if (state.isEyeDropperActive) {
@@ -597,7 +618,7 @@
 
     function exportImage() {
         const link = document.createElement('a');
-        link.download = `analisis-pagina-${document.getElementById('pageSlider').value || 1}.png`;
+        link.download = `analisis-pdf.png`;
         link.href = canvas.toDataURL('image/png');
         link.click();
     }
