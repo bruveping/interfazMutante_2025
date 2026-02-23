@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Piano Roll Pro - Visualizador MIDI</title>
+    <style>
+        :root {
+            --bg-dark: #121212;
+            --panel-bg: #1e1e1e;
+            --accent: #00e5ff;
+            --text-main: #ffffff;
+            --text-dim: #a0a0a0;
+            --border: #333;
+            --drop-overlay: rgba(0, 229, 255, 0.15);
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        header {
+            background-color: var(--panel-bg);
+            padding: 10px 20px;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 20px;
+            border-bottom: 1px solid var(--border);
+            z-index: 100;
+        }
+
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 5px 10px;
+            background: #252525;
+            border-radius: 6px;
+        }
+
+        label {
+            font-size: 11px;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            font-weight: bold;
+            white-space: nowrap;
+        }
+
+        select, input[type="range"] {
+            background: #333;
+            color: white;
+            border: 1px solid #444;
+            border-radius: 4px;
+            padding: 2px 5px;
+            cursor: pointer;
+        }
+
+        #canvasContainer {
+            flex-grow: 1;
+            position: relative;
+            overflow: auto;
+            background-color: #000;
+            /* Suaviza el scroll */
+            scroll-behavior: smooth;
+        }
+
+        canvas {
+            display: block;
+        }
+
+        .file-btn {
+            background: var(--accent);
+            color: #000;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 4px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.1s;
+        }
+
+        .file-btn:active {
+            transform: scale(0.95);
+        }
+
+        .status-bar {
+            padding: 5px 20px;
+            background: #111;
+            font-size: 11px;
+            color: var(--text-dim);
+            border-top: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+        }
+
+        /* Estilos para el Drag and Drop */
+        #dropZone {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--drop-overlay);
+            border: 4px dashed var(--accent);
+            z-index: 9999;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            pointer-events: none; /* Permite que el evento drop llegue al body */
+        }
+
+        #dropZone.active {
+            display: flex;
+        }
+
+        .drop-message {
+            background: var(--panel-bg);
+            padding: 20px 40px;
+            border-radius: 12px;
+            font-size: 24px;
+            font-weight: bold;
+            color: var(--accent);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+    </style>
+</head>
+<body id="dropTarget">
+
+<div id="dropZone">
+    <div class="drop-message">Suelta el archivo MIDI aquí</div>
+</div>
+
+<header>
+    <button class="file-btn" onclick="document.getElementById('midiInput').click()">Abrir MIDI</button>
+    <input type="file" id="midiInput" accept=".mid,.midi" style="display:none">
+
+    <div class="control-group">
+        <label>Zoom H</label>
+        <input type="range" id="zoomX" min="10" max="800" value="120">
+    </div>
+
+    <div class="control-group">
+        <label>Zoom V</label>
+        <input type="range" id="zoomY" min="6" max="50" value="18">
+    </div>
+
+    <div class="control-group">
+        <label>Grilla</label>
+        <select id="gridDivision">
+            <option value="1">Redondas (1/1)</option>
+            <option value="2">Blancas (1/2)</option>
+            <option value="4" selected>Negras (1/4)</option>
+            <option value="8">Corcheas (1/8)</option>
+            <option value="16">Semicorcheas (1/16)</option>
+            <option value="32">Fusas (1/32)</option>
+        </select>
+    </div>
+
+    <div class="control-group">
+        <label>Tupla</label>
+        <select id="gridMode">
+            <option value="1">Normal</option>
+            <option value="3">Tresillos (x3)</option>
+            <option value="5">Quintillos (x5)</option>
+            <option value="6">Seisillos (x6)</option>
+            <option value="7">Septillos (x7)</option>
+        </select>
+    </div>
+</header>
+
+<div id="canvasContainer">
+    <canvas id="pianoRoll"></canvas>
+</div>
+
+<div class="status-bar">
+    <span id="statusBar">Arrastra un archivo MIDI o usa el botón "Abrir"</span>
+    <span id="scrollInfo"></span>
+</div>
+
+<script>
+    const canvas = document.getElementById('pianoRoll');
+    const ctx = canvas.getContext('2d');
+    const container = document.getElementById('canvasContainer');
+    const statusBar = document.getElementById('statusBar');
+    const dropZone = document.getElementById('dropZone');
+    const body = document.body;
+
+    const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+    
+    let state = {
+        notes: [],
+        ppq: 480,
+        zoomX: 120, 
+        zoomY: 18,  
+        gridDiv: 4,
+        gridMode: 1,
+        maxTick: 0,
+        fileName: ""
+    };
+
+    // --- MANEJO DE ARCHIVOS (INPUT Y DRAG & DROP) ---
+
+    function handleFile(file) {
+        if (!file) return;
+        if (!file.name.toLowerCase().endsWith('.mid') && !file.name.toLowerCase().endsWith('.midi')) {
+            alert("Por favor, selecciona un archivo .mid válido");
+            return;
+        }
+
+        state.fileName = file.name;
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            await processMidiBuffer(e.target.result);
+        };
+        reader.readAsArrayBuffer(file);
+    }
+
+    // Eventos de Drag & Drop
+    body.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropZone.classList.add('active');
+    });
+
+    body.addEventListener('dragleave', (e) => {
+        if (e.relatedTarget === null || !body.contains(e.relatedTarget)) {
+            dropZone.classList.remove('active');
+        }
+    });
+
+    body.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('active');
+        const file = e.dataTransfer.files[0];
+        handleFile(file);
+    });
+
+    document.getElementById('midiInput').addEventListener('change', (e) => {
+        handleFile(e.target.files[0]);
+    });
+
+    async function processMidiBuffer(buffer) {
+        const data = new DataView(buffer);
+        
+        if (data.getUint32(0) !== 0x4D546864) return alert("Formato MIDI inválido (MThd no encontrado)");
+
+        state.ppq = data.getUint16(12);
+        state.notes = [];
+        state.maxTick = 0;
+
+        let offset = 14;
+        while (offset < data.byteLength) {
+            const type = data.getUint32(offset);
+            const len = data.getUint32(offset + 4);
+            offset += 8;
+            if (type === 0x4D54726B) parseTrack(data, offset, len);
+            offset += len;
+        }
+
+        statusBar.innerText = `Archivo: ${state.fileName} | ${state.notes.length} notas | PPQ: ${state.ppq}`;
+        render();
+        // Scroll automático al inicio de las notas
+        if (state.notes.length > 0) {
+            const minPitch = Math.min(...state.notes.map(n => n.pitch));
+            container.scrollTop = (127 - minPitch) * state.zoomY - (container.clientHeight / 2);
+        }
+    }
+
+    function parseTrack(data, offset, length) {
+        let currentTick = 0;
+        let p = offset;
+        const end = offset + length;
+        const activeNotes = new Map();
+
+        while (p < end) {
+            const [delta, bytes] = readVLQ(data, p);
+            p += bytes;
+            currentTick += delta;
+
+            const status = data.getUint8(p++);
+            if (status === 0xFF) { // Meta Event
+                p++; 
+                const [len, b] = readVLQ(data, p);
+                p += b + len;
+            } else if ((status & 0xF0) === 0x90) { // Note On
+                const pitch = data.getUint8(p++);
+                const vel = data.getUint8(p++);
+                if (vel > 0) activeNotes.set(pitch, currentTick);
+                else finalize(pitch, currentTick, activeNotes);
+            } else if ((status & 0xF0) === 0x80) { // Note Off
+                const pitch = data.getUint8(p++);
+                p++; // velocity
+                finalize(pitch, currentTick, activeNotes);
+            } else if ((status & 0xF0) === 0xB0 || (status & 0xF0) === 0xE0) p += 2; // CC / Pitch Bend
+            else if ((status & 0xF0) === 0xC0 || (status & 0xF0) === 0xD0) p += 1; // Program / Aftertouch
+            else if (status < 0x80) p--; // Running status fallback (básico)
+        }
+        state.maxTick = Math.max(state.maxTick, currentTick);
+    }
+
+    function finalize(pitch, end, map) {
+        if (map.has(pitch)) {
+            state.notes.push({ pitch, start: map.get(pitch), end });
+            map.delete(pitch);
+        }
+    }
+
+    function readVLQ(data, offset) {
+        let val = 0, bytes = 0;
+        while (true) {
+            let b = data.getUint8(offset + bytes++);
+            val = (val << 7) | (b & 0x7F);
+            if (!(b & 0x80)) break;
+        }
+        return [val, bytes];
+    }
+
+    // --- RENDERING ---
+    function render() {
+        if (!state.notes.length) return;
+
+        const pixelsPerTick = state.zoomX / state.ppq;
+        canvas.width = (state.maxTick * pixelsPerTick) + 300;
+        canvas.height = 128 * state.zoomY;
+
+        // 1. Fondo (Teclado)
+        for (let i = 0; i < 128; i++) {
+            const pitch = 127 - i;
+            const isBlack = NOTE_NAMES[pitch % 12].includes('#');
+            
+            ctx.fillStyle = isBlack ? '#0a0a0a' : '#181818';
+            ctx.fillRect(0, i * state.zoomY, canvas.width, state.zoomY);
+            
+            ctx.strokeStyle = '#222';
+            ctx.lineWidth = 0.5;
+            ctx.strokeRect(0, i * state.zoomY, canvas.width, state.zoomY);
+        }
+
+        // 2. Grilla Temporal
+        const quarterTick = state.ppq;
+        // El paso de la grilla depende de la división (ej 1/16) y la tupla (ej tresillo)
+        const gridTickStep = (4 / state.gridDiv) * (quarterTick / state.gridMode);
+        
+        for (let t = 0; t <= state.maxTick; t += gridTickStep) {
+            const x = t * pixelsPerTick;
+            const isMeasure = Math.abs(t % (quarterTick * 4)) < 0.1;
+            const isBeat = Math.abs(t % quarterTick) < 0.1;
+
+            ctx.lineWidth = isMeasure ? 2 : 1;
+            ctx.strokeStyle = isMeasure ? '#444' : (isBeat ? '#2a2a2a' : '#1a1a1a');
+            
+            ctx.beginPath();
+            ctx.moveTo(x, 0);
+            ctx.lineTo(x, canvas.height);
+            ctx.stroke();
+        }
+
+        // 3. Notas
+        state.notes.forEach(n => {
+            const x = n.start * pixelsPerTick;
+            const w = Math.max(1, (n.end - n.start) * pixelsPerTick);
+            const y = (127 - n.pitch) * state.zoomY;
+            const h = state.zoomY;
+
+            // Color basado en el círculo de quintas o pitch para variedad
+            const hue = (n.pitch * 137.5) % 360; 
+            ctx.fillStyle = `hsla(${hue}, 70%, 50%, 0.85)`;
+            ctx.strokeStyle = `hsla(${hue}, 80%, 30%, 1)`;
+            
+            // Dibujar cuerpo de la nota
+            ctx.fillRect(x, y + 1, w, h - 2);
+            ctx.strokeRect(x, y + 1, w, h - 2);
+
+            // Brillo superior
+            ctx.fillStyle = 'rgba(255,255,255,0.1)';
+            ctx.fillRect(x, y + 1, w, h / 3);
+
+            // Texto de la nota
+            if (state.zoomY > 9 && w > 15) {
+                ctx.fillStyle = "rgba(255,255,255,0.9)";
+                const fontSize = Math.min(state.zoomY - 4, 12);
+                ctx.font = `bold ${fontSize}px Inter, sans-serif`;
+                const name = NOTE_NAMES[n.pitch % 12] + Math.floor(n.pitch / 12);
+                ctx.fillText(name, x + 4, y + state.zoomY - 4);
+            }
+        });
+    }
+
+    // --- CONTROLES Y EVENTOS ---
+    document.getElementById('zoomX').addEventListener('input', (e) => {
+        state.zoomX = parseInt(e.target.value);
+        render();
+    });
+
+    document.getElementById('zoomY').addEventListener('input', (e) => {
+        state.zoomY = parseInt(e.target.value);
+        render();
+    });
+
+    document.getElementById('gridDivision').addEventListener('change', (e) => {
+        state.gridDiv = parseInt(e.target.value);
+        render();
+    });
+
+    document.getElementById('gridMode').addEventListener('change', (e) => {
+        state.gridMode = parseInt(e.target.value);
+        render();
+    });
+
+    window.addEventListener('resize', render);
+</script>
+</body>
+</html>
