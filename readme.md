@@ -66,7 +66,10 @@ anotador_con_resaltadores [anotador_con_resaltadores](https://bruveping.github.i
 
 suite_de_armonia [suite_de_armonia](https://bruveping.github.io/interfazMutante_2025/suite_de_armonia/)
 
-visualizador_de_pianoroll_midi [visualizador_de_pianoroll_midi](https://bruveping.github.io/interfazMutante_2025//visualizador_de_pianoroll_midi/)
+visualizador_de_pianoroll_midi [visualizador_de_pianoroll_midi](https://bruveping.github.io/interfazMutante_2025/visualizador_de_pianoroll_midi/)
+
+leer_cbz_pdf_imagenes01[leer_cbz_pdf_imagenes01](https://bruveping.github.io/interfazMutante_2025/leer_cbz_pdf_imagenes/)
+
 
 
 
