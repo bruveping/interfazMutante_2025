@@ -70,6 +70,10 @@ visualizador_de_pianoroll_midi [visualizador_de_pianoroll_midi](https://bruvepin
 
 leer_cbz_pdf_imagenes01 [leer_cbz_pdf_imagenes01](https://bruveping.github.io/interfazMutante_2025/leer_cbz_pdf_imagenes/)
 
+leer_cbr_cbz_pdf_jpg02 [leer_cbr_cbz_pdf_jpg](https://bruveping.github.io/interfazMutante_2025/leer_cbr_cbz_pdf_jpg/)
+
+
+
 
 
 
