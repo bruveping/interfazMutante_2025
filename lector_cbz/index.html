@@ -120,8 +120,9 @@
     <div id="file-selector">
         <h1 style="margin-bottom: 20px;">Lector CBZ</h1>
         <button class="btn" style="padding: 20px 40px; font-size: 18px;" onclick="document.getElementById('input').click()">SELECCIONAR CBZ</button>
-        <input type="file" id="input" hidden accept=".cbz">
-        <p style="margin-top: 20px; color: #888; font-size: 12px;">Optimizado para lectura móvil</p>
+        <!-- Cambiado accept para ser más permisivo en móviles -->
+        <input type="file" id="input" hidden accept=".cbz,.zip,application/x-cbz,application/zip,application/x-zip-compressed">
+        <p style="margin-top: 20px; color: #888; font-size: 12px;">Si el archivo aparece grisado, intenta renombrarlo a .zip</p>
     </div>
 
     <div id="viewer">
@@ -157,10 +158,8 @@
     let currentIndex = 0;
     let zoom = 1.0;
     
-    // Estado de movimiento
     let isDragging = false;
     let startY = 0;
-    let currentY = 0;
     let offsetTop = 0;
     let initialPinchDist = 0;
 
@@ -183,7 +182,6 @@
                 }
             });
 
-            // Ordenar alfanumérico (ej: 1, 2, 10 en lugar de 1, 10, 2)
             imageFiles.sort((a, b) => a.localeCompare(b, undefined, {numeric: true, sensitivity: 'base'}));
 
             if (imageFiles.length > 0) {
@@ -191,11 +189,13 @@
                 await renderPage();
                 controls.style.display = 'flex';
             } else {
-                alert("No se encontraron imágenes en el CBZ");
+                alert("No se encontraron imágenes compatibles");
+                document.getElementById('file-selector').style.display = 'block';
             }
         } catch (err) {
             console.error(err);
-            alert("Error procesando el CBZ. El archivo podría estar dañado.");
+            alert("Error: El navegador no pudo procesar este archivo comprimido.");
+            document.getElementById('file-selector').style.display = 'block';
         } finally {
             loader.style.display = 'none';
         }
@@ -203,13 +203,12 @@
 
     async function renderPage() {
         loader.style.display = 'flex';
-        progressText.textContent = `Cargando página ${currentIndex + 1}...`;
+        progressText.textContent = `Página ${currentIndex + 1}...`;
         
         try {
             const fileData = await zip.file(imageFiles[currentIndex]).async("blob");
             const url = URL.createObjectURL(fileData);
             
-            // Limpiar URL anterior para liberar memoria
             if (comicImg.src.startsWith('blob:')) {
                 URL.revokeObjectURL(comicImg.src);
             }
@@ -221,9 +220,10 @@
                 updateTransform();
                 pageInfo.textContent = `${currentIndex + 1} / ${imageFiles.length}`;
                 loader.style.display = 'none';
+                viewer.scrollTop = 0;
             };
         } catch (err) {
-            alert("Error al cargar la página");
+            console.error(err);
             loader.style.display = 'none';
         }
     }
@@ -232,8 +232,6 @@
         contentLayer.style.transform = `translateY(${offsetTop}px) scale(${zoom})`;
     }
 
-    // --- LOGICA DE GESTOS ---
-    
     function handleStart(y) {
         isDragging = true;
         startY = y;
@@ -245,40 +243,32 @@
         offsetTop += deltaY;
         startY = y;
 
-        // Limite superior
         if (offsetTop > 0) {
-            // Si arrastramos mucho hacia abajo al inicio
-            if (offsetTop > 80 && currentIndex > 0) {
+            if (offsetTop > 70 && currentIndex > 0) {
                 isDragging = false;
                 prevPage();
                 return;
             }
-            if (offsetTop > 100) offsetTop = 100; // Efecto rebote
+            if (offsetTop > 100) offsetTop = 100;
         }
 
-        // Limite inferior
-        const imgHeight = comicImg.getBoundingClientRect().height;
-        const viewerHeight = viewer.clientHeight;
-        const limit = viewerHeight - imgHeight;
+        const imgRect = comicImg.getBoundingClientRect();
+        const limit = viewer.clientHeight - imgRect.height;
 
         if (offsetTop < limit) {
-            // Si arrastramos mucho hacia arriba al final
-            if (offsetTop < limit - 80 && currentIndex < imageFiles.length - 1) {
+            if (offsetTop < limit - 70 && currentIndex < imageFiles.length - 1) {
                 isDragging = false;
                 nextPage();
                 return;
             }
         }
-
         updateTransform();
     }
 
-    // Mouse
     viewer.addEventListener('mousedown', e => handleStart(e.pageY));
     window.addEventListener('mousemove', e => handleMove(e.pageY));
     window.addEventListener('mouseup', () => isDragging = false);
 
-    // Touch (Celular)
     viewer.addEventListener('touchstart', e => {
         if (e.touches.length === 1) {
             handleStart(e.touches[0].pageY);
@@ -300,15 +290,14 @@
                 e.touches[0].pageY - e.touches[1].pageY
             );
             const delta = (dist - initialPinchDist) / 200;
-            zoom = Math.min(Math.max(0.5, zoom + delta), 4);
+            zoom = Math.min(Math.max(0.8, zoom + delta), 4);
             initialPinchDist = dist;
             updateTransform();
         }
     }, {passive: false});
 
-    viewer.addEventListener('touchend', () => isDragging = false);
+    window.addEventListener('touchend', () => isDragging = false);
 
-    // Navegación
     function nextPage() {
         if (currentIndex < imageFiles.length - 1) {
             currentIndex++;
@@ -326,20 +315,14 @@
     document.getElementById('next').onclick = nextPage;
     document.getElementById('prev').onclick = prevPage;
 
-    // Teclado y Rueda para PC
-    window.addEventListener('keydown', e => {
-        if (e.key === "ArrowRight" || e.key === " ") nextPage();
-        if (e.key === "ArrowLeft") prevPage();
-    });
-
     viewer.addEventListener('wheel', e => {
         if (e.ctrlKey) {
             e.preventDefault();
-            zoom = Math.min(Math.max(0.5, zoom - e.deltaY * 0.001), 4);
+            zoom = Math.min(Math.max(0.8, zoom - e.deltaY * 0.001), 4);
             updateTransform();
         } else {
             handleMove(startY - e.deltaY);
-            isDragging = false; // Reset inmediato para rueda
+            isDragging = false;
         }
     }, {passive: false});
 
