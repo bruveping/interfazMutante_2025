@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Lector - PDF, CBZ e Imágenes</title>
+    <title>Lector Pro - PDF, CBZ e Imágenes</title>
     
     <!-- Favicon SVG Moderno -->
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cdefs%3E%3ClinearGradient id='grad' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' style='stop-color:%23007bff;stop-opacity:1' /%3E%3Cstop offset='100%25' style='stop-color:%2300d4ff;stop-opacity:1' /%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath fill='url(%23grad)' d='M21 4H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zM3 18V6h8v12H3zm18 0h-8V6h8v12z'/%3E%3Cpath fill='%23fff' d='M5 8h4v2H5V8zm0 4h4v2H5v-2zm10-4h4v2h-4V8zm0 4h4v2h-4v-2z'/%3E%3C/svg%3E">
@@ -18,7 +18,7 @@
             --ui-color: rgba(45, 45, 45, 0.9);
             --accent-color: #007bff;
             --text-color: #ffffff;
-            --drop-zone-bg: rgba(0, 123, 255, 0.1);
+            --drop-zone-bg: rgba(0, 123, 255, 0.2);
         }
 
         body, html {
@@ -41,7 +41,6 @@
             position: relative;
         }
 
-        /* Toolbar Superior */
         #toolbar {
             height: 50px;
             background: var(--ui-color);
@@ -65,43 +64,27 @@
         }
 
         .btn:hover { background: #444; }
-        .btn:active { transform: scale(0.95); }
 
-        /* Área de Visualización */
         #viewer-viewport {
             flex: 1;
             position: relative;
-            overflow: auto;
+            overflow: hidden; 
             display: flex;
             justify-content: center;
             align-items: flex-start;
-            scrollbar-width: none;
-            transition: background-color 0.3s ease;
+            cursor: grab;
         }
-        
-        #viewer-viewport::-webkit-scrollbar { display: none; }
 
-        /* Overlay de Arrastre */
-        #drop-overlay {
-            position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: var(--drop-zone-bg);
-            border: 3px dashed var(--accent-color);
-            display: none;
-            justify-content: center;
-            align-items: center;
-            z-index: 200;
-            pointer-events: none;
-        }
+        #viewer-viewport:active { cursor: grabbing; }
 
         #render-container {
             position: relative;
             transform-origin: top center;
-            transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            transition: transform 0.1s ease-out;
             display: flex;
             flex-direction: column;
             align-items: center;
-            cursor: zoom-in;
+            pointer-events: none;
         }
 
         #page-content {
@@ -112,7 +95,18 @@
             -webkit-user-drag: none;
         }
 
-        /* Overlay de Carga */
+        #drop-overlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: var(--drop-zone-bg);
+            border: 4px dashed var(--accent-color);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 200;
+            pointer-events: none;
+        }
+
         #loader {
             position: fixed;
             top: 0; left: 0; width: 100%; height: 100%;
@@ -135,17 +129,6 @@
 
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-        /* Controles Flotantes */
-        .touch-zone {
-            position: absolute;
-            top: 50px;
-            bottom: 0;
-            width: 20%;
-            z-index: 50;
-        }
-        #zone-prev { left: 0; }
-        #zone-next { right: 0; }
-
         #info-overlay {
             position: absolute;
             bottom: 20px;
@@ -165,26 +148,25 @@
 
 <div id="app-container">
     <div id="drop-overlay">
-        <h2 style="color: var(--accent-color); text-shadow: 0 2px 4px rgba(0,0,0,0.5);">Suelta el archivo para abrir</h2>
+        <h2 style="color: var(--accent-color); text-shadow: 0 2px 4px rgba(0,0,0,0.5);">Suelta el archivo aquí</h2>
     </div>
 
     <div id="toolbar">
         <div style="display: flex; gap: 10px;">
-            <input type="file" id="file-input" hidden accept=".pdf,.cbz,.jpg,.jpeg,.png,.gif,.tiff,.webp">
-            <button class="btn" onclick="document.getElementById('file-input').click()">Abrir Archivo</button>
-            <span id="file-name" style="font-size: 12px; max-width: 150px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; align-self: center;">Ningún archivo</span>
+            <input type="file" id="file-input" hidden accept=".pdf,.cbz,.jpg,.jpeg,.png,.gif,.webp">
+            <button class="btn" onclick="document.getElementById('file-input').click()">Abrir</button>
+            <span id="file-name" style="font-size: 12px; max-width: 120px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; align-self: center;">Ninguno</span>
         </div>
         
         <div style="display: flex; gap: 5px;">
             <button class="btn" onclick="adjustZoom(-0.1)">-</button>
             <span id="zoom-level" style="min-width: 40px; text-align: center;">100%</span>
             <button class="btn" onclick="adjustZoom(0.1)">+</button>
-            <button class="btn" onclick="resetZoom()" title="Restablecer (Doble clic)">↺</button>
         </div>
 
         <div style="display: flex; gap: 5px;">
             <button class="btn" id="prev-btn">Ant</button>
-            <span id="page-num">0 / 0</span>
+            <span id="page-num">0/0</span>
             <button class="btn" id="next-btn">Sig</button>
         </div>
     </div>
@@ -193,11 +175,9 @@
         <div id="render-container">
             <div id="content-wrapper"></div>
         </div>
-        <div id="zone-prev" class="touch-zone"></div>
-        <div id="zone-next" class="touch-zone"></div>
     </div>
 
-    <div id="info-overlay">Soporta PDF, CBZ e Imágenes. No compatible con CBR.</div>
+    <div id="info-overlay">Arrastra o usa rueda para navegar. Zoom: Pellizco o Ctrl+Rueda.</div>
 </div>
 
 <div id="loader">
@@ -206,9 +186,6 @@
 </div>
 
 <script>
-    /**
-     * Lector Universal - Lógica Principal (Sin CBR)
-     */
     const fileInput = document.getElementById('file-input');
     const viewport = document.getElementById('viewer-viewport');
     const renderContainer = document.getElementById('render-container');
@@ -219,7 +196,6 @@
     const fileNameDisplay = document.getElementById('file-name');
     const dropOverlay = document.getElementById('drop-overlay');
 
-    let currentFile = null;
     let fileType = '';
     let currentPage = 0;
     let totalPages = 0;
@@ -227,20 +203,16 @@
     let pagesData = [];
     let pdfDoc = null;
 
+    let isDragging = false;
+    let startX, startY;
+    let scrollLeft, scrollTop;
+    let lastDragDiffY = 0;
+
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
-    // --- Manejo de Drag & Drop ---
-    window.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        dropOverlay.style.display = 'flex';
-    });
-
-    window.addEventListener('dragleave', (e) => {
-        if (e.relatedTarget === null) {
-            dropOverlay.style.display = 'none';
-        }
-    });
-
+    // --- CARGA DE ARCHIVOS ---
+    window.addEventListener('dragover', (e) => { e.preventDefault(); dropOverlay.style.display = 'flex'; });
+    window.addEventListener('dragleave', (e) => { if (e.relatedTarget === null) dropOverlay.style.display = 'none'; });
     window.addEventListener('drop', (e) => {
         e.preventDefault();
         dropOverlay.style.display = 'none';
@@ -253,30 +225,16 @@
         if (file) handleFile(file);
     };
 
-    renderContainer.addEventListener('dblclick', (e) => {
-        resetZoom();
-    });
-
-    function resetZoom() {
-        zoom = 1.0;
-        applyZoom();
-        viewport.scrollTop = 0;
-    }
-
-    // --- Lógica de Procesamiento ---
     async function handleFile(file) {
-        showLoader(true, "Cargando archivo...");
-        currentFile = file;
+        showLoader(true, "Cargando...");
         fileNameDisplay.textContent = file.name;
         const ext = file.name.split('.').pop().toLowerCase();
-        
         resetState();
 
         try {
-            if (['jpg', 'jpeg', 'png', 'gif', 'tiff', 'webp'].includes(ext)) {
+            if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext)) {
                 fileType = 'image';
-                const url = URL.createObjectURL(file);
-                pagesData = [url];
+                pagesData = [URL.createObjectURL(file)];
                 totalPages = 1;
                 renderPage();
             } else if (ext === 'pdf') {
@@ -287,66 +245,56 @@
                 renderPage();
             } else if (ext === 'cbz') {
                 fileType = 'comic';
-                await loadComic(file);
-            } else if (ext === 'cbr') {
-                alert("Los archivos CBR no son compatibles. Por favor, conviértelos a CBZ.");
-                fileNameDisplay.textContent = "Ningún archivo";
+                await loadCBZ(file);
             } else {
                 alert("Formato no soportado.");
-                fileNameDisplay.textContent = "Ningún archivo";
+                fileNameDisplay.textContent = "Ninguno";
             }
         } catch (err) {
             console.error(err);
-            alert("Error al procesar el archivo.");
+            alert("Error al abrir archivo.");
         } finally {
             showLoader(false);
         }
     }
 
-    function resetState() {
-        currentPage = 0;
-        zoom = 1.0;
-        pagesData.forEach(url => {
-            if (url.startsWith('blob:')) URL.revokeObjectURL(url);
+    async function loadCBZ(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                try {
+                    const zip = await JSZip.loadAsync(e.target.result);
+                    const files = [];
+                    zip.forEach((path, entry) => {
+                        if (!entry.dir && /\.(jpe?g|png|gif|webp)$/i.test(entry.name)) {
+                            files.push(entry);
+                        }
+                    });
+                    files.sort((a, b) => a.name.localeCompare(b.name, undefined, {numeric: true}));
+                    pagesData = await Promise.all(files.map(async f => URL.createObjectURL(await f.async("blob"))));
+                    totalPages = pagesData.length;
+                    renderPage();
+                    resolve();
+                } catch (err) { reject(err); }
+            };
+            reader.onerror = reject;
+            reader.readAsArrayBuffer(file);
         });
-        pagesData = [];
-        pdfDoc = null;
-        contentWrapper.innerHTML = '';
-        updateUI();
-        applyZoom();
     }
 
-    async function loadComic(file) {
-        try {
-            const zip = await JSZip.loadAsync(file);
-            const files = [];
-            zip.forEach((relPath, zipEntry) => {
-                if (!zipEntry.dir && /\.(jpe?g|png|gif|webp)$/i.test(zipEntry.name)) {
-                    files.push(zipEntry);
-                }
-            });
-
-            if (files.length === 0) throw new Error("No se encontraron imágenes.");
-
-            files.sort((a, b) => a.name.localeCompare(b.name, undefined, {numeric: true, sensitivity: 'base'}));
-            
-            const urls = await Promise.all(files.map(async f => {
-                const blob = await f.async("blob");
-                return URL.createObjectURL(blob);
-            }));
-
-            pagesData = urls;
-            totalPages = urls.length;
-            renderPage();
-        } catch (e) {
-            alert("Error al abrir el archivo CBZ.");
-        }
+    function resetState() {
+        currentPage = 0; zoom = 1.0;
+        pagesData.forEach(url => url.startsWith('blob:') && URL.revokeObjectURL(url));
+        pagesData = []; pdfDoc = null;
+        contentWrapper.innerHTML = '';
+        viewport.scrollLeft = 0; viewport.scrollTop = 0;
+        updateUI(); applyZoom();
     }
 
     async function renderPage() {
         contentWrapper.innerHTML = '';
-        showLoader(true, "Renderizando página...");
-
+        if (totalPages === 0) return;
+        
         try {
             if (fileType === 'image' || fileType === 'comic') {
                 const img = new Image();
@@ -355,51 +303,22 @@
                 contentWrapper.appendChild(img);
             } else if (fileType === 'pdf') {
                 const page = await pdfDoc.getPage(currentPage + 1);
-                const viewportPdf = page.getViewport({ scale: 2 });
+                const vp = page.getViewport({ scale: 2 });
                 const canvas = document.createElement('canvas');
-                const context = canvas.getContext('2d');
-                canvas.height = viewportPdf.height;
-                canvas.width = viewportPdf.width;
-                canvas.style.width = "100%";
-                canvas.style.height = "auto";
                 canvas.id = "page-content";
-                
-                await page.render({ canvasContext: context, viewport: viewportPdf }).promise;
+                canvas.width = vp.width; canvas.height = vp.height;
+                canvas.style.width = "100%";
+                await page.render({ canvasContext: canvas.getContext('2d'), viewport: vp }).promise;
                 contentWrapper.appendChild(canvas);
             }
-        } catch (e) {
-            console.error(e);
-        }
-
-        updateUI();
-        viewport.scrollTop = 0;
-        showLoader(false);
+            updateUI();
+            viewport.scrollTop = 0;
+        } catch (e) { console.error(e); }
     }
 
-    function nextPage() {
-        if (currentPage < totalPages - 1) {
-            currentPage++;
-            renderPage();
-        }
-    }
-
-    function prevPage() {
-        if (currentPage > 0) {
-            currentPage--;
-            renderPage();
-        }
-    }
-
-    viewport.addEventListener('wheel', (e) => {
-        const isAtBottom = Math.abs((viewport.scrollHeight - viewport.clientHeight) - viewport.scrollTop) < 10;
-        const isAtTop = viewport.scrollTop <= 5;
-
-        if (e.deltaY > 0 && isAtBottom) {
-            nextPage();
-        } else if (e.deltaY < 0 && isAtTop) {
-            prevPage();
-        }
-    });
+    // --- NAVEGACIÓN Y ZOOM ---
+    function nextPage() { if (currentPage < totalPages - 1) { currentPage++; renderPage(); } }
+    function prevPage() { if (currentPage > 0) { currentPage--; renderPage(); } }
 
     function adjustZoom(delta) {
         zoom = Math.min(Math.max(0.1, zoom + delta), 4.0);
@@ -409,74 +328,106 @@
     function applyZoom() {
         renderContainer.style.transform = `scale(${zoom})`;
         zoomDisplay.textContent = `${Math.round(zoom * 100)}%`;
-        renderContainer.style.cursor = zoom > 1 ? 'zoom-out' : 'zoom-in';
-        
-        const scaledHeight = renderContainer.offsetHeight * zoom;
-        contentWrapper.style.marginBottom = `${(zoom > 1) ? (scaledHeight - renderContainer.offsetHeight) : 0}px`;
+        const rect = renderContainer.getBoundingClientRect();
+        renderContainer.style.height = (zoom > 1) ? `${rect.height}px` : 'auto';
     }
 
-    // --- Eventos Táctiles ---
-    let initialPinchDist = 0;
-    let lastTouchY = 0;
-    let lastTapTime = 0;
+    // --- LÓGICA DE ARRASTRE (MOUSE Y TOUCH) ---
+    function startDrag(x, y) {
+        isDragging = true;
+        startX = x;
+        startY = y;
+        scrollLeft = viewport.scrollLeft;
+        scrollTop = viewport.scrollTop;
+        lastDragDiffY = 0;
+    }
 
-    viewport.addEventListener('touchstart', (e) => {
-        const currentTime = new Date().getTime();
-        const tapDiff = currentTime - lastTapTime;
-        if (tapDiff < 300 && tapDiff > 0) {
-            resetZoom();
+    function moveDrag(x, y) {
+        if (!isDragging) return;
+        const dx = startX - x;
+        const dy = startY - y;
+        
+        viewport.scrollLeft = scrollLeft + dx;
+        viewport.scrollTop = scrollTop + dy;
+        lastDragDiffY = dy;
+
+        // Si estamos al borde, el arrastre acumulado permite cambiar de página
+        if (zoom <= 1.2) {
+            const isAtBottom = Math.abs((viewport.scrollHeight - viewport.clientHeight) - viewport.scrollTop) < 5;
+            const isAtTop = viewport.scrollTop <= 2;
+            
+            if (dy > 80 && isAtBottom) {
+                isDragging = false;
+                nextPage();
+            } else if (dy < -80 && isAtTop) {
+                isDragging = false;
+                prevPage();
+            }
+        }
+    }
+
+    // Eventos Mouse
+    viewport.addEventListener('mousedown', (e) => startDrag(e.pageX, e.pageY));
+    window.addEventListener('mousemove', (e) => moveDrag(e.pageX, e.pageY));
+    window.addEventListener('mouseup', () => isDragging = false);
+
+    // Eventos Rueda Mouse
+    viewport.addEventListener('wheel', (e) => {
+        if (e.ctrlKey) {
             e.preventDefault();
+            adjustZoom(e.deltaY > 0 ? -0.1 : 0.1);
+        } else {
+            const isAtBottom = Math.abs((viewport.scrollHeight - viewport.clientHeight) - viewport.scrollTop) < 20;
+            const isAtTop = viewport.scrollTop <= 5;
+            if (e.deltaY > 0 && isAtBottom) nextPage();
+            else if (e.deltaY < 0 && isAtTop) prevPage();
+            else viewport.scrollTop += e.deltaY;
         }
-        lastTapTime = currentTime;
+    }, { passive: false });
 
-        if (e.touches.length === 2) {
-            initialPinchDist = Math.hypot(
-                e.touches[0].pageX - e.touches[1].pageX,
-                e.touches[0].pageY - e.touches[1].pageY
-            );
-        } else if (e.touches.length === 1) {
-            lastTouchY = e.touches[0].pageY;
+    // Eventos Touch
+    let initialPinchDist = 0;
+    viewport.addEventListener('touchstart', (e) => {
+        if (e.touches.length === 1) {
+            startDrag(e.touches[0].pageX, e.touches[0].pageY);
+        } else if (e.touches.length === 2) {
+            initialPinchDist = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
         }
-    }, {passive: false});
+    }, { passive: false });
 
     viewport.addEventListener('touchmove', (e) => {
-        if (e.touches.length === 2) {
+        if (e.touches.length === 1) {
+            moveDrag(e.touches[0].pageX, e.touches[0].pageY);
+        } else if (e.touches.length === 2) {
             e.preventDefault();
-            const currentDist = Math.hypot(
-                e.touches[0].pageX - e.touches[1].pageX,
-                e.touches[0].pageY - e.touches[1].pageY
-            );
-            const diff = (currentDist - initialPinchDist) / 100;
-            adjustZoom(diff);
+            const currentDist = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
+            const delta = (currentDist - initialPinchDist) / 200;
+            adjustZoom(delta);
             initialPinchDist = currentDist;
-        } else if (e.touches.length === 1 && zoom > 1) {
-            const deltaY = lastTouchY - e.touches[0].pageY;
-            viewport.scrollTop += deltaY;
-            lastTouchY = e.touches[0].pageY;
-            
-            const isAtBottom = Math.abs((viewport.scrollHeight - viewport.clientHeight) - viewport.scrollTop) < 10;
-            if (isAtBottom && deltaY > 20) nextPage();
         }
-    }, {passive: false});
+    }, { passive: false });
 
-    document.getElementById('zone-prev').onclick = prevPage;
-    document.getElementById('zone-next').onclick = nextPage;
-    document.getElementById('prev-btn').onclick = prevPage;
-    document.getElementById('next-btn').onclick = nextPage;
+    window.addEventListener('touchend', () => isDragging = false);
 
+    // --- UI HELPERS ---
     function showLoader(show, text = "") {
         loader.style.display = show ? 'flex' : 'none';
         document.getElementById('loader-text').textContent = text;
     }
 
     function updateUI() {
-        pageDisplay.textContent = (totalPages > 0) ? `${currentPage + 1} / ${totalPages}` : "0 / 0";
-        zoomDisplay.textContent = `${Math.round(zoom * 100)}%`;
+        pageDisplay.textContent = `${currentPage + 1}/${totalPages}`;
     }
 
-    window.oncontextmenu = (e) => {
-        if (e.target.id === 'page-content') e.preventDefault();
-    };
+    document.getElementById('prev-btn').onclick = prevPage;
+    document.getElementById('next-btn').onclick = nextPage;
+    
+    let lastTap = 0;
+    viewport.addEventListener('touchend', (e) => {
+        const now = Date.now();
+        if (now - lastTap < 300) { zoom = 1.0; applyZoom(); viewport.scrollTop = 0; }
+        lastTap = now;
+    });
 
 </script>
 </body>
