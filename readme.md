@@ -72,6 +72,8 @@ leer_cbz_pdf_imagenes01 [leer_cbz_pdf_imagenes01](https://bruveping.github.io/in
 
 leer_cbr_cbz_pdf_jpg02 [leer_cbr_cbz_pdf_jpg](https://bruveping.github.io/interfazMutante_2025/leer_cbr_cbz_pdf_jpg/)
 
+/lector_cbz/ [/lector_cbz/](https://bruveping.github.io/interfazMutante_2025/lector_cbz/)
+
 
 
 
