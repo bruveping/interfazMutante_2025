@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>CBZ Mobile Reader</title>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    
+    <style>
+        :root {
+            --bg: #000000;
+            --ui: rgba(30, 30, 30, 0.95);
+            --accent: #ff3e3e;
+            --text: #ffffff;
+        }
+
+        body, html {
+            margin: 0; padding: 0;
+            width: 100%; height: 100%;
+            background-color: var(--bg);
+            color: var(--text);
+            font-family: system-ui, -apple-system, sans-serif;
+            overflow: hidden;
+            touch-action: none;
+        }
+
+        #app {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            height: 100%;
+        }
+
+        #viewer {
+            flex: 1;
+            overflow: hidden;
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            cursor: grab;
+        }
+
+        #content-layer {
+            position: relative;
+            transform-origin: top center;
+            will-change: transform;
+        }
+
+        #comic-img {
+            max-width: 100%;
+            display: block;
+            user-select: none;
+            -webkit-user-drag: none;
+        }
+
+        #controls {
+            position: fixed;
+            bottom: 0; left: 0; width: 100%;
+            height: 60px;
+            background: var(--ui);
+            display: flex;
+            align-items: center;
+            justify-content: space-around;
+            z-index: 100;
+            border-top: 1px solid #333;
+        }
+
+        .btn {
+            background: #333;
+            border: none;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        .btn:active { background: var(--accent); }
+
+        #file-selector {
+            position: fixed;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            z-index: 200;
+        }
+
+        #loader {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.9);
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .spinner {
+            width: 50px; height: 50px;
+            border: 5px solid #222;
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        #page-info {
+            font-size: 14px;
+            font-variant-numeric: tabular-nums;
+        }
+    </style>
+</head>
+<body>
+
+<div id="app">
+    <div id="file-selector">
+        <h1 style="margin-bottom: 20px;">Lector CBZ</h1>
+        <button class="btn" style="padding: 20px 40px; font-size: 18px;" onclick="document.getElementById('input').click()">SELECCIONAR CBZ</button>
+        <input type="file" id="input" hidden accept=".cbz">
+        <p style="margin-top: 20px; color: #888; font-size: 12px;">Optimizado para lectura móvil</p>
+    </div>
+
+    <div id="viewer">
+        <div id="content-layer">
+            <img id="comic-img" src="" alt="">
+        </div>
+    </div>
+
+    <div id="controls" style="display: none;">
+        <button class="btn" id="prev">Anterior</button>
+        <span id="page-info">0 / 0</span>
+        <button class="btn" id="next">Siguiente</button>
+    </div>
+</div>
+
+<div id="loader">
+    <div class="spinner"></div>
+    <p id="progress" style="margin-top: 10px;">Cargando comic...</p>
+</div>
+
+<script>
+    const input = document.getElementById('input');
+    const viewer = document.getElementById('viewer');
+    const contentLayer = document.getElementById('content-layer');
+    const comicImg = document.getElementById('comic-img');
+    const controls = document.getElementById('controls');
+    const pageInfo = document.getElementById('page-info');
+    const loader = document.getElementById('loader');
+    const progressText = document.getElementById('progress');
+
+    let zip = null;
+    let imageFiles = [];
+    let currentIndex = 0;
+    let zoom = 1.0;
+    
+    // Estado de movimiento
+    let isDragging = false;
+    let startY = 0;
+    let currentY = 0;
+    let offsetTop = 0;
+    let initialPinchDist = 0;
+
+    input.onchange = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        document.getElementById('file-selector').style.display = 'none';
+        loader.style.display = 'flex';
+        progressText.textContent = "Abriendo archivo...";
+
+        try {
+            const arrayBuffer = await file.arrayBuffer();
+            zip = await JSZip.loadAsync(arrayBuffer);
+            
+            imageFiles = [];
+            zip.forEach((path, entry) => {
+                if (!entry.dir && /\.(jpe?g|png|webp|gif)$/i.test(path)) {
+                    imageFiles.push(path);
+                }
+            });
+
+            // Ordenar alfanumérico (ej: 1, 2, 10 en lugar de 1, 10, 2)
+            imageFiles.sort((a, b) => a.localeCompare(b, undefined, {numeric: true, sensitivity: 'base'}));
+
+            if (imageFiles.length > 0) {
+                currentIndex = 0;
+                await renderPage();
+                controls.style.display = 'flex';
+            } else {
+                alert("No se encontraron imágenes en el CBZ");
+            }
+        } catch (err) {
+            console.error(err);
+            alert("Error procesando el CBZ. El archivo podría estar dañado.");
+        } finally {
+            loader.style.display = 'none';
+        }
+    };
+
+    async function renderPage() {
+        loader.style.display = 'flex';
+        progressText.textContent = `Cargando página ${currentIndex + 1}...`;
+        
+        try {
+            const fileData = await zip.file(imageFiles[currentIndex]).async("blob");
+            const url = URL.createObjectURL(fileData);
+            
+            // Limpiar URL anterior para liberar memoria
+            if (comicImg.src.startsWith('blob:')) {
+                URL.revokeObjectURL(comicImg.src);
+            }
+
+            comicImg.src = url;
+            comicImg.onload = () => {
+                offsetTop = 0;
+                zoom = 1.0;
+                updateTransform();
+                pageInfo.textContent = `${currentIndex + 1} / ${imageFiles.length}`;
+                loader.style.display = 'none';
+            };
+        } catch (err) {
+            alert("Error al cargar la página");
+            loader.style.display = 'none';
+        }
+    }
+
+    function updateTransform() {
+        contentLayer.style.transform = `translateY(${offsetTop}px) scale(${zoom})`;
+    }
+
+    // --- LOGICA DE GESTOS ---
+    
+    function handleStart(y) {
+        isDragging = true;
+        startY = y;
+    }
+
+    function handleMove(y) {
+        if (!isDragging) return;
+        const deltaY = y - startY;
+        offsetTop += deltaY;
+        startY = y;
+
+        // Limite superior
+        if (offsetTop > 0) {
+            // Si arrastramos mucho hacia abajo al inicio
+            if (offsetTop > 80 && currentIndex > 0) {
+                isDragging = false;
+                prevPage();
+                return;
+            }
+            if (offsetTop > 100) offsetTop = 100; // Efecto rebote
+        }
+
+        // Limite inferior
+        const imgHeight = comicImg.getBoundingClientRect().height;
+        const viewerHeight = viewer.clientHeight;
+        const limit = viewerHeight - imgHeight;
+
+        if (offsetTop < limit) {
+            // Si arrastramos mucho hacia arriba al final
+            if (offsetTop < limit - 80 && currentIndex < imageFiles.length - 1) {
+                isDragging = false;
+                nextPage();
+                return;
+            }
+        }
+
+        updateTransform();
+    }
+
+    // Mouse
+    viewer.addEventListener('mousedown', e => handleStart(e.pageY));
+    window.addEventListener('mousemove', e => handleMove(e.pageY));
+    window.addEventListener('mouseup', () => isDragging = false);
+
+    // Touch (Celular)
+    viewer.addEventListener('touchstart', e => {
+        if (e.touches.length === 1) {
+            handleStart(e.touches[0].pageY);
+        } else if (e.touches.length === 2) {
+            initialPinchDist = Math.hypot(
+                e.touches[0].pageX - e.touches[1].pageX,
+                e.touches[0].pageY - e.touches[1].pageY
+            );
+        }
+    }, {passive: false});
+
+    viewer.addEventListener('touchmove', e => {
+        if (e.touches.length === 1) {
+            handleMove(e.touches[0].pageY);
+        } else if (e.touches.length === 2) {
+            e.preventDefault();
+            const dist = Math.hypot(
+                e.touches[0].pageX - e.touches[1].pageX,
+                e.touches[0].pageY - e.touches[1].pageY
+            );
+            const delta = (dist - initialPinchDist) / 200;
+            zoom = Math.min(Math.max(0.5, zoom + delta), 4);
+            initialPinchDist = dist;
+            updateTransform();
+        }
+    }, {passive: false});
+
+    viewer.addEventListener('touchend', () => isDragging = false);
+
+    // Navegación
+    function nextPage() {
+        if (currentIndex < imageFiles.length - 1) {
+            currentIndex++;
+            renderPage();
+        }
+    }
+
+    function prevPage() {
+        if (currentIndex > 0) {
+            currentIndex--;
+            renderPage();
+        }
+    }
+
+    document.getElementById('next').onclick = nextPage;
+    document.getElementById('prev').onclick = prevPage;
+
+    // Teclado y Rueda para PC
+    window.addEventListener('keydown', e => {
+        if (e.key === "ArrowRight" || e.key === " ") nextPage();
+        if (e.key === "ArrowLeft") prevPage();
+    });
+
+    viewer.addEventListener('wheel', e => {
+        if (e.ctrlKey) {
+            e.preventDefault();
+            zoom = Math.min(Math.max(0.5, zoom - e.deltaY * 0.001), 4);
+            updateTransform();
+        } else {
+            handleMove(startY - e.deltaY);
+            isDragging = false; // Reset inmediato para rueda
+        }
+    }, {passive: false});
+
+</script>
+</body>
+</html>
