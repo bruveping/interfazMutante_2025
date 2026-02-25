@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Lector - PDF, CBZ e Imágenes</title>
+    
+    <!-- Favicon SVG Moderno -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cdefs%3E%3ClinearGradient id='grad' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' style='stop-color:%23007bff;stop-opacity:1' /%3E%3Cstop offset='100%25' style='stop-color:%2300d4ff;stop-opacity:1' /%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath fill='url(%23grad)' d='M21 4H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zM3 18V6h8v12H3zm18 0h-8V6h8v12z'/%3E%3Cpath fill='%23fff' d='M5 8h4v2H5V8zm0 4h4v2H5v-2zm10-4h4v2h-4V8zm0 4h4v2h-4v-2z'/%3E%3C/svg%3E">
+
+    <!-- Librerías Externas -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    
+    <style>
+        :root {
+            --bg-color: #1a1a1a;
+            --ui-color: rgba(45, 45, 45, 0.9);
+            --accent-color: #007bff;
+            --text-color: #ffffff;
+            --drop-zone-bg: rgba(0, 123, 255, 0.1);
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            overflow: hidden;
+            touch-action: none;
+        }
+
+        #app-container {
+            display: flex;
+            flex-direction: column;
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+        }
+
+        /* Toolbar Superior */
+        #toolbar {
+            height: 50px;
+            background: var(--ui-color);
+            display: flex;
+            align-items: center;
+            padding: 0 15px;
+            justify-content: space-between;
+            z-index: 100;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+        }
+
+        .btn {
+            background: transparent;
+            border: 1px solid #555;
+            color: white;
+            padding: 5px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        .btn:hover { background: #444; }
+        .btn:active { transform: scale(0.95); }
+
+        /* Área de Visualización */
+        #viewer-viewport {
+            flex: 1;
+            position: relative;
+            overflow: auto;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            scrollbar-width: none;
+            transition: background-color 0.3s ease;
+        }
+        
+        #viewer-viewport::-webkit-scrollbar { display: none; }
+
+        /* Overlay de Arrastre */
+        #drop-overlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: var(--drop-zone-bg);
+            border: 3px dashed var(--accent-color);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 200;
+            pointer-events: none;
+        }
+
+        #render-container {
+            position: relative;
+            transform-origin: top center;
+            transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            cursor: zoom-in;
+        }
+
+        #page-content {
+            max-width: 100%;
+            height: auto;
+            display: block;
+            user-select: none;
+            -webkit-user-drag: none;
+        }
+
+        /* Overlay de Carga */
+        #loader {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8);
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid var(--accent-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* Controles Flotantes */
+        .touch-zone {
+            position: absolute;
+            top: 50px;
+            bottom: 0;
+            width: 20%;
+            z-index: 50;
+        }
+        #zone-prev { left: 0; }
+        #zone-next { right: 0; }
+
+        #info-overlay {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--ui-color);
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 12px;
+            pointer-events: none;
+            opacity: 0.7;
+            z-index: 60;
+        }
+    </style>
+</head>
+<body>
+
+<div id="app-container">
+    <div id="drop-overlay">
+        <h2 style="color: var(--accent-color); text-shadow: 0 2px 4px rgba(0,0,0,0.5);">Suelta el archivo para abrir</h2>
+    </div>
+
+    <div id="toolbar">
+        <div style="display: flex; gap: 10px;">
+            <input type="file" id="file-input" hidden accept=".pdf,.cbz,.jpg,.jpeg,.png,.gif,.tiff,.webp">
+            <button class="btn" onclick="document.getElementById('file-input').click()">Abrir Archivo</button>
+            <span id="file-name" style="font-size: 12px; max-width: 150px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; align-self: center;">Ningún archivo</span>
+        </div>
+        
+        <div style="display: flex; gap: 5px;">
+            <button class="btn" onclick="adjustZoom(-0.1)">-</button>
+            <span id="zoom-level" style="min-width: 40px; text-align: center;">100%</span>
+            <button class="btn" onclick="adjustZoom(0.1)">+</button>
+            <button class="btn" onclick="resetZoom()" title="Restablecer (Doble clic)">↺</button>
+        </div>
+
+        <div style="display: flex; gap: 5px;">
+            <button class="btn" id="prev-btn">Ant</button>
+            <span id="page-num">0 / 0</span>
+            <button class="btn" id="next-btn">Sig</button>
+        </div>
+    </div>
+
+    <div id="viewer-viewport">
+        <div id="render-container">
+            <div id="content-wrapper"></div>
+        </div>
+        <div id="zone-prev" class="touch-zone"></div>
+        <div id="zone-next" class="touch-zone"></div>
+    </div>
+
+    <div id="info-overlay">Soporta PDF, CBZ e Imágenes. No compatible con CBR.</div>
+</div>
+
+<div id="loader">
+    <div class="spinner"></div>
+    <p id="loader-text" style="margin-top: 15px;">Procesando...</p>
+</div>
+
+<script>
+    /**
+     * Lector Universal - Lógica Principal (Sin CBR)
+     */
+    const fileInput = document.getElementById('file-input');
+    const viewport = document.getElementById('viewer-viewport');
+    const renderContainer = document.getElementById('render-container');
+    const contentWrapper = document.getElementById('content-wrapper');
+    const loader = document.getElementById('loader');
+    const pageDisplay = document.getElementById('page-num');
+    const zoomDisplay = document.getElementById('zoom-level');
+    const fileNameDisplay = document.getElementById('file-name');
+    const dropOverlay = document.getElementById('drop-overlay');
+
+    let currentFile = null;
+    let fileType = '';
+    let currentPage = 0;
+    let totalPages = 0;
+    let zoom = 1.0;
+    let pagesData = [];
+    let pdfDoc = null;
+
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+    // --- Manejo de Drag & Drop ---
+    window.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropOverlay.style.display = 'flex';
+    });
+
+    window.addEventListener('dragleave', (e) => {
+        if (e.relatedTarget === null) {
+            dropOverlay.style.display = 'none';
+        }
+    });
+
+    window.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropOverlay.style.display = 'none';
+        const file = e.dataTransfer.files[0];
+        if (file) handleFile(file);
+    });
+
+    fileInput.onchange = (e) => {
+        const file = e.target.files[0];
+        if (file) handleFile(file);
+    };
+
+    renderContainer.addEventListener('dblclick', (e) => {
+        resetZoom();
+    });
+
+    function resetZoom() {
+        zoom = 1.0;
+        applyZoom();
+        viewport.scrollTop = 0;
+    }
+
+    // --- Lógica de Procesamiento ---
+    async function handleFile(file) {
+        showLoader(true, "Cargando archivo...");
+        currentFile = file;
+        fileNameDisplay.textContent = file.name;
+        const ext = file.name.split('.').pop().toLowerCase();
+        
+        resetState();
+
+        try {
+            if (['jpg', 'jpeg', 'png', 'gif', 'tiff', 'webp'].includes(ext)) {
+                fileType = 'image';
+                const url = URL.createObjectURL(file);
+                pagesData = [url];
+                totalPages = 1;
+                renderPage();
+            } else if (ext === 'pdf') {
+                fileType = 'pdf';
+                const arrayBuffer = await file.arrayBuffer();
+                pdfDoc = await pdfjsLib.getDocument({data: arrayBuffer}).promise;
+                totalPages = pdfDoc.numPages;
+                renderPage();
+            } else if (ext === 'cbz') {
+                fileType = 'comic';
+                await loadComic(file);
+            } else if (ext === 'cbr') {
+                alert("Los archivos CBR no son compatibles. Por favor, conviértelos a CBZ.");
+                fileNameDisplay.textContent = "Ningún archivo";
+            } else {
+                alert("Formato no soportado.");
+                fileNameDisplay.textContent = "Ningún archivo";
+            }
+        } catch (err) {
+            console.error(err);
+            alert("Error al procesar el archivo.");
+        } finally {
+            showLoader(false);
+        }
+    }
+
+    function resetState() {
+        currentPage = 0;
+        zoom = 1.0;
+        pagesData.forEach(url => {
+            if (url.startsWith('blob:')) URL.revokeObjectURL(url);
+        });
+        pagesData = [];
+        pdfDoc = null;
+        contentWrapper.innerHTML = '';
+        updateUI();
+        applyZoom();
+    }
+
+    async function loadComic(file) {
+        try {
+            const zip = await JSZip.loadAsync(file);
+            const files = [];
+            zip.forEach((relPath, zipEntry) => {
+                if (!zipEntry.dir && /\.(jpe?g|png|gif|webp)$/i.test(zipEntry.name)) {
+                    files.push(zipEntry);
+                }
+            });
+
+            if (files.length === 0) throw new Error("No se encontraron imágenes.");
+
+            files.sort((a, b) => a.name.localeCompare(b.name, undefined, {numeric: true, sensitivity: 'base'}));
+            
+            const urls = await Promise.all(files.map(async f => {
+                const blob = await f.async("blob");
+                return URL.createObjectURL(blob);
+            }));
+
+            pagesData = urls;
+            totalPages = urls.length;
+            renderPage();
+        } catch (e) {
+            alert("Error al abrir el archivo CBZ.");
+        }
+    }
+
+    async function renderPage() {
+        contentWrapper.innerHTML = '';
+        showLoader(true, "Renderizando página...");
+
+        try {
+            if (fileType === 'image' || fileType === 'comic') {
+                const img = new Image();
+                img.src = pagesData[currentPage];
+                img.id = "page-content";
+                contentWrapper.appendChild(img);
+            } else if (fileType === 'pdf') {
+                const page = await pdfDoc.getPage(currentPage + 1);
+                const viewportPdf = page.getViewport({ scale: 2 });
+                const canvas = document.createElement('canvas');
+                const context = canvas.getContext('2d');
+                canvas.height = viewportPdf.height;
+                canvas.width = viewportPdf.width;
+                canvas.style.width = "100%";
+                canvas.style.height = "auto";
+                canvas.id = "page-content";
+                
+                await page.render({ canvasContext: context, viewport: viewportPdf }).promise;
+                contentWrapper.appendChild(canvas);
+            }
+        } catch (e) {
+            console.error(e);
+        }
+
+        updateUI();
+        viewport.scrollTop = 0;
+        showLoader(false);
+    }
+
+    function nextPage() {
+        if (currentPage < totalPages - 1) {
+            currentPage++;
+            renderPage();
+        }
+    }
+
+    function prevPage() {
+        if (currentPage > 0) {
+            currentPage--;
+            renderPage();
+        }
+    }
+
+    viewport.addEventListener('wheel', (e) => {
+        const isAtBottom = Math.abs((viewport.scrollHeight - viewport.clientHeight) - viewport.scrollTop) < 10;
+        const isAtTop = viewport.scrollTop <= 5;
+
+        if (e.deltaY > 0 && isAtBottom) {
+            nextPage();
+        } else if (e.deltaY < 0 && isAtTop) {
+            prevPage();
+        }
+    });
+
+    function adjustZoom(delta) {
+        zoom = Math.min(Math.max(0.1, zoom + delta), 4.0);
+        applyZoom();
+    }
+
+    function applyZoom() {
+        renderContainer.style.transform = `scale(${zoom})`;
+        zoomDisplay.textContent = `${Math.round(zoom * 100)}%`;
+        renderContainer.style.cursor = zoom > 1 ? 'zoom-out' : 'zoom-in';
+        
+        const scaledHeight = renderContainer.offsetHeight * zoom;
+        contentWrapper.style.marginBottom = `${(zoom > 1) ? (scaledHeight - renderContainer.offsetHeight) : 0}px`;
+    }
+
+    // --- Eventos Táctiles ---
+    let initialPinchDist = 0;
+    let lastTouchY = 0;
+    let lastTapTime = 0;
+
+    viewport.addEventListener('touchstart', (e) => {
+        const currentTime = new Date().getTime();
+        const tapDiff = currentTime - lastTapTime;
+        if (tapDiff < 300 && tapDiff > 0) {
+            resetZoom();
+            e.preventDefault();
+        }
+        lastTapTime = currentTime;
+
+        if (e.touches.length === 2) {
+            initialPinchDist = Math.hypot(
+                e.touches[0].pageX - e.touches[1].pageX,
+                e.touches[0].pageY - e.touches[1].pageY
+            );
+        } else if (e.touches.length === 1) {
+            lastTouchY = e.touches[0].pageY;
+        }
+    }, {passive: false});
+
+    viewport.addEventListener('touchmove', (e) => {
+        if (e.touches.length === 2) {
+            e.preventDefault();
+            const currentDist = Math.hypot(
+                e.touches[0].pageX - e.touches[1].pageX,
+                e.touches[0].pageY - e.touches[1].pageY
+            );
+            const diff = (currentDist - initialPinchDist) / 100;
+            adjustZoom(diff);
+            initialPinchDist = currentDist;
+        } else if (e.touches.length === 1 && zoom > 1) {
+            const deltaY = lastTouchY - e.touches[0].pageY;
+            viewport.scrollTop += deltaY;
+            lastTouchY = e.touches[0].pageY;
+            
+            const isAtBottom = Math.abs((viewport.scrollHeight - viewport.clientHeight) - viewport.scrollTop) < 10;
+            if (isAtBottom && deltaY > 20) nextPage();
+        }
+    }, {passive: false});
+
+    document.getElementById('zone-prev').onclick = prevPage;
+    document.getElementById('zone-next').onclick = nextPage;
+    document.getElementById('prev-btn').onclick = prevPage;
+    document.getElementById('next-btn').onclick = nextPage;
+
+    function showLoader(show, text = "") {
+        loader.style.display = show ? 'flex' : 'none';
+        document.getElementById('loader-text').textContent = text;
+    }
+
+    function updateUI() {
+        pageDisplay.textContent = (totalPages > 0) ? `${currentPage + 1} / ${totalPages}` : "0 / 0";
+        zoomDisplay.textContent = `${Math.round(zoom * 100)}%`;
+    }
+
+    window.oncontextmenu = (e) => {
+        if (e.target.id === 'page-content') e.preventDefault();
+    };
+
+</script>
+</body>
+</html>
