@@ -261,7 +261,7 @@ function buildScene() {
     const pPrevDom = polar(R_DOM, nextMajA);  // chord chain
 
     // The dominant that resolves to this tonic is a 5th above
-    const domLabel = ROOTS[(i + 7) % 12] + "7";
+    const domLabel = ROOTS[(i + 1) % 12] + "7";
 
     // ── Arrows ──
     arrow(pMaj,    pMin,     "aL", "#ffffff", 0.38, 1.2, r_maj, r_min);
@@ -384,3 +384,4 @@ setTimeout(() => {
 </script>
 </body>
 </html>
+
