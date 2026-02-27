@@ -1,206 +1,386 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Círculo de Armonía - Progresión y Dominantes</title>
-    <script src="https://d3js.org/d3.v7.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@tonaljs/tonal/browser/tonal.min.js"></script>
-    <style>
-        body {
-            margin: 0;
-            background-color: #000;
-            color: #fff;
-            font-family: 'Courier New', Courier, monospace;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
-            overflow: hidden;
-        }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Círculo de Quintas</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@600;700&family=Share+Tech+Mono&display=swap');
 
-        #controls {
-            margin-bottom: 20px;
-            text-align: center;
-        }
+  :root {
+    --major: #ff4d1a;
+    --minor: #ffaa00;
+    --dom:   #00d4ff;
+    --bg:    #050508;
+  }
 
-        .slider-container {
-            width: 350px;
-            margin: 10px auto;
-        }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
 
-        input[type=range] {
-            width: 100%;
-            accent-color: #00f2ff;
-        }
+  body {
+    background: var(--bg);
+    color: #fff;
+    font-family: 'Rajdhani', 'Arial Narrow', sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    min-height: 100vh;
+    padding: 16px;
+  }
 
-        .marker {
-            fill: #ff00ff;
-            filter: drop-shadow(0 0 8px #ff00ff);
-        }
+  header { text-align: center; margin-bottom: 14px; }
 
-        .chord-text {
-            font-weight: bold;
-            pointer-events: none;
-            text-shadow: 1px 1px 2px #000;
-        }
+  header h1 {
+    font-family: 'Share Tech Mono', 'Courier New', monospace;
+    font-size: 10px;
+    letter-spacing: 5px;
+    color: #444;
+    text-transform: uppercase;
+    margin-bottom: 2px;
+  }
 
-        .info {
-            position: absolute;
-            bottom: 20px;
-            font-size: 12px;
-            color: #666;
-            text-transform: uppercase;
-        }
-    </style>
+  header h2 {
+    font-size: 26px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    background: linear-gradient(90deg, var(--major), var(--minor), var(--dom));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  #controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 14px;
+    width: min(420px, 90vw);
+  }
+
+  #controls span {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: #555;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  input[type=range] {
+    flex: 1;
+    -webkit-appearance: none;
+    appearance: none;
+    height: 2px;
+    background: linear-gradient(90deg, var(--major), var(--dom));
+    outline: none;
+    border-radius: 2px;
+  }
+
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 0 8px #ffffffaa, 0 0 18px var(--dom);
+    cursor: pointer;
+  }
+
+  #rotVal { width: 36px; text-align: right; }
+
+  svg { display: block; }
+
+  .legend {
+    display: flex;
+    gap: 20px;
+    margin-top: 12px;
+    font-size: 11px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+
+  .li { display: flex; align-items: center; gap: 6px; color: #555; }
+
+  .dot { width: 9px; height: 9px; border-radius: 50%; border: 2px solid; }
+
+  #tooltip {
+    position: fixed;
+    pointer-events: none;
+    background: #0c0c1aee;
+    border: 1px solid #2a2a40;
+    padding: 7px 13px;
+    border-radius: 5px;
+    font-size: 12px;
+    font-family: 'Share Tech Mono', monospace;
+    color: #bbb;
+    opacity: 0;
+    transition: opacity 0.15s;
+    z-index: 99;
+    letter-spacing: 1px;
+  }
+</style>
 </head>
 <body>
 
-    <div id="controls">
-        <h1 style="letter-spacing: 5px; color: #fff;">ROTAR</h1>
-        <div class="slider-container">
-            <input type="range" id="rotationSlider" min="0" max="360" value="0">
-        </div>
-    </div>
+<header>
+  <h1>Teoría Musical · Armonía Funcional</h1>
+  <h2>Círculo de Quintas</h2>
+</header>
 
-    <div id="canvas-container"></div>
+<div id="controls">
+  <span>Rotar</span>
+  <input type="range" id="slider" min="0" max="360" value="0" step="1">
+  <span id="rotVal">0°</span>
+</div>
 
-    <div class="info">
-        Rojo: Mayor | Naranja: Menor | Azul: Dominante 7
-    </div>
+<svg id="svg"></svg>
 
-    <script>
-        const width = 800;
-        const height = 800;
-        const centerX = width / 2;
-        const centerY = height / 2;
+<div class="legend">
+  <div class="li"><div class="dot" style="border-color:#ff4d1a"></div><span style="color:#888">Mayor</span></div>
+  <div class="li"><div class="dot" style="border-color:#ffaa00"></div><span style="color:#888">Menor</span></div>
+  <div class="li"><div class="dot" style="border-color:#00d4ff"></div><span style="color:#888">Dom 7</span></div>
+</div>
 
-        const svg = d3.select("#canvas-container")
-            .append("svg")
-            .attr("width", width)
-            .attr("height", height)
-            .attr("viewBox", `0 0 ${width} ${height}`);
+<div id="tooltip"></div>
 
-        // Marcador fijo superior
-        svg.append("path")
-            .attr("d", d3.symbol().type(d3.symbolTriangle).size(600))
-            .attr("transform", `translate(${centerX}, ${centerY - 320}) rotate(180)`)
-            .attr("class", "marker");
+<script>
+const ROOTS = ["C","G","D","A","E","B","F#","Db","Ab","Eb","Bb","F"];
+const N     = 12;
+const STEP  = (2 * Math.PI) / N;
+const NS    = "http://www.w3.org/2000/svg";
 
-        const mainGroup = svg.append("g")
-            .attr("transform", `translate(${centerX}, ${centerY})`);
+const SIZE  = Math.min(window.innerWidth - 32, 680);
+const W = SIZE, H = SIZE;
+const CX = W / 2, CY = H / 2;
 
-        // Definición de puntas de flecha
-        const defs = svg.append("defs");
-        defs.append("marker")
-            .attr("id", "arrow-white")
-            .attr("viewBox", "0 -5 10 10")
-            .attr("refX", 25)
-            .attr("refY", 0)
-            .attr("markerWidth", 5)
-            .attr("markerHeight", 5)
-            .attr("orient", "auto")
-            .append("path")
-            .attr("d", "M0,-5L10,0L0,5")
-            .attr("fill", "#ffffffaa");
+const R_MAJ = SIZE * 0.375;
+const R_MIN = SIZE * 0.283;
+const R_DOM = SIZE * 0.185;
+const r_maj = SIZE * 0.046;
+const r_min = SIZE * 0.033;
+const r_dom = SIZE * 0.033;
 
-        const rotationGroup = mainGroup.append("g");
+// ── SVG setup ────────────────────────────────────────────────────────────────
+const svg = document.getElementById("svg");
+svg.setAttribute("width",   W);
+svg.setAttribute("height",  H);
+svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
 
-        // Datos: Círculo de quintas (12 pasos)
-        const roots = ["C", "G", "D", "A", "E", "B", "F#", "Db", "Ab", "Eb", "Bb", "F"];
-        const radiusOuter = 260;  // Mayores
-        const radiusMid = 260;    // Menores (alineados circularmente)
-        const radiusInner = 140;  // Dominantes
+// ── Helpers ──────────────────────────────────────────────────────────────────
+function el(tag, attrs) {
+  const e = document.createElementNS(NS, tag);
+  if (attrs) for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
+  return e;
+}
+function group(id) {
+  const g = el("g", id ? { id } : {});
+  svg.appendChild(g);
+  return g;
+}
+function polar(r, a) {
+  return { x: CX + r * Math.cos(a), y: CY + r * Math.sin(a) };
+}
 
-        function draw() {
-            rotationGroup.selectAll("*").remove();
+// ── Defs ─────────────────────────────────────────────────────────────────────
+const defs = el("defs");
+svg.appendChild(defs);
 
-            roots.forEach((root, i) => {
-                const angleStep = (2 * Math.PI) / 12;
-                const angleMajor = i * angleStep - Math.PI / 2;
-                // Menores están a medio camino del siguiente paso de quinta
-                const angleMinor = angleMajor + (angleStep / 2.5); 
-                const angleDom = angleMajor;
+function addGlow(id, dev) {
+  const f = el("filter", { id, x:"-60%", y:"-60%", width:"220%", height:"220%" });
+  const b = el("feGaussianBlur", { in:"SourceGraphic", stdDeviation: dev, result:"b" });
+  const m = el("feMerge");
+  ["b","SourceGraphic"].forEach(s => {
+    const n = el("feMergeNode"); n.setAttribute("in", s); m.appendChild(n);
+  });
+  f.appendChild(b); f.appendChild(m);
+  defs.appendChild(f);
+}
+addGlow("gM", 5); addGlow("gN", 4); addGlow("gD", 4); addGlow("gP", 8);
 
-                // --- POSICIONES ---
-                const posMaj = { x: radiusOuter * Math.cos(angleMajor), y: radiusOuter * Math.sin(angleMajor) };
-                const posMin = { x: radiusMid * Math.cos(angleMinor), y: radiusMid * Math.sin(angleMinor) };
-                const posDom = { x: radiusInner * Math.cos(angleDom), y: radiusInner * Math.sin(angleDom) };
+function addArrow(id, color, opacity) {
+  const m = el("marker", {
+    id, viewBox:"0 -4 8 8", refX:7, refY:0,
+    markerWidth:5, markerHeight:5, orient:"auto"
+  });
+  const p = el("path", { d:"M0,-4L8,0L0,4", fill:color, opacity });
+  m.appendChild(p);
+  defs.appendChild(m);
+}
+addArrow("aL", "#ffffff", 0.5);
+addArrow("aD", "#00d4ff", 0.65);
+addArrow("aC", "#00d4ff", 0.25);
 
-                // --- FLECHAS ---
-                // 1. Mayor -> Menor (Préstamo)
-                drawLine(posMaj, posMin, "#ffffff44");
+// ── Layers ───────────────────────────────────────────────────────────────────
+const lRings  = group("rings");
+const lLines  = group("lines");
+const lNodes  = group("nodes");
+const lLabels = group("labels");
 
-                // 2. Menor -> Siguiente Mayor (Cadena de quintas)
-                const nextI = (i + 1) % 12;
-                const nextAngleMajor = nextI * angleStep - Math.PI / 2;
-                const nextPosMaj = { x: radiusOuter * Math.cos(nextAngleMajor), y: radiusOuter * Math.sin(nextAngleMajor) };
-                drawLine(posMin, nextPosMaj, "#ffffff44");
+// Background guide rings
+const ringColors = ["#ff4d1a","#ffaa00","#00d4ff"];
+[R_MAJ, R_MIN, R_DOM].forEach((r, i) => {
+  lRings.appendChild(el("circle", {
+    cx: CX, cy: CY, r,
+    fill: "none", stroke: ringColors[i],
+    "stroke-width": 0.5, opacity: 0.13
+  }));
+});
 
-                // 3. Dominante -> Mayor y Menor (Resolución V7)
-                const domName = Tonal.Note.transpose(root, "5P") + "7";
-                drawLine(posDom, posMaj, "#00f2ffaa"); // V7 -> I
-                drawLine(posDom, posMin, "#00f2ffaa"); // V7 -> Im
+// Pointer triangle (fixed, outside rotation)
+const PX = CX, PY = CY - R_MAJ - 34, PS = 12;
+lRings.appendChild(el("polygon", {
+  points: `${PX},${PY + PS*1.1} ${PX - PS},${PY - PS*0.55} ${PX + PS},${PY - PS*0.55}`,
+  fill: "#cc00ff",
+  opacity: 0.9,
+  filter: "url(#gP)"
+}));
 
-                // 4. Cadena de dominantes (Ej: G7 -> C7)
-                const prevI = (i + 1) % 12; // En sentido antihorario o de quintas
-                const prevAngleDom = prevI * angleStep - Math.PI / 2;
-                const prevPosDom = { x: radiusInner * Math.cos(prevAngleDom), y: radiusInner * Math.sin(prevAngleDom) };
-                drawLine(prevPosDom, posDom, "#00f2ff44");
+// ── Draw scene ───────────────────────────────────────────────────────────────
+let currentAngle = 0;
+let targetAngle  = 0;
+let rafId        = null;
 
-                // --- NODOS ---
-                drawNode(posMaj.x, posMaj.y, root, "#ff4d00", 30); // Mayor
-                drawNode(posMin.x, posMin.y, root + "m", "#ffaa00", 22); // Menor
-                drawNode(posDom.x, posDom.y, domName, "#00ccff", 22); // Dominante
-            });
-        }
+function buildScene() {
+  lLines.innerHTML  = "";
+  lNodes.innerHTML  = "";
+  lLabels.innerHTML = "";
 
-        function drawLine(p1, p2, color) {
-            rotationGroup.append("line")
-                .attr("x1", p1.x)
-                .attr("y1", p1.y)
-                .attr("x2", p2.x)
-                .attr("y2", p2.y)
-                .attr("stroke", color)
-                .attr("stroke-width", 1.5)
-                .attr("marker-end", "url(#arrow-white)");
-        }
+  const rot = (currentAngle * Math.PI) / 180;
 
-        function drawNode(x, y, label, color, r) {
-            const g = rotationGroup.append("g")
-                .attr("transform", `translate(${x}, ${y})`)
-                .attr("class", "chord-group-node");
+  for (let i = 0; i < N; i++) {
+    const root  = ROOTS[i];
+    const aMaj  = i * STEP + rot - Math.PI / 2;
+    const aMin  = aMaj + STEP * 0.42;
 
-            g.append("circle")
-                .attr("r", r)
-                .attr("fill", "#000")
-                .attr("stroke", color)
-                .attr("stroke-width", 2.5);
+    const pMaj     = polar(R_MAJ, aMaj);
+    const pMin     = polar(R_MIN, aMin);
+    const pDom     = polar(R_DOM, aMaj);
 
-            g.append("text")
-                .attr("class", "chord-text")
-                .attr("text-anchor", "middle")
-                .attr("dy", "0.35em")
-                .attr("fill", color)
-                .style("font-size", (r * 0.7) + "px")
-                .text(label);
-        }
+    const nextMajA = (i + 1) * STEP + rot - Math.PI / 2;
+    const pNextMaj = polar(R_MAJ, nextMajA);
 
-        // Lógica de rotación fluida
-        const slider = document.getElementById("rotationSlider");
-        slider.addEventListener("input", (e) => {
-            const angle = e.target.value;
-            rotationGroup.attr("transform", `rotate(${angle})`);
-            
-            // Compensar rotación del texto para que no quede cabeza abajo
-            rotationGroup.selectAll(".chord-text")
-                .attr("transform", (d, i, nodes) => {
-                    return `rotate(${-angle})`;
-                });
-        });
+    const pPrevDom = polar(R_DOM, nextMajA);  // chord chain
 
-        draw();
-    </script>
+    // The dominant that resolves to this tonic is a 5th above
+    const domLabel = ROOTS[(i + 7) % 12] + "7";
+
+    // ── Arrows ──
+    arrow(pMaj,    pMin,     "aL", "#ffffff", 0.38, 1.2, r_maj, r_min);
+    arrow(pMin,    pNextMaj, "aL", "#ffffff", 0.3,  1.2, r_min, r_maj);
+    arrow(pDom,    pMaj,     "aD", "#00d4ff", 0.55, 1.6, r_dom, r_maj);
+    arrow(pDom,    pMin,     "aD", "#00d4ff", 0.3,  1.2, r_dom, r_min);
+    arrow(pPrevDom,pDom,     "aC", "#00d4ff", 0.2,  1.0, r_dom, r_dom);
+
+    // ── Nodes ──
+    node(pMaj, r_maj, root,      "#ff4d1a", "gM", `${root} Mayor — Tónica (I)`);
+    node(pMin, r_min, root+"m",  "#ffaa00", "gN", `${root}m — Relativa / Préstamo`);
+    node(pDom, r_dom, domLabel,  "#00d4ff", "gD", `${domLabel} — Dominante V7→${root}`);
+  }
+}
+
+function arrow(p1, p2, marker, color, opacity, sw, m1, m2) {
+  const dx = p2.x - p1.x, dy = p2.y - p1.y;
+  const d  = Math.sqrt(dx*dx + dy*dy) || 1;
+  const ux = dx/d, uy = dy/d;
+  lLines.appendChild(el("line", {
+    x1: p1.x + ux*(m1+2), y1: p1.y + uy*(m1+2),
+    x2: p2.x - ux*(m2+6), y2: p2.y - uy*(m2+6),
+    stroke: color, "stroke-width": sw, opacity,
+    "marker-end": `url(#${marker})`
+  }));
+}
+
+const tip = document.getElementById("tooltip");
+
+function node(pos, r, label, color, filterId, tipText) {
+  const g = el("g");
+  g.setAttribute("transform", `translate(${pos.x},${pos.y})`);
+  g.style.cursor = "pointer";
+
+  // Glow halo
+  g.appendChild(el("circle", {
+    r: r+5, fill:"none", stroke:color,
+    "stroke-width":1, opacity:0.2,
+    filter:`url(#${filterId})`
+  }));
+
+  // Body
+  const body = el("circle", {
+    r, fill:"#06060d", stroke:color,
+    "stroke-width":2, filter:`url(#${filterId})`
+  });
+  g.appendChild(body);
+
+  // Label (separate layer so it always faces up)
+  const t = el("text", {
+    x: pos.x, y: pos.y,
+    "text-anchor":"middle",
+    "dominant-baseline":"middle",
+    fill: color,
+    "font-family":"Rajdhani,'Arial Narrow',sans-serif",
+    "font-weight":"700",
+    "font-size": (r * 0.72)+"px",
+    "pointer-events":"none",
+    "letter-spacing":"-0.5px"
+  });
+  t.textContent = label;
+  lLabels.appendChild(t);
+
+  // Hover / click
+  g.addEventListener("mouseenter", e => {
+    body.setAttribute("fill", color + "22");
+    tip.textContent = tipText;
+    tip.style.opacity = 1;
+    moveTip(e);
+  });
+  g.addEventListener("mousemove", moveTip);
+  g.addEventListener("mouseleave", () => {
+    body.setAttribute("fill", "#06060d");
+    tip.style.opacity = 0;
+  });
+  g.addEventListener("click", () => {
+    body.setAttribute("fill", color + "55");
+    setTimeout(() => body.setAttribute("fill", "#06060d"), 300);
+  });
+
+  lNodes.appendChild(g);
+}
+
+function moveTip(e) {
+  tip.style.left = (e.clientX + 14) + "px";
+  tip.style.top  = (e.clientY - 30) + "px";
+}
+
+// ── Slider with smooth animation ─────────────────────────────────────────────
+document.getElementById("slider").addEventListener("input", e => {
+  targetAngle = +e.target.value;
+  document.getElementById("rotVal").textContent = targetAngle + "°";
+  if (!rafId) rafId = requestAnimationFrame(animate);
+});
+
+function animate() {
+  const diff = targetAngle - currentAngle;
+  if (Math.abs(diff) < 0.25) {
+    currentAngle = targetAngle;
+    rafId = null;
+    buildScene();
+    return;
+  }
+  currentAngle += diff * 0.18;
+  buildScene();
+  rafId = requestAnimationFrame(animate);
+}
+
+// ── Init ─────────────────────────────────────────────────────────────────────
+buildScene();
+
+// Fade-in entrance
+[lNodes, lLines, lLabels].forEach(l => {
+  l.style.opacity = "0";
+  l.style.transition = "opacity 0.8s ease";
+});
+setTimeout(() => {
+  [lNodes, lLines, lLabels].forEach(l => l.style.opacity = "1");
+}, 80);
+</script>
 </body>
 </html>
