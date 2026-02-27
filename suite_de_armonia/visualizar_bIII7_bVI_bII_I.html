@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Círculo de Quintas — bIII7→bVI△7→bII△#11→I</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@600;700&family=Share+Tech+Mono&display=swap');
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: #050508;
+    color: #fff;
+    font-family: 'Rajdhani', 'Arial Narrow', sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+    padding: 16px;
+  }
+
+  header { text-align: center; margin-bottom: 10px; }
+
+  header h1 {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 5px;
+    color: #444;
+    text-transform: uppercase;
+    margin-bottom: 3px;
+  }
+
+  header h2 {
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    color: #888;
+    font-family: 'Share Tech Mono', monospace;
+  }
+
+  /* cadence display */
+  #cadence {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 8px 0 12px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 13px;
+  }
+
+  .cstep {
+    padding: 4px 10px;
+    border-radius: 4px;
+    border: 1px solid;
+    font-weight: 600;
+    letter-spacing: 1px;
+  }
+
+  .carr { color: #444; font-size: 16px; }
+
+  #controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+    width: min(420px, 90vw);
+  }
+
+  #controls span {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: #555;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  input[type=range] {
+    flex: 1;
+    -webkit-appearance: none;
+    appearance: none;
+    height: 2px;
+    background: linear-gradient(90deg, #ff4d1a, #00aaff);
+    outline: none;
+    border-radius: 2px;
+  }
+
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 0 8px #ffffffaa, 0 0 18px #00aaff;
+    cursor: pointer;
+  }
+
+  #rotVal { width: 36px; text-align: right; }
+
+  svg { display: block; }
+
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 14px;
+    margin-top: 10px;
+    font-size: 11px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+  }
+
+  .li { display: flex; align-items: center; gap: 6px; color: #555; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; border: 2px solid; }
+
+  #tooltip {
+    position: fixed;
+    pointer-events: none;
+    background: #0c0c1aee;
+    border: 1px solid #2a2a40;
+    padding: 7px 13px;
+    border-radius: 5px;
+    font-size: 12px;
+    font-family: 'Share Tech Mono', monospace;
+    color: #bbb;
+    opacity: 0;
+    transition: opacity 0.15s;
+    z-index: 99;
+    letter-spacing: 1px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Teoría Musical · Cadencia por Sustitución</h1>
+  <h2>Círculo de Quintas</h2>
+</header>
+
+<!-- Cadence label -->
+<div id="cadence">
+  <span class="cstep" style="color:#00aaff;border-color:#00aaff33">bIII7</span>
+  <span class="carr">→</span>
+  <span class="cstep" style="color:#00e09e;border-color:#00e09e33">bVI△7</span>
+  <span class="carr">→</span>
+  <span class="cstep" style="color:#cc44ff;border-color:#cc44ff33">bII△#11</span>
+  <span class="carr">→</span>
+  <span class="cstep" style="color:#ff4d1a;border-color:#ff4d1a33">I</span>
+</div>
+
+<div id="controls">
+  <span>Rotar</span>
+  <input type="range" id="slider" min="0" max="360" value="0" step="1">
+  <span id="rotVal">0°</span>
+</div>
+
+<svg id="svg"></svg>
+
+<div class="legend">
+  <div class="li"><div class="dot" style="border-color:#ff4d1a"></div><span style="color:#888">I — Tónica</span></div>
+  <div class="li"><div class="dot" style="border-color:#cc44ff"></div><span style="color:#888">bII△#11</span></div>
+  <div class="li"><div class="dot" style="border-color:#00e09e"></div><span style="color:#888">bVI△7</span></div>
+  <div class="li"><div class="dot" style="border-color:#00aaff"></div><span style="color:#888">bIII7</span></div>
+</div>
+
+<div id="tooltip"></div>
+
+<script>
+// ── DATA ─────────────────────────────────────────────────────────────────────
+const ROOTS = ["C","G","D","A","E","B","F#","Db","Ab","Eb","Bb","F"];
+const N     = 12;
+const STEP  = (2 * Math.PI) / N;
+const NS    = "http://www.w3.org/2000/svg";
+
+// ── SIZES ────────────────────────────────────────────────────────────────────
+const SIZE  = Math.min(window.innerWidth - 32, 680);
+const W = SIZE, H = SIZE;
+const CX = W / 2, CY = H / 2;
+
+// 4 concentric rings (outer → inner)
+const R_I    = SIZE * 0.375;  // I   (tonic)
+const R_bII  = SIZE * 0.285;  // bII maj7#11
+const R_bVI  = SIZE * 0.196;  // bVI maj7
+const R_bIII = SIZE * 0.108;  // bIII 7
+
+// Node radii
+const r_I    = SIZE * 0.044;
+const r_bII  = SIZE * 0.031;
+const r_bVI  = SIZE * 0.028;
+const r_bIII = SIZE * 0.026;
+
+// ── SVG ──────────────────────────────────────────────────────────────────────
+const svg = document.getElementById("svg");
+svg.setAttribute("width",   W);
+svg.setAttribute("height",  H);
+svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+
+// ── HELPERS ──────────────────────────────────────────────────────────────────
+function el(tag, attrs) {
+  const e = document.createElementNS(NS, tag);
+  if (attrs) for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
+  return e;
+}
+function grp(id) {
+  const g = el("g", id ? { id } : {});
+  svg.appendChild(g);
+  return g;
+}
+function polar(r, a) {
+  return { x: CX + r * Math.cos(a), y: CY + r * Math.sin(a) };
+}
+
+// ── DEFS ─────────────────────────────────────────────────────────────────────
+const defs = el("defs");
+svg.appendChild(defs);
+
+function addGlow(id, dev) {
+  const f = el("filter", { id, x:"-60%", y:"-60%", width:"220%", height:"220%" });
+  const b = el("feGaussianBlur", { in:"SourceGraphic", stdDeviation: dev, result:"b" });
+  const m = el("feMerge");
+  ["b","SourceGraphic"].forEach(s => {
+    const n = el("feMergeNode"); n.setAttribute("in", s); m.appendChild(n);
+  });
+  f.appendChild(b); f.appendChild(m);
+  defs.appendChild(f);
+}
+addGlow("gI",  6);   // tonic
+addGlow("gBII",5);   // bII
+addGlow("gBVI",4);   // bVI
+addGlow("gB3", 4);   // bIII
+addGlow("gPtr",8);   // pointer
+
+function addArrow(id, color, opacity) {
+  const m = el("marker", {
+    id, viewBox:"0 -4 8 8", refX:7, refY:0,
+    markerWidth:5, markerHeight:5, orient:"auto"
+  });
+  m.appendChild(el("path", { d:"M0,-4L8,0L0,4", fill:color, opacity }));
+  defs.appendChild(m);
+}
+// Step arrows (bIII→bVI, bVI→bII)
+addArrow("aB3",  "#00aaff", 0.7);
+addArrow("aBVI", "#00e09e", 0.7);
+// Resolution arrow (bII→I) — dashed look via repeated short segments not possible in SVG marker,
+// so we use a bright solid arrow for this key resolution
+addArrow("aRes", "#cc44ff", 0.85);
+
+// ── LAYERS ───────────────────────────────────────────────────────────────────
+const lRings  = grp("rings");
+const lLines  = grp("lines");
+const lNodes  = grp("nodes");
+const lLabels = grp("labels");
+
+// Guide rings
+const ringData = [
+  { r: R_I,    c: "#ff4d1a" },
+  { r: R_bII,  c: "#cc44ff" },
+  { r: R_bVI,  c: "#00e09e" },
+  { r: R_bIII, c: "#00aaff" },
+];
+ringData.forEach(({ r, c }) => {
+  lRings.appendChild(el("circle", {
+    cx: CX, cy: CY, r,
+    fill:"none", stroke:c,
+    "stroke-width":0.5, opacity:0.15
+  }));
+});
+
+// Fixed pointer triangle at top
+const PX = CX, PY = CY - R_I - 34, PS = 12;
+lRings.appendChild(el("polygon", {
+  points: `${PX},${PY+PS*1.1} ${PX-PS},${PY-PS*0.55} ${PX+PS},${PY-PS*0.55}`,
+  fill:"#cc00ff", opacity:0.9, filter:"url(#gPtr)"
+}));
+
+// ── STATE ─────────────────────────────────────────────────────────────────────
+let currentAngle = 0, targetAngle = 0, rafId = null;
+
+// ── BUILD SCENE ───────────────────────────────────────────────────────────────
+function buildScene() {
+  lLines.innerHTML  = "";
+  lNodes.innerHTML  = "";
+  lLabels.innerHTML = "";
+
+  const rot = (currentAngle * Math.PI) / 180;
+
+  for (let i = 0; i < N; i++) {
+    const root = ROOTS[i];
+    const a    = i * STEP + rot - Math.PI / 2;
+
+    // Positions for all 4 rings at this angular slot
+    const pI    = polar(R_I,    a);
+    const pBII  = polar(R_bII,  a);
+    const pBVI  = polar(R_bVI,  a);
+    const pBIII = polar(R_bIII, a);
+
+    // The cadence step arrows go from ring[i] to the PREVIOUS slot (i-1)
+    // on the next outer ring, because:
+    //   bIII7 of tonic[j] is at position (j+9)%12
+    //   bVI△7 of tonic[j] is at position (j+8)%12  → one step back
+    //   bII△#11 of tonic[j] is at position (j+7)%12 → one more step back
+    //
+    // So reading outward: inner[i] → ring_bVI[(i-1+N)%N] → ring_bII[(i-2+N)%N] → outer[(i+5)%N... wait no:
+    //
+    // Correct targets (verified):
+    //   bIII7[i] resolves to bVI△7 at (i-1+N)%N
+    //   bVI△7[i] resolves to bII△#11 at (i-1+N)%N
+    //   bII△#11[i] resolves to I at (i+5)%N   [tritone sub jump]
+
+    const iPrev = (i - 1 + N) % N;
+    const iRes  = (i + 5) % N;
+    const aPrev = iPrev * STEP + rot - Math.PI / 2;
+    const aRes  = iRes  * STEP + rot - Math.PI / 2;
+
+    const pBVI_target = polar(R_bVI,  aPrev);   // where bIII7[i] points
+    const pBII_target = polar(R_bII,  aPrev);   // where bVI△7[i] points
+    const pI_target   = polar(R_I,    aRes);    // where bII△#11[i] points (resolution)
+
+    // ── ARROWS ──
+    // 1. bIII7 → bVI△7  (cyan → teal)
+    drawArrow(pBIII, pBVI_target, "aB3",  "#00aaff", 0.55, 1.4, r_bIII, r_bVI);
+    // 2. bVI△7 → bII△#11 (teal → purple)
+    drawArrow(pBVI,  pBII_target, "aBVI", "#00e09e", 0.55, 1.4, r_bVI,  r_bII);
+    // 3. bII△#11 → I  (purple → red, the resolution jump)
+    drawArrow(pBII,  pI_target,   "aRes", "#cc44ff", 0.65, 1.8, r_bII,  r_I);
+
+    // ── NODES ──
+    //
+    // At position i the chord's ROOT is ROOTS[i].
+    // Each ring assigns a chord quality to that root.
+    // Functional labels (what role it plays for its resolution target):
+    //   inner:  ROOTS[i]7        → bIII7 of tonic ROOTS[(i+3)%N]
+    //   ring2:  ROOTS[i]△7      → bVI△7 of tonic ROOTS[(i+4)%N]  (enharmonically)
+    //   ring3:  ROOTS[i]△#11    → bII△#11 of tonic ROOTS[(i-5+N)%N]
+    //   outer:  ROOTS[i]        → I
+
+    drawNode(pI,    r_I,    root,           "#ff4d1a", "gI",
+             `${root} — Tónica (I)`);
+    drawNode(pBII,  r_bII,  root+"△#11",   "#cc44ff", "gBII",
+             `${root}maj7#11 — bII para ${ROOTS[(i+5)%N]}`);
+    drawNode(pBVI,  r_bVI,  root+"△7",     "#00e09e", "gBVI",
+             `${root}maj7 — bVI para ${ROOTS[(i+4)%N]}`);
+    drawNode(pBIII, r_bIII, root+"7",       "#00aaff", "gB3",
+             `${root}7 — bIII para ${ROOTS[(i+3)%N]}`);
+  }
+}
+
+// ── ARROW ─────────────────────────────────────────────────────────────────────
+function drawArrow(p1, p2, marker, color, opacity, sw, m1, m2) {
+  const dx = p2.x - p1.x, dy = p2.y - p1.y;
+  const d  = Math.sqrt(dx*dx + dy*dy) || 1;
+  const ux = dx/d, uy = dy/d;
+  lLines.appendChild(el("line", {
+    x1: p1.x + ux*(m1+2),  y1: p1.y + uy*(m1+2),
+    x2: p2.x - ux*(m2+6),  y2: p2.y - uy*(m2+6),
+    stroke: color, "stroke-width": sw, opacity,
+    "marker-end": `url(#${marker})`
+  }));
+}
+
+// ── NODE ──────────────────────────────────────────────────────────────────────
+const tip = document.getElementById("tooltip");
+
+function drawNode(pos, r, label, color, filterId, tipText) {
+  const g = el("g");
+  g.setAttribute("transform", `translate(${pos.x},${pos.y})`);
+  g.style.cursor = "pointer";
+
+  // Glow halo
+  g.appendChild(el("circle", {
+    r: r+5, fill:"none", stroke:color,
+    "stroke-width":1, opacity:0.18,
+    filter:`url(#${filterId})`
+  }));
+
+  // Body
+  const body = el("circle", {
+    r, fill:"#06060d", stroke:color,
+    "stroke-width":2, filter:`url(#${filterId})`
+  });
+  g.appendChild(body);
+
+  // Label in separate layer (never rotates)
+  const fontSize = label.length > 5 ? r * 0.55 : r * 0.68;
+  const t = el("text", {
+    x: pos.x, y: pos.y,
+    "text-anchor":"middle", "dominant-baseline":"middle",
+    fill: color,
+    "font-family":"Rajdhani,'Arial Narrow',sans-serif",
+    "font-weight":"700",
+    "font-size": fontSize + "px",
+    "pointer-events":"none",
+    "letter-spacing":"-0.5px"
+  });
+  t.textContent = label;
+  lLabels.appendChild(t);
+
+  // Interactions
+  g.addEventListener("mouseenter", e => {
+    body.setAttribute("fill", color + "22");
+    tip.textContent = tipText;
+    tip.style.opacity = 1;
+    moveTip(e);
+  });
+  g.addEventListener("mousemove", moveTip);
+  g.addEventListener("mouseleave", () => {
+    body.setAttribute("fill", "#06060d");
+    tip.style.opacity = 0;
+  });
+  g.addEventListener("click", () => {
+    body.setAttribute("fill", color + "55");
+    setTimeout(() => body.setAttribute("fill", "#06060d"), 320);
+  });
+
+  lNodes.appendChild(g);
+}
+
+function moveTip(e) {
+  tip.style.left = (e.clientX + 14) + "px";
+  tip.style.top  = (e.clientY - 30) + "px";
+}
+
+// ── SLIDER ────────────────────────────────────────────────────────────────────
+document.getElementById("slider").addEventListener("input", e => {
+  targetAngle = +e.target.value;
+  document.getElementById("rotVal").textContent = targetAngle + "°";
+  if (!rafId) rafId = requestAnimationFrame(animate);
+});
+
+function animate() {
+  const diff = targetAngle - currentAngle;
+  if (Math.abs(diff) < 0.25) {
+    currentAngle = targetAngle;
+    rafId = null;
+    buildScene();
+    return;
+  }
+  currentAngle += diff * 0.18;
+  buildScene();
+  rafId = requestAnimationFrame(animate);
+}
+
+// ── INIT ──────────────────────────────────────────────────────────────────────
+buildScene();
+
+[lNodes, lLines, lLabels].forEach(l => {
+  l.style.opacity = "0";
+  l.style.transition = "opacity 0.9s ease";
+});
+setTimeout(() => [lNodes, lLines, lLabels].forEach(l => l.style.opacity = "1"), 80);
+</script>
+</body>
+</html>
