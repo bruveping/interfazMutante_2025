@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Círculo de Armonía - Progresión y Dominantes</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tonaljs/tonal/browser/tonal.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            background-color: #000;
+            color: #fff;
+            font-family: 'Courier New', Courier, monospace;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        #controls {
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .slider-container {
+            width: 350px;
+            margin: 10px auto;
+        }
+
+        input[type=range] {
+            width: 100%;
+            accent-color: #00f2ff;
+        }
+
+        .marker {
+            fill: #ff00ff;
+            filter: drop-shadow(0 0 8px #ff00ff);
+        }
+
+        .chord-text {
+            font-weight: bold;
+            pointer-events: none;
+            text-shadow: 1px 1px 2px #000;
+        }
+
+        .info {
+            position: absolute;
+            bottom: 20px;
+            font-size: 12px;
+            color: #666;
+            text-transform: uppercase;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="controls">
+        <h1 style="letter-spacing: 5px; color: #fff;">ROTAR</h1>
+        <div class="slider-container">
+            <input type="range" id="rotationSlider" min="0" max="360" value="0">
+        </div>
+    </div>
+
+    <div id="canvas-container"></div>
+
+    <div class="info">
+        Rojo: Mayor | Naranja: Menor | Azul: Dominante 7
+    </div>
+
+    <script>
+        const width = 800;
+        const height = 800;
+        const centerX = width / 2;
+        const centerY = height / 2;
+
+        const svg = d3.select("#canvas-container")
+            .append("svg")
+            .attr("width", width)
+            .attr("height", height)
+            .attr("viewBox", `0 0 ${width} ${height}`);
+
+        // Marcador fijo superior
+        svg.append("path")
+            .attr("d", d3.symbol().type(d3.symbolTriangle).size(600))
+            .attr("transform", `translate(${centerX}, ${centerY - 320}) rotate(180)`)
+            .attr("class", "marker");
+
+        const mainGroup = svg.append("g")
+            .attr("transform", `translate(${centerX}, ${centerY})`);
+
+        // Definición de puntas de flecha
+        const defs = svg.append("defs");
+        defs.append("marker")
+            .attr("id", "arrow-white")
+            .attr("viewBox", "0 -5 10 10")
+            .attr("refX", 25)
+            .attr("refY", 0)
+            .attr("markerWidth", 5)
+            .attr("markerHeight", 5)
+            .attr("orient", "auto")
+            .append("path")
+            .attr("d", "M0,-5L10,0L0,5")
+            .attr("fill", "#ffffffaa");
+
+        const rotationGroup = mainGroup.append("g");
+
+        // Datos: Círculo de quintas (12 pasos)
+        const roots = ["C", "G", "D", "A", "E", "B", "F#", "Db", "Ab", "Eb", "Bb", "F"];
+        const radiusOuter = 260;  // Mayores
+        const radiusMid = 260;    // Menores (alineados circularmente)
+        const radiusInner = 140;  // Dominantes
+
+        function draw() {
+            rotationGroup.selectAll("*").remove();
+
+            roots.forEach((root, i) => {
+                const angleStep = (2 * Math.PI) / 12;
+                const angleMajor = i * angleStep - Math.PI / 2;
+                // Menores están a medio camino del siguiente paso de quinta
+                const angleMinor = angleMajor + (angleStep / 2.5); 
+                const angleDom = angleMajor;
+
+                // --- POSICIONES ---
+                const posMaj = { x: radiusOuter * Math.cos(angleMajor), y: radiusOuter * Math.sin(angleMajor) };
+                const posMin = { x: radiusMid * Math.cos(angleMinor), y: radiusMid * Math.sin(angleMinor) };
+                const posDom = { x: radiusInner * Math.cos(angleDom), y: radiusInner * Math.sin(angleDom) };
+
+                // --- FLECHAS ---
+                // 1. Mayor -> Menor (Préstamo)
+                drawLine(posMaj, posMin, "#ffffff44");
+
+                // 2. Menor -> Siguiente Mayor (Cadena de quintas)
+                const nextI = (i + 1) % 12;
+                const nextAngleMajor = nextI * angleStep - Math.PI / 2;
+                const nextPosMaj = { x: radiusOuter * Math.cos(nextAngleMajor), y: radiusOuter * Math.sin(nextAngleMajor) };
+                drawLine(posMin, nextPosMaj, "#ffffff44");
+
+                // 3. Dominante -> Mayor y Menor (Resolución V7)
+                const domName = Tonal.Note.transpose(root, "5P") + "7";
+                drawLine(posDom, posMaj, "#00f2ffaa"); // V7 -> I
+                drawLine(posDom, posMin, "#00f2ffaa"); // V7 -> Im
+
+                // 4. Cadena de dominantes (Ej: G7 -> C7)
+                const prevI = (i + 1) % 12; // En sentido antihorario o de quintas
+                const prevAngleDom = prevI * angleStep - Math.PI / 2;
+                const prevPosDom = { x: radiusInner * Math.cos(prevAngleDom), y: radiusInner * Math.sin(prevAngleDom) };
+                drawLine(prevPosDom, posDom, "#00f2ff44");
+
+                // --- NODOS ---
+                drawNode(posMaj.x, posMaj.y, root, "#ff4d00", 30); // Mayor
+                drawNode(posMin.x, posMin.y, root + "m", "#ffaa00", 22); // Menor
+                drawNode(posDom.x, posDom.y, domName, "#00ccff", 22); // Dominante
+            });
+        }
+
+        function drawLine(p1, p2, color) {
+            rotationGroup.append("line")
+                .attr("x1", p1.x)
+                .attr("y1", p1.y)
+                .attr("x2", p2.x)
+                .attr("y2", p2.y)
+                .attr("stroke", color)
+                .attr("stroke-width", 1.5)
+                .attr("marker-end", "url(#arrow-white)");
+        }
+
+        function drawNode(x, y, label, color, r) {
+            const g = rotationGroup.append("g")
+                .attr("transform", `translate(${x}, ${y})`)
+                .attr("class", "chord-group-node");
+
+            g.append("circle")
+                .attr("r", r)
+                .attr("fill", "#000")
+                .attr("stroke", color)
+                .attr("stroke-width", 2.5);
+
+            g.append("text")
+                .attr("class", "chord-text")
+                .attr("text-anchor", "middle")
+                .attr("dy", "0.35em")
+                .attr("fill", color)
+                .style("font-size", (r * 0.7) + "px")
+                .text(label);
+        }
+
+        // Lógica de rotación fluida
+        const slider = document.getElementById("rotationSlider");
+        slider.addEventListener("input", (e) => {
+            const angle = e.target.value;
+            rotationGroup.attr("transform", `rotate(${angle})`);
+            
+            // Compensar rotación del texto para que no quede cabeza abajo
+            rotationGroup.selectAll(".chord-text")
+                .attr("transform", (d, i, nodes) => {
+                    return `rotate(${-angle})`;
+                });
+        });
+
+        draw();
+    </script>
+</body>
+</html>
