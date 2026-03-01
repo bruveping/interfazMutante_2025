@@ -23,26 +23,28 @@
         .node-label { font-weight: 900; font-size: 13px; pointer-events: none; text-shadow: 0 2px 4px rgba(0,0,0,0.8); }
         .active-step { stroke: #38bdf8 !important; stroke-width: 8px; filter: drop-shadow(0 0 15px #38bdf8); }
         
-        /* Tipografía específica para el input para evitar confusión visual */
         .harmony-input {
             font-family: 'JetBrains Mono', 'ui-monospace', monospace;
-            text-transform: none !important; /* Asegura que se vea tal cual se escribe */
+            text-transform: none !important;
         }
         
         input::placeholder { color: #475569; }
+
+        .custom-scroll::-webkit-scrollbar { width: 4px; }
+        .custom-scroll::-webkit-scrollbar-track { background: transparent; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
     </style>
 </head>
 <body>
 
-<div class="absolute top-6 left-6 z-50 flex flex-col gap-4 w-96">
-    <div class="ui-panel p-6 shadow-2xl space-y-5">
+<div class="absolute top-6 left-6 z-50 flex flex-col gap-4 w-96 max-h-[90vh]">
+    <div class="ui-panel p-6 shadow-2xl space-y-5 overflow-y-auto custom-scroll">
         <header>
             <h1 class="text-sky-400 font-black text-2xl uppercase tracking-tighter italic leading-none">Armonía Pro</h1>
             <p class="text-slate-500 text-[10px] mt-1 uppercase font-bold tracking-widest">Generador MIDI con Cifrado Funcional</p>
         </header>
 
         <div class="grid grid-cols-2 gap-3">
-            <!-- Selector de Tonalidad -->
             <div class="flex flex-col gap-1 bg-slate-800/40 p-3 rounded-xl border border-slate-700/50">
                 <span class="text-[9px] font-black uppercase text-slate-500">Tonalidad Central</span>
                 <select id="key-selector" onchange="processProgression()" class="bg-transparent text-sky-400 font-bold text-sm outline-none cursor-pointer">
@@ -53,7 +55,6 @@
                 </select>
             </div>
 
-            <!-- Ritmo Armónico -->
             <div class="flex flex-col gap-1 bg-slate-800/40 p-3 rounded-xl border border-slate-700/50">
                 <span class="text-[9px] font-black uppercase text-slate-500">Ritmo</span>
                 <select id="rhythm-selector" onchange="processProgression()" class="bg-transparent text-emerald-400 font-bold text-sm outline-none cursor-pointer">
@@ -64,24 +65,21 @@
             </div>
         </div>
 
-        <!-- Input de Progresión -->
         <div class="space-y-2">
             <div class="flex justify-between items-end">
                 <label class="text-[10px] font-black uppercase text-slate-500">Progresión (I ii bIII IV...)</label>
                 <span class="text-[9px] text-slate-600 font-mono">Sensible a mayúsculas</span>
             </div>
             <input type="text" id="progression-input" 
-                value="I ii bIII IV V bVI bVII I"
+                value="I IV Vaug I ii V7#11 I"
                 class="harmony-input w-full bg-slate-950/50 border border-slate-700 rounded-xl p-4 text-sky-300 text-base tracking-widest outline-none focus:border-sky-500 transition-colors shadow-inner"
                 oninput="processProgression()"
                 spellcheck="false"
                 autocomplete="off">
         </div>
 
-        <!-- Preview Real -->
         <div id="chord-preview" class="flex flex-wrap gap-1.5 min-h-[44px] p-3 bg-slate-900/80 rounded-xl border border-slate-800"></div>
 
-        <!-- Botones de Acción -->
         <div class="grid grid-cols-2 gap-3 pt-2">
             <button id="btn-play" onclick="playFullSequence()" class="bg-sky-600 hover:bg-sky-500 text-white font-black py-4 rounded-xl flex items-center justify-center gap-2 text-xs transition-all active:scale-95 shadow-lg shadow-sky-900/20">
                 <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M11.596 8.697-6.363 3.692c-.54.313-1.233-.066-1.233-.697V4.308c0-.63.692-1.01 1.233-.696l6.363 3.692a.802.802 0 0 1 0 1.393z"/></svg>
@@ -92,13 +90,33 @@
                 BAJAR MIDI
             </button>
         </div>
+
+        <div class="pt-4 border-t border-slate-800 space-y-3">
+            <h3 class="text-[10px] font-black uppercase text-slate-400 tracking-wider">Diccionario de Referencia</h3>
+            <div class="text-[11px] leading-relaxed text-slate-500 space-y-2">
+                <p>
+                    <strong class="text-slate-300">Cualidad:</strong> 
+                    Mayúsculas: <span class="text-sky-400">Mayor</span>. Minúsculas: <span class="text-emerald-400">Menor</span>.
+                </p>
+                <p>
+                    <strong class="text-slate-300">Nuevos Colores:</strong> 
+                    <code class="text-amber-400">aug</code> (Aumentado: 1 3 #5), <code class="text-amber-400">7#11</code> (Lidio Dom: 1 3 5 b7 #11).
+                </p>
+                <p>
+                    <strong class="text-slate-300">Sufijos:</strong> 
+                    <code class="text-sky-300">7</code>, <code class="text-sky-300">maj7</code>, <code class="text-sky-300">m7</code>, <code class="text-sky-300">dim</code>, <code class="text-sky-300">alt</code>.
+                </p>
+                <p class="italic text-[10px] text-slate-600">
+                    Ejemplo: <span class="text-slate-400">I Vaug vi IV7#11</span>
+                </p>
+            </div>
+        </div>
     </div>
 </div>
 
 <div id="visualizer" class="w-full h-screen"></div>
 
 <script>
-    // --- MOTOR ARMONICO MEJORADO ---
     const BASE_ROMAN = {
         'I': 0, 'II': 2, 'III': 4, 'IV': 5, 'V': 7, 'VI': 9, 'VII': 11
     };
@@ -111,6 +129,7 @@
         'm7': [0, 3, 7, 10],
         'dim': [0, 3, 6],
         'aug': [0, 4, 8],
+        '7#11': [0, 4, 7, 10, 18], // 18 semitonos = 4ta aumentada en octava arriba (11#) o simplemente 6 semitonos si es cerrada
         'alt': [0, 4, 10, 13, 15]
     };
 
@@ -122,31 +141,27 @@
         let str = input.trim();
         if (!str) return null;
 
-        // 1. Detectar Alteración (b o #)
         let accidentalOffset = 0;
         if (str.startsWith('b')) { accidentalOffset = -1; str = str.substring(1); }
         else if (str.startsWith('#')) { accidentalOffset = 1; str = str.substring(1); }
 
-        // 2. Extraer Raíz Romana y Sufijo (Soporta mayúsculas y minúsculas)
         let match = str.match(/^(IV|III|II|I|VII|VI|V)/i);
         if (!match) return null;
 
         let roman = match[0];
         let suffix = str.substring(roman.length);
         
-        // La clave: Comprobamos si el fragmento romano es minúsculas para determinar la calidad
         let isLower = (roman === roman.toLowerCase());
         let romanKey = roman.toUpperCase();
 
-        // 3. Calcular Semitono de la Raíz
         let rootPos = (BASE_ROMAN[romanKey] + accidentalOffset + 12) % 12;
 
-        // 4. Determinar Calidad (Intervalos)
-        // Por defecto: Mayúscula -> Mayor, Minúscula -> Menor
         let intervals = isLower ? CHORD_INTERVALS['min'] : CHORD_INTERVALS['maj'];
         
-        // Sobreescribir con sufijos específicos si existen
-        if (suffix.includes('maj7')) intervals = CHORD_INTERVALS['maj7'];
+        // Priorizar sufijos específicos
+        if (suffix.includes('7#11')) intervals = CHORD_INTERVALS['7#11'];
+        else if (suffix.includes('aug')) intervals = CHORD_INTERVALS['aug'];
+        else if (suffix.includes('maj7')) intervals = CHORD_INTERVALS['maj7'];
         else if (suffix.includes('m7')) intervals = CHORD_INTERVALS['m7'];
         else if (suffix.includes('7')) intervals = CHORD_INTERVALS['7'];
         else if (suffix === 'm') intervals = CHORD_INTERVALS['min'];
@@ -157,15 +172,16 @@
             original: input,
             root: rootPos,
             intervals: intervals,
-            color: getTensionColor(romanKey, accidentalOffset, isLower)
+            color: getTensionColor(romanKey, accidentalOffset, isLower, suffix)
         };
     }
 
-    function getTensionColor(roman, accidental, isMinor) {
-        if (roman === 'V') return '#ef4444'; // Dominante
-        if (accidental !== 0) return '#a855f7'; // Intercambio modal
-        if (roman === 'I') return '#10b981'; // Tónica
-        return '#f59e0b'; // Otros
+    function getTensionColor(roman, accidental, isMinor, suffix) {
+        if (suffix.includes('aug') || suffix.includes('#11')) return '#f472b6'; // Rosa para tensiones lidias/aug
+        if (roman === 'V') return '#ef4444'; 
+        if (accidental !== 0) return '#a855f7'; 
+        if (roman === 'I') return '#10b981'; 
+        return '#f59e0b'; 
     }
 
     function processProgression() {
@@ -185,6 +201,8 @@
             
             let label = noteName;
             if (chord.intervals === CHORD_INTERVALS['min']) label += "m";
+            else if (chord.intervals === CHORD_INTERVALS['aug']) label += "aug";
+            else if (chord.intervals === CHORD_INTERVALS['7#11']) label += "7(#11)";
             else if (chord.intervals === CHORD_INTERVALS['maj7']) label += "maj7";
             else if (chord.intervals === CHORD_INTERVALS['m7']) label += "m7";
             else if (chord.intervals === CHORD_INTERVALS['7']) label += "7";
@@ -197,7 +215,6 @@
         renderVisualization();
     }
 
-    // --- AUDIO & MIDI ---
     async function playFullSequence() {
         if (activeProgression.length === 0) return;
         if (audioCtx.state === 'suspended') await audioCtx.resume();
@@ -276,7 +293,6 @@
         a.click();
     }
 
-    // --- VISUALIZACIÓN ---
     const svg = d3.select("#visualizer").append("svg").attr("width", "100%").attr("height", "100%");
     const gLines = svg.append("g");
     const gNodes = svg.append("g");
