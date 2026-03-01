@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tonnetz: Análisis de Cadencias</title>
+    <style>
+        :root {
+            --bg-color: #020617;
+            --grid-color: #1e293b;
+            --line-color: #22d3ee;
+            --text-color: #f8fafc;
+            --accent-color: #38bdf8;
+            --triad-color: rgba(56, 189, 248, 0.05);
+            --active-color: #f97316;
+            --node-size: 50px;
+            --panel-bg: rgba(15, 23, 42, 0.9);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        header {
+            padding: 1rem;
+            background: var(--panel-bg);
+            border-bottom: 1px solid var(--grid-color);
+            z-index: 100;
+            text-align: center;
+        }
+
+        /* Panel de Salida de Cadencia */
+        #cadence-display {
+            background: rgba(0, 0, 0, 0.4);
+            padding: 15px;
+            margin: 10px auto;
+            max-width: 800px;
+            border-radius: 12px;
+            border: 1px dashed var(--accent-color);
+            min-height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            flex-wrap: wrap;
+            font-size: 1.2rem;
+            font-weight: bold;
+        }
+
+        .chord-tag {
+            background: var(--active-color);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 4px;
+            animation: pop 0.3s ease-out;
+        }
+
+        @keyframes pop {
+            0% { transform: scale(0.8); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        #canvas-container {
+            flex-grow: 1;
+            position: relative;
+            cursor: grab;
+            overflow: hidden;
+        }
+
+        #tonnetz {
+            position: absolute;
+            top: 0; left: 0;
+            transform-origin: 0 0;
+        }
+
+        .node {
+            position: absolute;
+            width: var(--node-size);
+            height: var(--node-size);
+            background: #1e293b;
+            border: 2px solid #334155;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 0.85rem;
+            z-index: 10;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+        }
+
+        svg {
+            position: absolute;
+            top: 0; left: 0;
+            width: 10000px; height: 10000px;
+            z-index: 1;
+        }
+
+        line {
+            stroke: var(--line-color);
+            stroke-width: 4.5;
+            stroke-linecap: round;
+            opacity: 0.4;
+        }
+
+        .triad {
+            fill: var(--triad-color);
+            stroke: none;
+            cursor: pointer;
+            pointer-events: auto;
+            transition: fill 0.2s;
+        }
+
+        .triad:hover { fill: rgba(255, 255, 255, 0.1); }
+        .triad.active { fill: var(--active-color); fill-opacity: 0.7; }
+
+        .controls {
+            position: fixed;
+            bottom: 2rem; right: 2rem;
+            display: flex; flex-direction: column; gap: 10px;
+            z-index: 100;
+        }
+
+        .btn {
+            background: var(--accent-color);
+            color: #000; border: none;
+            padding: 10px 20px; border-radius: 6px;
+            font-weight: bold; cursor: pointer;
+            transition: transform 0.1s;
+        }
+        .btn:active { transform: scale(0.95); }
+        .btn.secondary { background: #94a3b8; }
+
+        .legend {
+            position: fixed;
+            bottom: 2rem; left: 2rem;
+            background: var(--panel-bg);
+            padding: 1rem; border-radius: 8px;
+            border: 1px solid var(--grid-color);
+            font-size: 0.8rem; z-index: 100;
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Analizador de Progresiones Tonnetz</h1>
+    <div id="cadence-display">
+        <span style="color: #64748b; font-weight: normal;">Selecciona triángulos para ver la cadencia...</span>
+    </div>
+</header>
+
+<div id="canvas-container">
+    <div id="tonnetz">
+        <svg id="connections-layer"></svg>
+        <div id="nodes-layer"></div>
+    </div>
+</div>
+
+<div class="legend">
+    <div><b>Análisis:</b></div>
+    <p>Triángulo apuntando arriba ▲: <b>Tríada Mayor</b></p>
+    <p>Triángulo apuntando abajo ▼: <b>Tríada Menor</b></p>
+    <div style="margin-top:8px; color:var(--active-color)"><i>Haz clic en las caras para sumar acordes.</i></div>
+</div>
+
+<div class="controls">
+    <button class="btn" onclick="downloadCadence()">📥 Descargar TXT</button>
+    <button class="btn secondary" onclick="clearSelections()">Reiniciar Cadencia</button>
+    <button class="btn secondary" onclick="resetView()">Centrar Red</button>
+</div>
+
+<script>
+    const notes = ['Do', 'Do#', 'Re', 'Re#', 'Mi', 'Fa', 'Fa#', 'Sol', 'Sol#', 'La', 'La#', 'Si'];
+    
+    const ROWS = 8;
+    const COLS = 12;
+    const SPACING_X = 120;
+    const SPACING_Y = 100;
+    const OBLIQUE_OFFSET = 60;
+
+    const tonnetz = document.getElementById('tonnetz');
+    const nodesLayer = document.getElementById('nodes-layer');
+    const svg = document.getElementById('connections-layer');
+    const container = document.getElementById('canvas-container');
+    const cadenceDisplay = document.getElementById('cadence-display');
+
+    let translateX = 0, translateY = 0;
+    let isDragging = false, lastX, lastY;
+    let chordSequence = [];
+
+    function init() {
+        const grid = [];
+        for (let r = 0; r < ROWS; r++) {
+            grid[r] = [];
+            for (let c = 0; c < COLS; c++) {
+                let noteVal = (c * 7 + r * 4) % 12;
+                if (noteVal < 0) noteVal += 12;
+                const posX = c * SPACING_X + (r * OBLIQUE_OFFSET);
+                const posY = r * SPACING_Y;
+                grid[r][c] = { x: posX, y: posY, note: notes[noteVal], val: noteVal };
+
+                const node = document.createElement('div');
+                node.className = 'node';
+                node.innerText = notes[noteVal];
+                node.style.left = `${posX}px`;
+                node.style.top = `${posY}px`;
+                nodesLayer.appendChild(node);
+            }
+        }
+
+        for (let r = 0; r < ROWS; r++) {
+            for (let c = 0; c < COLS; c++) {
+                const p1 = grid[r][c];
+                if (c < COLS - 1) createLine(p1.x, p1.y, grid[r][c+1].x, grid[r][c+1].y);
+                if (r < ROWS - 1) createLine(p1.x, p1.y, grid[r+1][c].x, grid[r+1][c].y);
+                if (r < ROWS - 1 && c > 0) createLine(p1.x, p1.y, grid[r+1][c-1].x, grid[r+1][c-1].y);
+
+                if (r < ROWS - 1 && c < COLS - 1) createTriangle(p1, grid[r][c+1], grid[r+1][c], 'major');
+                if (r > 0 && c < COLS - 1) createTriangle(p1, grid[r][c+1], grid[r-1][c+1], 'minor');
+            }
+        }
+        resetView();
+    }
+
+    function createLine(x1, y1, x2, y2) {
+        const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+        line.setAttribute("x1", x1); line.setAttribute("y1", y1);
+        line.setAttribute("x2", x2); line.setAttribute("y2", y2);
+        svg.appendChild(line);
+    }
+
+    function createTriangle(p1, p2, p3, type) {
+        const poly = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
+        poly.setAttribute("points", `${p1.x},${p1.y} ${p2.x},${p2.y} ${p3.x},${p3.y}`);
+        poly.setAttribute("class", "triad");
+        
+        const chordName = identifyChord([p1.val, p2.val, p3.val], type);
+
+        poly.onclick = (e) => {
+            e.stopPropagation();
+            if (!poly.classList.contains('active')) {
+                poly.classList.add('active');
+                chordSequence.push(chordName);
+            } else {
+                poly.classList.remove('active');
+                const index = chordSequence.indexOf(chordName);
+                if (index > -1) chordSequence.splice(index, 1);
+            }
+            updateCadenceDisplay();
+        };
+        svg.appendChild(poly);
+    }
+
+    function identifyChord(vals, type) {
+        for(let root of vals) {
+            const third = type === 'major' ? (root + 4) % 12 : (root + 3) % 12;
+            const fifth = (root + 7) % 12;
+            if (vals.includes(third) && vals.includes(fifth)) {
+                return notes[root] + (type === 'major' ? '' : 'm');
+            }
+        }
+        return "Acc";
+    }
+
+    function updateCadenceDisplay() {
+        if (chordSequence.length === 0) {
+            cadenceDisplay.innerHTML = '<span style="color: #64748b; font-weight: normal;">Selecciona triángulos para ver la cadencia...</span>';
+            return;
+        }
+        cadenceDisplay.innerHTML = chordSequence.map((chord, i) => `
+            <div class="chord-tag">${chord}</div>
+            ${i < chordSequence.length - 1 ? '<span style="color:var(--accent-color)">→</span>' : ''}
+        `).join('');
+    }
+
+    function downloadCadence() {
+        if (chordSequence.length === 0) return;
+        
+        const text = "Progresión Armónica Tonnetz:\n\n" + chordSequence.join(" → ");
+        const blob = new Blob([text], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'progresion_tonnetz.txt';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
+
+    function clearSelections() {
+        document.querySelectorAll('.triad.active').forEach(el => el.classList.remove('active'));
+        chordSequence = [];
+        updateCadenceDisplay();
+    }
+
+    function resetView() {
+        translateX = (container.clientWidth - (COLS * SPACING_X)) / 2;
+        translateY = (container.clientHeight - (ROWS * SPACING_Y)) / 2;
+        updateTransform();
+    }
+
+    function updateTransform() {
+        tonnetz.style.transform = `translate(${translateX}px, ${translateY}px)`;
+    }
+
+    container.onmousedown = e => { isDragging = true; lastX = e.clientX; lastY = e.clientY; container.style.cursor = 'grabbing'; };
+    window.onmousemove = e => {
+        if (!isDragging) return;
+        translateX += e.clientX - lastX;
+        translateY += e.clientY - lastY;
+        lastX = e.clientX; lastY = e.clientY;
+        updateTransform();
+    };
+    window.onmouseup = () => { isDragging = false; container.style.cursor = 'grab'; };
+
+    window.onload = init;
+</script>
+
+</body>
+</html>
