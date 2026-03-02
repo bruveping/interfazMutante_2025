@@ -76,6 +76,9 @@ leer_cbr_cbz_pdf_jpg02 [leer_cbr_cbz_pdf_jpg](https://bruveping.github.io/interf
 
 generador_lorem_ipsum [generador_lorem_ipsum](https://bruveping.github.io/interfazMutante_2025/generador_lorem_ipsum/)
 
+simple_explorador_de_idas [/simple_explorador_de_idas](https://bruveping.github.io/interfazMutante_2025/simple_explorador_de_idas/)
+
+
 
 
 
