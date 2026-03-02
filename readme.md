@@ -74,7 +74,8 @@ leer_cbr_cbz_pdf_jpg02 [leer_cbr_cbz_pdf_jpg](https://bruveping.github.io/interf
 
 /lector_cbz/ [/lector_cbz/](https://bruveping.github.io/interfazMutante_2025/lector_cbz/)
 
-generador_lorem_ipsum [generador_lorem_ipsum](https://bruveping.github.io/generador_lorem_ipsum/)
+generador_lorem_ipsum [generador_lorem_ipsum](https://bruveping.github.io/interfazMutante_2025/generador_lorem_ipsum/)
+
 
 
 
