@@ -370,8 +370,8 @@
                 filterNode.type = 'lowpass';
                 
                 // Safe creation of analyzer
-                if (typeof audioCtx.createAnalyzer === 'function') {
-                    analyzer = audioCtx.createAnalyzer();
+                if (typeof audioCtx.createAnalyser === 'function') {
+                    analyzer = audioCtx.createAnalyser();
                     analyzer.fftSize = 1024;
                 } else {
                     console.warn("Analyzer not supported");
