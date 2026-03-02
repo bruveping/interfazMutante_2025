@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generador Lorem Ipsum Profesional</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background-color: #f3f4f6;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        /* Estilo para la sábana de texto continua */
+        .text-sheet {
+            background: white;
+            width: 100%;
+            min-height: 80vh;
+            padding: 3rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            border-radius: 0.75rem;
+            box-sizing: border-box;
+        }
+
+        .lorem-content {
+            font-size: 1.125rem;
+            line-height: 1.75;
+            text-align: justify;
+            word-wrap: break-word;
+            color: #1f2937;
+        }
+
+        .controls-panel {
+            max-height: 95vh;
+            overflow-y: auto;
+        }
+
+        input::-webkit-outer-spin-button,
+        input::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #111827;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            display: none;
+            z-index: 1000;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+
+        .stat-card {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            padding: 0.75rem;
+            border-radius: 0.5rem;
+            text-align: center;
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+
+    <div id="toast" class="toast text-sm font-medium">Copiado al portapapeles</div>
+
+    <div class="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-8">
+        
+        <!-- Panel de Controles -->
+        <aside class="controls-panel bg-white p-6 rounded-xl shadow-lg h-fit sticky top-8">
+            <h2 class="text-2xl font-bold mb-4 border-b pb-2 text-indigo-700">Generador de Texto</h2>
+
+            <!-- Estadísticas -->
+            <div class="grid grid-cols-3 gap-2 mb-6">
+                <div class="stat-card">
+                    <p class="text-[10px] uppercase font-bold text-gray-400">Palabras</p>
+                    <p id="statWords" class="text-indigo-600 font-bold text-lg">0</p>
+                </div>
+                <div class="stat-card">
+                    <p class="text-[10px] uppercase font-bold text-gray-400">C. sin esp</p>
+                    <p id="statChars" class="text-indigo-600 font-bold text-lg">0</p>
+                </div>
+                <div class="stat-card">
+                    <p class="text-[10px] uppercase font-bold text-gray-400">C. con esp</p>
+                    <p id="statCharsSpace" class="text-indigo-600 font-bold text-lg">0</p>
+                </div>
+            </div>
+
+            <!-- Sección de Contenido -->
+            <section class="mb-8 p-5 bg-indigo-50 rounded-xl border border-indigo-100">
+                <h3 class="text-sm font-bold uppercase text-indigo-600 mb-4 tracking-wider italic">Configuración</h3>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-semibold mb-1 uppercase text-gray-600">Tipo de Medida</label>
+                        <select id="measureType" class="w-full p-2.5 text-sm border rounded-lg outline-none focus:ring-2 focus:ring-indigo-400 transition-all">
+                            <option value="words">Palabras</option>
+                            <option value="chars">Caracteres (sin espacios)</option>
+                            <option value="charsWithSpace">Caracteres (con espacios)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold mb-1 uppercase text-gray-600">Cantidad Objetivo</label>
+                        <input type="number" id="measureValue" value="800" min="1" class="w-full p-2.5 text-lg border-2 border-indigo-200 rounded-lg font-bold text-indigo-700 focus:border-indigo-500 outline-none transition-all">
+                        <p class="text-[10px] text-indigo-400 mt-2 italic">Corrección: El conteo de caracteres ahora incluye los signos de puntuación.</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Acciones -->
+            <div class="flex flex-col gap-3">
+                <button onclick="copyToClipboard()" class="w-full bg-indigo-600 text-white font-bold py-3.5 rounded-lg hover:bg-indigo-700 transition flex items-center justify-center gap-2 shadow-lg active:scale-[0.98]">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                    Copiar Texto
+                </button>
+                <button onclick="downloadTxt()" class="w-full border-2 border-indigo-600 text-indigo-700 font-bold py-3 rounded-lg hover:bg-indigo-50 transition flex items-center justify-center gap-2 active:scale-[0.98]">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                    Descargar .txt
+                </button>
+            </div>
+        </aside>
+
+        <!-- Área de Texto Continua (Sábana) -->
+        <main class="lg:col-span-2">
+            <div class="text-sheet">
+                <div id="loremOutput" class="lorem-content"></div>
+            </div>
+        </main>
+
+    </div>
+
+    <script>
+        // Array base con puntuación original
+        const LOREM_WORDS = "lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.".split(" ");
+
+        let currentGeneratedText = "";
+
+        function generateLorem(targetValue, type) {
+            let result = [];
+            let currentCount = 0;
+            let i = 0;
+            let capitalizeNext = true;
+
+            if (targetValue <= 0) return "";
+
+            while (true) {
+                let wordTemplate = LOREM_WORDS[i % LOREM_WORDS.length];
+                let word = wordTemplate;
+                
+                if (capitalizeNext) {
+                    word = word.charAt(0).toUpperCase() + word.slice(1);
+                    capitalizeNext = false;
+                }
+
+                if (word.endsWith('.')) {
+                    capitalizeNext = true;
+                }
+
+                // Definir incremento basado en el tipo
+                let increment = 0;
+                if (type === 'words') {
+                    increment = 1;
+                } else if (type === 'chars') {
+                    // Ahora contamos todo excepto espacios
+                    increment = word.length; 
+                } else if (type === 'charsWithSpace') {
+                    increment = word.length + 1;
+                }
+
+                if (currentCount + increment > targetValue && currentCount > 0) break;
+
+                result.push(word);
+                currentCount += increment;
+                i++;
+            }
+
+            let text = result.join(" ");
+
+            if (text.endsWith('.') || text.endsWith(',')) {
+                text = text.slice(0, -1);
+            }
+
+            return text;
+        }
+
+        function updateStats(text) {
+            const words = text.trim() === "" ? 0 : text.trim().split(/\s+/).length;
+            
+            // CORRECCIÓN: Contamos todo lo que NO sea un espacio en blanco (\S)
+            // Esto incluye letras, números y SIGNOS de puntuación.
+            const charsNoSpaceMatch = text.match(/\S/g);
+            const charsNoSpace = charsNoSpaceMatch ? charsNoSpaceMatch.length : 0;
+            
+            const charsWithSpace = text.length;
+
+            document.getElementById('statWords').innerText = words.toLocaleString();
+            document.getElementById('statChars').innerText = charsNoSpace.toLocaleString();
+            document.getElementById('statCharsSpace').innerText = charsWithSpace.toLocaleString();
+        }
+
+        function updateUI() {
+            const measureType = document.getElementById('measureType').value;
+            const measureValue = parseInt(document.getElementById('measureValue').value) || 0;
+
+            currentGeneratedText = generateLorem(measureValue, measureType);
+            updateStats(currentGeneratedText);
+
+            const output = document.getElementById('loremOutput');
+            output.innerText = currentGeneratedText;
+        }
+
+        function copyToClipboard() {
+            if (!currentGeneratedText) return;
+            const tempInput = document.createElement("textarea");
+            tempInput.value = currentGeneratedText;
+            document.body.appendChild(tempInput);
+            tempInput.select();
+            document.execCommand("copy");
+            document.body.removeChild(tempInput);
+            
+            const t = document.getElementById('toast');
+            t.style.display = 'block';
+            setTimeout(() => t.style.display = 'none', 2000);
+        }
+
+        function downloadTxt() {
+            if (!currentGeneratedText) return;
+            const blob = new Blob([currentGeneratedText], { type: 'text/plain' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `lorem_ipsum_${Date.now()}.txt`;
+            a.click();
+            window.URL.revokeObjectURL(url);
+        }
+
+        ['measureType', 'measureValue'].forEach(id => {
+            document.getElementById(id).addEventListener('input', updateUI);
+        });
+
+        window.onload = updateUI;
+    </script>
+</body>
+</html>
