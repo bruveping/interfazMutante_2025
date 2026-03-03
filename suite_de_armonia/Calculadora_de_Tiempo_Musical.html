@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calculadora de Tiempo Musical</title>
+    <style>
+        :root {
+            --primary: #6366f1;
+            --primary-hover: #4f46e5;
+            --bg: #0f172a;
+            --card-bg: #1e293b;
+            --text: #f8fafc;
+            --text-dim: #94a3b8;
+            --accent: #10b981;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            background-color: var(--card-bg);
+            padding: 2rem;
+            border-radius: 1.5rem;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            width: 100%;
+            max-width: 500px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            margin-bottom: 1.5rem;
+            text-align: center;
+            color: var(--text);
+            font-weight: 700;
+        }
+
+        .tabs {
+            display: flex;
+            background: rgba(0, 0, 0, 0.2);
+            padding: 4px;
+            border-radius: 0.75rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .tab {
+            flex: 1;
+            padding: 10px;
+            text-align: center;
+            cursor: pointer;
+            border-radius: 0.5rem;
+            transition: all 0.2s;
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--text-dim);
+        }
+
+        .tab.active {
+            background-color: var(--primary);
+            color: white;
+        }
+
+        .input-group {
+            margin-bottom: 1.25rem;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-size: 0.85rem;
+            color: var(--text-dim);
+            font-weight: 500;
+        }
+
+        .row {
+            display: flex;
+            gap: 1rem;
+        }
+
+        input {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            border-radius: 0.75rem;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            background: rgba(0, 0, 0, 0.2);
+            color: white;
+            font-size: 1rem;
+            box-sizing: border-box;
+            transition: border-color 0.2s;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: var(--primary);
+            background: rgba(0, 0, 0, 0.3);
+        }
+
+        .result-card {
+            margin-top: 2rem;
+            padding: 1.5rem;
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(16, 185, 129, 0.1) 100%);
+            border-radius: 1rem;
+            border: 1px solid rgba(99, 102, 241, 0.2);
+            text-align: center;
+        }
+
+        .result-label {
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-dim);
+            margin-bottom: 0.5rem;
+        }
+
+        .result-value {
+            font-size: 2rem;
+            font-weight: 800;
+            color: var(--accent);
+        }
+
+        .result-subtext {
+            font-size: 0.9rem;
+            color: var(--text-dim);
+            margin-top: 0.5rem;
+        }
+
+        .help-text {
+            font-size: 0.75rem;
+            color: #64748b;
+            margin-top: 1.5rem;
+            line-height: 1.4;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Calculadora Musical</h1>
+
+    <div class="tabs">
+        <div class="tab active" onclick="switchMode('duration')">Calcular Duración</div>
+        <div class="tab" onclick="switchMode('measures')">Calcular Compases</div>
+    </div>
+
+    <!-- Sección de Configuración de Tempo -->
+    <div class="row">
+        <div class="input-group" style="flex: 2;">
+            <label for="bpm">BPM (Tempo)</label>
+            <input type="number" id="bpm" value="120" oninput="calculate()">
+        </div>
+        <div class="input-group" style="flex: 1;">
+            <label for="numerator">Numerador</label>
+            <input type="number" id="numerator" value="4" oninput="calculate()">
+        </div>
+        <div class="input-group" style="flex: 1;">
+            <label for="denominator">Denominador</label>
+            <input type="number" id="denominator" value="4" oninput="calculate()">
+        </div>
+    </div>
+
+    <!-- Inputs Dinámicos según el modo -->
+    <div id="dynamicInputs">
+        <div class="input-group" id="inputMeasuresGroup">
+            <label for="measures">Cantidad de Compases</label>
+            <input type="number" id="measures" value="24" oninput="calculate()">
+        </div>
+
+        <div class="row" id="inputTimeGroup" style="display: none;">
+            <div class="input-group" style="flex: 1;">
+                <label for="minutes">Minutos</label>
+                <input type="number" id="minutes" value="3" oninput="calculate()">
+            </div>
+            <div class="input-group" style="flex: 1;">
+                <label for="seconds">Segundos</label>
+                <input type="number" id="seconds" value="0" oninput="calculate()">
+            </div>
+        </div>
+    </div>
+
+    <!-- Resultados -->
+    <div class="result-card">
+        <div id="resultLabel" class="result-label">Duración Total</div>
+        <div id="resultValue" class="result-value">48.00s</div>
+        <div id="resultSubtext" class="result-subtext">2.00s por compás</div>
+    </div>
+
+    <div class="help-text">
+        * El cálculo asume que el denominador representa la figura que recibe un pulso (ej. 4 = negra). <br>
+        Fórmula: (60 / BPM) * Numerador = Tiempo por compás.
+    </div>
+</div>
+
+<script>
+    let currentMode = 'duration';
+
+    function switchMode(mode) {
+        currentMode = mode;
+        
+        // Actualizar UI de pestañas
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        event.target.classList.add('active');
+
+        // Mostrar/Ocultar inputs
+        const measureInput = document.getElementById('inputMeasuresGroup');
+        const timeInput = document.getElementById('inputTimeGroup');
+        
+        if (mode === 'duration') {
+            measureInput.style.display = 'block';
+            timeInput.style.display = 'none';
+            document.getElementById('resultLabel').innerText = 'Duración Total';
+        } else {
+            measureInput.style.display = 'none';
+            timeInput.style.display = 'flex';
+            document.getElementById('resultLabel').innerText = 'Total de Compases';
+        }
+        
+        calculate();
+    }
+
+    function calculate() {
+        const bpm = parseFloat(document.getElementById('bpm').value) || 0;
+        const num = parseFloat(document.getElementById('numerator').value) || 1;
+        const den = parseFloat(document.getElementById('denominator').value) || 4;
+        
+        if (bpm <= 0) {
+            document.getElementById('resultValue').innerText = "---";
+            return;
+        }
+
+        // 1. Calcular duración de un solo compás
+        // El pulso es 60/bpm. Multiplicado por el numerador da el tiempo del compás.
+        const secondsPerMeasure = (60 / bpm) * num;
+        
+        const resultValueEl = document.getElementById('resultValue');
+        const resultSubtextEl = document.getElementById('resultSubtext');
+
+        if (currentMode === 'duration') {
+            const measures = parseFloat(document.getElementById('measures').value) || 0;
+            const totalSeconds = measures * secondsPerMeasure;
+            
+            // Formatear tiempo
+            const mins = Math.floor(totalSeconds / 60);
+            const secs = (totalSeconds % 60).toFixed(2);
+            
+            resultValueEl.innerText = mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
+            resultSubtextEl.innerText = `${secondsPerMeasure.toFixed(2)}s por compás`;
+        } else {
+            const minsInput = parseFloat(document.getElementById('minutes').value) || 0;
+            const secsInput = parseFloat(document.getElementById('seconds').value) || 0;
+            const totalSecondsInput = (minsInput * 60) + secsInput;
+            
+            const totalMeasures = totalSecondsInput / secondsPerMeasure;
+            
+            resultValueEl.innerText = totalMeasures.toFixed(2);
+            resultSubtextEl.innerText = `Aprox. ${Math.round(totalMeasures)} compases completos`;
+        }
+    }
+
+    // Inicializar
+    window.onload = calculate;
+</script>
+
+</body>
+</html>
