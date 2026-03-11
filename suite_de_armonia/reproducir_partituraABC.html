@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Notación ABC</title>
+    <!-- Librería abcjs completa -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/abcjs/6.3.0/abcjs-basic-min.js" type="text/javascript"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=DM+Mono:wght@400;500&display=swap');
+
+        :root {
+            --paper: #fdfaf6;
+            --accent: #8b3a1a;
+            --accent2: #2a5a3a;
+            --ink: #1a1209;
+        }
+
+        body {
+            background-color: #f1ede4;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100' height='100' filter='url(%23noise)' opacity='0.05'/%3E%3C/svg%3E");
+            font-family: 'DM Mono', monospace;
+            color: var(--ink);
+        }
+
+        .serif { font-family: 'Playfair Display', serif; }
+
+        .card-paper {
+            background: var(--paper);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1), inset 0 0 100px rgba(139,58,26,0.02);
+            border: 1px solid #e8dfc8;
+        }
+
+        #score-output svg { width: 100%; height: auto; }
+        
+        /* Cursor de reproducción */
+        .abcjs-cursor { stroke: var(--accent); stroke-width: 2; }
+        
+        @media print { .no-print { display: none; } }
+    </style>
+</head>
+<body class="min-h-screen p-4 md:p-8">
+
+    <div class="max-w-5xl mx-auto">
+        <header class="text-center mb-10 no-print">
+            <h1 class="serif text-4xl md:text-5xl text-amber-900 mb-2">ABC Notation Studio</h1>
+            <p class="text-xs uppercase tracking-[0.3em] text-emerald-800 font-bold opacity-70">Editor · Partitura · Reproducción</p>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            
+            <!-- Panel Izquierdo: Editor -->
+            <div class="lg:col-span-5 space-y-4 no-print">
+                <div class="card-paper rounded-lg p-5">
+                    <div class="flex justify-between items-center mb-3">
+                        <span class="text-[10px] uppercase tracking-widest font-bold text-amber-800 opacity-60">Editor de Notación</span>
+                        <div id="status" class="w-2 h-2 rounded-full bg-emerald-500"></div>
+                    </div>
+                    <textarea id="abc-input" spellcheck="false" class="w-full h-[450px] bg-transparent border-none outline-none text-sm leading-relaxed resize-none overflow-y-auto">X:1
+T:mi primer tema con acordes
+M:4/4
+L:1/4
+K:C
+"C"[CEG]DEz | "G"z2 [GBd]a |]</textarea>
+                </div>
+
+                <!-- Controles -->
+                <div class="card-paper rounded-lg p-5 space-y-4">
+                    <div class="flex items-center gap-3">
+                        <button onclick="playScore()" class="flex-1 bg-emerald-800 hover:bg-emerald-900 text-white py-3 rounded font-bold transition-all flex items-center justify-center gap-2 text-sm">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg> REPRODUCIR
+                        </button>
+                        <button onclick="stopScore()" class="flex-1 border-2 border-amber-900 text-amber-900 py-[10px] rounded font-bold hover:bg-amber-900 hover:text-white transition-all text-sm">
+                            DETENER
+                        </button>
+                    </div>
+                    
+                    <div class="pt-2 border-t border-amber-100">
+                        <div class="flex justify-between text-[10px] font-bold text-amber-900 mb-2">
+                            <span>TEMPO (BPM)</span>
+                            <span id="tempo-val">180</span>
+                        </div>
+                        <input type="range" id="tempo-slider" min="40" max="240" value="180" class="w-full accent-emerald-800" oninput="updateTempo(this.value)">
+                    </div>
+
+                    <button onclick="window.print()" class="w-full text-[10px] font-bold text-slate-400 hover:text-slate-600 transition-colors uppercase tracking-widest">
+                        Generar PDF / Imprimir
+                    </button>
+                </div>
+            </div>
+
+            <!-- Panel Derecho: Partitura -->
+            <div class="lg:col-span-7">
+                <div class="card-paper rounded-lg p-8 min-h-[600px] relative">
+                    <div class="absolute top-4 left-6 text-[10px] uppercase tracking-widest font-bold text-amber-800 opacity-30 no-print italic">Manuscript Score</div>
+                    <div id="score-output" class="mt-4"></div>
+                </div>
+                <div id="error-msg" class="mt-4 p-3 bg-red-50 text-red-700 text-xs rounded border border-red-100 hidden"></div>
+            </div>
+		<div class="lg:col-span-7">
+			<h3>Créditos y Librerías</h3>
+			<li>[abcjs](https://github.com) - Licencia MIT/GPL.</li>
+			<li>[Tailwind CSS](https://tailwindcss.com) - Licencia MIT.</li>
+			<li>[Google Fonts](https://fonts.google.com) - Open Font License.</li>
+		</>
+
+        </div>
+    </div>
+
+    <script>
+        let visualObj;
+        let synthControl = null;
+        let currentTempo = 180;
+        let audioContext = null;
+
+        const input = document.getElementById('abc-input');
+        const errorEl = document.getElementById('error-msg');
+
+        function showError(msg) {
+            errorEl.textContent = msg;
+            errorEl.classList.toggle('hidden', !msg);
+        }
+
+        function updateTempo(val) {
+            currentTempo = parseInt(val);
+            document.getElementById('tempo-val').textContent = val;
+        }
+
+        function renderScore() {
+            showError('');
+            const abc = input.value.trim();
+            if (!abc) return;
+
+            try {
+                const result = ABCJS.renderAbc('score-output', abc, {
+                    responsive: 'resize',
+                    add_classes: true,
+                    paddingleft: 0,
+                    paddingright: 0,
+                    format: {
+                        titlefont: "Playfair Display 28",
+                        subtitlefont: "Playfair Display 18",
+                        composerfont: "DM Mono 14",
+                        partsfont: "DM Mono 12"
+                    }
+                });
+                visualObj = result[0];
+                document.getElementById('status').className = "w-2 h-2 rounded-full bg-emerald-500";
+            } catch(e) {
+                showError('Error de renderizado: ' + e.message);
+                document.getElementById('status').className = "w-2 h-2 rounded-full bg-red-500";
+            }
+        }
+
+        async function playScore() {
+            stopScore();
+            
+            if (!ABCJS.synth.supportsAudio()) {
+                showError('Audio no soportado en este navegador.');
+                return;
+            }
+
+            // Iniciar Contexto de Audio
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioContext.state === 'suspended') await audioContext.resume();
+
+            const abc = input.value.trim();
+            renderScore();
+
+            try {
+                // Creamos el sintetizador
+                const midiBuffer = new ABCJS.synth.CreateSynth();
+                
+                // NOTA: Eliminamos la llamada a visualObj.getMillisecondsPerMeasure()
+                // Pasamos las opciones de tempo (qpm) directamente en el init
+                await midiBuffer.init({
+                    visualObj: visualObj,
+                    audioContext: audioContext,
+                    options: { qpm: currentTempo }
+                });
+
+                await midiBuffer.prime();
+                midiBuffer.start();
+                
+                synthControl = midiBuffer;
+            } catch(e) {
+                showError('Error al iniciar audio: ' + e.message);
+                console.error(e);
+            }
+        }
+
+        function stopScore() {
+            if (synthControl) {
+                try { 
+                    if(synthControl.stop) synthControl.stop();
+                    // En algunas versiones es pause()
+                    if(synthControl.pause) synthControl.pause();
+                } catch(e) {}
+                synthControl = null;
+            }
+        }
+
+        let debounce;
+        input.addEventListener('input', () => {
+            clearTimeout(debounce);
+            debounce = setTimeout(renderScore, 600);
+        });
+
+        window.onload = renderScore;
+    </script>
+</body>
+</html>
