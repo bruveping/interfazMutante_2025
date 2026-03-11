@@ -31,7 +31,6 @@
             grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
             z-index: 100;
             flex-shrink: 0;
-            /* Transición de opacidad para suavidad */
             transition: opacity 0.2s ease-in-out;
         }
 
@@ -85,40 +84,39 @@
             border-color: rgba(56, 189, 248, 0.4);
         }
 
-        /* Botón Flotante corregido */
+        /* Botón Flotante con Z-INDEX ULTRA ALTO */
         #toggle-nav {
             position: fixed;
-            bottom: 20px; /* Movido abajo a la derecha para no estorbar títulos */
-            right: 20px;
-            z-index: 1000;
+            bottom: 25px; 
+            right: 25px;
+            z-index: 9999; /* Por encima de absolutamente todo */
             background: #38bdf8;
             color: #020408;
             border: none;
-            width: 45px;
-            height: 45px;
+            width: 50px;
+            height: 50px;
             border-radius: 50%;
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.6);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.8), 0 0 10px rgba(56, 189, 248, 0.4);
             transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            font-weight: bold;
         }
 
         #toggle-nav:hover {
-            transform: scale(1.1);
+            transform: scale(1.15);
             background: #7dd3fc;
         }
 
-        /* Si el menú está oculto, el botón puede ser más discreto o cambiar de color */
+        /* Estado cuando el menú está oculto */
         #toggle-nav.is-hidden {
-            background: rgba(15, 23, 42, 0.8);
+            background: #0f172a;
             color: #38bdf8;
-            border: 1px solid #38bdf8;
+            border: 2px solid #38bdf8;
         }
 
-        /* El Iframe ahora siempre ocupa el espacio restante real */
+        /* El Iframe ocupa el resto */
         #content-frame {
             flex-grow: 1;
             width: 100%;
@@ -130,9 +128,9 @@
 
 <body>
 
-    <!-- Botón de control (Movido a la esquina inferior derecha) -->
+    <!-- Botón de control -->
     <button id="toggle-nav" title="Mostrar/Ocultar Menú" onclick="toggleMenu()">
-        <svg id="icon-menu" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+        <svg id="icon-menu" xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
     </button>
 
     <nav id="nav-bar">
@@ -147,7 +145,7 @@
         <a href="#" class="nav-link" onclick="loadApp('visualizador_circulo_quintas01.html', this)">Círculo 01</a>
         <a href="#" class="nav-link" onclick="loadApp('visualizador_circulo_quintas02.html', this)">Círculo 02</a>
         <a href="#" class="nav-link" onclick="loadApp('visualizador_acordes001.html', this)">Acordes 001</a>
-        <a href="#" class="nav-link" onclick="loadApp('visualizar_bIII7_bVI_bII_I.html', this)">bIII7_bVI_bII_I</a>
+        <a href="#" class="nav-link" onclick="loadApp('visualizar_bIII7_bVI_bII_I.html', this)">Modulación bIII7</a>
         <a href="#" class="nav-link" onclick="loadApp('tonnez_v1.html', this)">Tonnez V1</a>
         <a href="#" class="nav-link" onclick="loadApp('escribir_acordes_a_mano.html', this)">Escribir Acordes</a>
         <a href="#" class="nav-link" onclick="loadApp('visualizador_de_adsr.html', this)">ADSR Visual</a>
@@ -181,9 +179,12 @@
             });
             element.classList.add('active');
 
-            // En móvil, quizás quieras que el menú se cierre solo al elegir una app
-            if (window.innerWidth < 768) {
-                toggleMenu();
+            // Auto-cerrar en pantallas pequeñas para dar espacio
+            if (window.innerWidth < 1024) {
+                const nav = document.getElementById('nav-bar');
+                if (!nav.classList.contains('hidden-nav')) {
+                    toggleMenu();
+                }
             }
 
             if (event) event.preventDefault();
@@ -193,4 +194,3 @@
 </body>
 
 </html>
-
