@@ -42,7 +42,13 @@
             color: white;
             /* Color de texto para que sea visible */
         }
-
+        @media (min-width: 768px) {
+            #nav-bar {
+                /* Aquí recuperamos tus 8 columnas y 2 filas */
+                grid-template-columns: repeat(8, 1fr);
+                grid-template-rows: repeat(2, 1fr);
+            }
+        }
         .nav-link {
             font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
             font-size: 10px;
@@ -102,7 +108,7 @@
             onclick="loadApp('visualizar_bIII7_bVI_bII_I.html', this)">visualizar_bIII7_bVI_bII_I</a>
         <a href="#" class="nav-link" onclick="loadApp('tonnez_v1.html', this)">visualizar_tonnez</a>
         <a href="#" class="nav-link"
-            onclick="loadApp('escribir_acordes_a_mano.html', this)">visualizar_escribir_acordes_a_mano</a>
+            onclick="loadApp('escribir_acordes_a_mano.html', this)">escribir_acordes_a_mano</a>
         <a href="#" class="nav-link" onclick="loadApp('visualizador_de_adsr.html', this)">visualizador_de_adsr</a>
         <a href="#" class="nav-link"
             onclick="loadApp('Calculadora_de_Tiempo_Musical.html', this)">Calculadora_de_Tiempo_Musical</a>
@@ -137,3 +143,4 @@
 </body>
 
 </html>
+
