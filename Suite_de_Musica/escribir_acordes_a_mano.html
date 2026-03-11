@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Armonía Pro - Editor Inteligente</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="icon" type="image/jpeg" href="favicon.jpg">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&family=JetBrains+Mono:wght@500;700&display=swap');
+
+        body {
+            background-color: #020617;
+            color: #f8fafc;
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            overflow: hidden;
+        }
+
+        .cadence-node {
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .tension-line {
+            fill: none;
+            stroke-width: 2;
+            stroke-dasharray: 8, 4;
+            opacity: 0.2;
+        }
+
+        .ui-panel {
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(16px);
+            border: 1px solid #1e293b;
+            border-radius: 20px;
+        }
+
+        .node-label {
+            font-weight: 900;
+            font-size: 13px;
+            pointer-events: none;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+        }
+
+        .active-step {
+            stroke: #38bdf8 !important;
+            stroke-width: 8px;
+            filter: drop-shadow(0 0 15px #38bdf8);
+        }
+
+        .harmony-input {
+            font-family: 'JetBrains Mono', 'ui-monospace', monospace;
+            text-transform: none !important;
+        }
+
+        input::placeholder {
+            color: #475569;
+        }
+
+        .custom-scroll::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        .custom-scroll::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .custom-scroll::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 10px;
+        }
+
+        /* Estilo base para el botón de Menú */
+        .menu-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 10px 24px;
+            font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+            font-size: 14px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: #f8fafc;
+            text-decoration: none;
+            background: rgba(30, 41, 59, 0.7);
+            /* Fondo semi-transparente */
+            border: 1px solid rgba(56, 189, 248, 0.3);
+            border-radius: 8px;
+            backdrop-filter: blur(8px);
+            /* Efecto cristalizado */
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Efecto de Brillo (Hover) */
+        .menu-btn:hover {
+            color: #ffffff;
+            background: rgba(56, 189, 248, 0.15);
+            border-color: #38bdf8;
+            box-shadow: 0 0 15px rgba(56, 189, 248, 0.4);
+            transform: translateY(-2px);
+        }
+
+        /* Efecto de clic (Active) */
+        .menu-btn:active {
+            transform: translateY(0);
+            box-shadow: 0 0 5px rgba(56, 189, 248, 0.2);
+        }
+
+        /* Indicador sutil inferior */
+        .menu-btn::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            width: 0;
+            height: 2px;
+            background: #38bdf8;
+            transition: all 0.3s ease;
+            transform: translateX(-50%);
+        }
+
+        .menu-btn:hover::after {
+            width: 60%;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="absolute top-6 left-6 z-50 flex flex-col gap-4 w-96 max-h-[90vh]">
+        <div class="ui-panel p-6 shadow-2xl space-y-5 overflow-y-auto custom-scroll">
+            <header>
+                <h1 class="text-sky-400 font-black text-2xl uppercase tracking-tighter italic leading-none">Armonía Pro
+                </h1>
+                <a href="index.html" class="menu-btn">Menu</a>
+                <p class="text-slate-500 text-[10px] mt-1 uppercase font-bold tracking-widest">Generador MIDI con
+                    Cifrado Funcional</p>
+            </header>
+
+            <div class="grid grid-cols-2 gap-3">
+                <div class="flex flex-col gap-1 bg-slate-800/40 p-3 rounded-xl border border-slate-700/50">
+                    <span class="text-[9px] font-black uppercase text-slate-500">Tonalidad Central</span>
+                    <select id="key-selector" onchange="processProgression()"
+                        class="bg-transparent text-sky-400 font-bold text-sm outline-none cursor-pointer">
+                        <option value="0">C (Do)</option>
+                        <option value="1">C# / Db</option>
+                        <option value="2">D (Re)</option>
+                        <option value="3">Eb / D#</option>
+                        <option value="4">E (Mi)</option>
+                        <option value="5">F (Fa)</option>
+                        <option value="6">F# / Gb</option>
+                        <option value="7">G (Sol)</option>
+                        <option value="8">Ab / G#</option>
+                        <option value="9">A (La)</option>
+                        <option value="10">Bb / A#</option>
+                        <option value="11">B (Si)</option>
+                    </select>
+                </div>
+
+                <div class="flex flex-col gap-1 bg-slate-800/40 p-3 rounded-xl border border-slate-700/50">
+                    <span class="text-[9px] font-black uppercase text-slate-500">Ritmo</span>
+                    <select id="rhythm-selector" onchange="processProgression()"
+                        class="bg-transparent text-emerald-400 font-bold text-sm outline-none cursor-pointer">
+                        <option value="1">1 Compás</option>
+                        <option value="0.5">1/2 Compás</option>
+                        <option value="0.25">1/4 Compás</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="space-y-2">
+                <div class="flex justify-between items-end">
+                    <label class="text-[10px] font-black uppercase text-slate-500">Progresión (I ii bIII IV...)</label>
+                    <span class="text-[9px] text-slate-600 font-mono">Sensible a mayúsculas</span>
+                </div>
+                <input type="text" id="progression-input" value="I IV Vaug I ii V7#11 I"
+                    class="harmony-input w-full bg-slate-950/50 border border-slate-700 rounded-xl p-4 text-sky-300 text-base tracking-widest outline-none focus:border-sky-500 transition-colors shadow-inner"
+                    oninput="processProgression()" spellcheck="false" autocomplete="off">
+            </div>
+
+            <div id="chord-preview"
+                class="flex flex-wrap gap-1.5 min-h-[44px] p-3 bg-slate-900/80 rounded-xl border border-slate-800">
+            </div>
+
+            <div class="grid grid-cols-2 gap-3 pt-2">
+                <button id="btn-play" onclick="playFullSequence()"
+                    class="bg-sky-600 hover:bg-sky-500 text-white font-black py-4 rounded-xl flex items-center justify-center gap-2 text-xs transition-all active:scale-95 shadow-lg shadow-sky-900/20">
+                    <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                        <path
+                            d="M11.596 8.697-6.363 3.692c-.54.313-1.233-.066-1.233-.697V4.308c0-.63.692-1.01 1.233-.696l6.363 3.692a.802.802 0 0 1 0 1.393z" />
+                    </svg>
+                    REPRODUCIR
+                </button>
+                <button onclick="exportMIDI()"
+                    class="bg-emerald-600 hover:bg-emerald-500 text-white font-black py-4 rounded-xl flex items-center justify-center gap-2 text-xs transition-all active:scale-95 shadow-lg shadow-emerald-900/20">
+                    <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                        <path
+                            d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z" />
+                        <path
+                            d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z" />
+                    </svg>
+                    BAJAR MIDI
+                </button>
+            </div>
+
+            <div class="pt-4 border-t border-slate-800 space-y-3">
+                <h3 class="text-[10px] font-black uppercase text-slate-400 tracking-wider">Diccionario de Referencia
+                </h3>
+                <div class="text-[11px] leading-relaxed text-slate-500 space-y-2">
+                    <p>
+                        <strong class="text-slate-300">Cualidad:</strong>
+                        Mayúsculas: <span class="text-sky-400">Mayor</span>. Minúsculas: <span
+                            class="text-emerald-400">Menor</span>.
+                    </p>
+                    <p>
+                        <strong class="text-slate-300">Nuevos Colores:</strong>
+                        <code class="text-amber-400">aug</code> (Aumentado: 1 3 #5), <code
+                            class="text-amber-400">7#11</code> (Lidio Dom: 1 3 5 b7 #11).
+                    </p>
+                    <p>
+                        <strong class="text-slate-300">Sufijos:</strong>
+                        <code class="text-sky-300">7</code>, <code class="text-sky-300">maj7</code>, <code
+                            class="text-sky-300">m7</code>, <code class="text-sky-300">dim</code>, <code
+                            class="text-sky-300">alt</code>.
+                    </p>
+                    <p class="italic text-[10px] text-slate-600">
+                        Ejemplo: <span class="text-slate-400">I Vaug vi IV7#11</span>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="visualizer" class="w-full h-screen"></div>
+
+    <script>
+        const BASE_ROMAN = {
+            'I': 0, 'II': 2, 'III': 4, 'IV': 5, 'V': 7, 'VI': 9, 'VII': 11
+        };
+
+        const CHORD_INTERVALS = {
+            'maj': [0, 4, 7],
+            'min': [0, 3, 7],
+            'maj7': [0, 4, 7, 11],
+            '7': [0, 4, 7, 10],
+            'm7': [0, 3, 7, 10],
+            'dim': [0, 3, 6],
+            'aug': [0, 4, 8],
+            '7#11': [0, 4, 7, 10, 18], // 18 semitonos = 4ta aumentada en octava arriba (11#) o simplemente 6 semitonos si es cerrada
+            'alt': [0, 4, 10, 13, 15]
+        };
+
+        const NOTE_NAMES = ["C", "C#", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B"];
+        let activeProgression = [];
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        function parseChord(input) {
+            let str = input.trim();
+            if (!str) return null;
+
+            let accidentalOffset = 0;
+            if (str.startsWith('b')) { accidentalOffset = -1; str = str.substring(1); }
+            else if (str.startsWith('#')) { accidentalOffset = 1; str = str.substring(1); }
+
+            let match = str.match(/^(IV|III|II|I|VII|VI|V)/i);
+            if (!match) return null;
+
+            let roman = match[0];
+            let suffix = str.substring(roman.length);
+
+            let isLower = (roman === roman.toLowerCase());
+            let romanKey = roman.toUpperCase();
+
+            let rootPos = (BASE_ROMAN[romanKey] + accidentalOffset + 12) % 12;
+
+            let intervals = isLower ? CHORD_INTERVALS['min'] : CHORD_INTERVALS['maj'];
+
+            // Priorizar sufijos específicos
+            if (suffix.includes('7#11')) intervals = CHORD_INTERVALS['7#11'];
+            else if (suffix.includes('aug')) intervals = CHORD_INTERVALS['aug'];
+            else if (suffix.includes('maj7')) intervals = CHORD_INTERVALS['maj7'];
+            else if (suffix.includes('m7')) intervals = CHORD_INTERVALS['m7'];
+            else if (suffix.includes('7')) intervals = CHORD_INTERVALS['7'];
+            else if (suffix === 'm') intervals = CHORD_INTERVALS['min'];
+            else if (suffix === 'dim') intervals = CHORD_INTERVALS['dim'];
+            else if (suffix === 'alt') intervals = CHORD_INTERVALS['alt'];
+
+            return {
+                original: input,
+                root: rootPos,
+                intervals: intervals,
+                color: getTensionColor(romanKey, accidentalOffset, isLower, suffix)
+            };
+        }
+
+        function getTensionColor(roman, accidental, isMinor, suffix) {
+            if (suffix.includes('aug') || suffix.includes('#11')) return '#f472b6'; // Rosa para tensiones lidias/aug
+            if (roman === 'V') return '#ef4444';
+            if (accidental !== 0) return '#a855f7';
+            if (roman === 'I') return '#10b981';
+            return '#f59e0b';
+        }
+
+        function processProgression() {
+            const input = document.getElementById('progression-input').value;
+            const keyOffset = parseInt(document.getElementById('key-selector').value);
+            const tokens = input.split(/\s+/).filter(x => x.length > 0);
+
+            activeProgression = tokens.map(t => parseChord(t)).filter(x => x !== null);
+
+            const preview = document.getElementById('chord-preview');
+            preview.innerHTML = '';
+
+            activeProgression.forEach(chord => {
+                const span = document.createElement('div');
+                const finalRoot = (chord.root + keyOffset) % 12;
+                const noteName = NOTE_NAMES[finalRoot];
+
+                let label = noteName;
+                if (chord.intervals === CHORD_INTERVALS['min']) label += "m";
+                else if (chord.intervals === CHORD_INTERVALS['aug']) label += "aug";
+                else if (chord.intervals === CHORD_INTERVALS['7#11']) label += "7(#11)";
+                else if (chord.intervals === CHORD_INTERVALS['maj7']) label += "maj7";
+                else if (chord.intervals === CHORD_INTERVALS['m7']) label += "m7";
+                else if (chord.intervals === CHORD_INTERVALS['7']) label += "7";
+
+                span.className = "px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-[11px] font-black text-sky-400 uppercase shadow-sm";
+                span.innerText = label;
+                preview.appendChild(span);
+            });
+
+            renderVisualization();
+        }
+
+        async function playFullSequence() {
+            if (activeProgression.length === 0) return;
+            if (audioCtx.state === 'suspended') await audioCtx.resume();
+
+            const keyOffset = parseInt(document.getElementById('key-selector').value);
+            const rhythmMult = parseFloat(document.getElementById('rhythm-selector').value);
+            const stepMs = 2000 * rhythmMult;
+
+            const btn = document.getElementById('btn-play');
+            btn.disabled = true;
+            btn.classList.add('opacity-50');
+
+            for (let i = 0; i < activeProgression.length; i++) {
+                const chord = activeProgression[i];
+                const now = audioCtx.currentTime;
+
+                d3.selectAll(".node-circle").classed("active-step", (d, idx) => idx === i);
+
+                chord.intervals.forEach((interval, idx) => {
+                    const midi = 48 + keyOffset + chord.root + interval;
+                    const freq = 440 * Math.pow(2, (midi - 69) / 12);
+
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+
+                    osc.type = idx === 0 ? 'triangle' : 'sine';
+                    osc.frequency.setValueAtTime(freq, now);
+
+                    gain.gain.setValueAtTime(0, now);
+                    gain.gain.linearRampToValueAtTime(0.08, now + 0.02);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + (stepMs / 1000));
+
+                    osc.connect(gain).connect(audioCtx.destination);
+                    osc.start(now);
+                    osc.stop(now + (stepMs / 1000));
+                });
+
+                await new Promise(r => setTimeout(r, stepMs));
+            }
+
+            d3.selectAll(".node-circle").classed("active-step", false);
+            btn.disabled = false;
+            btn.classList.remove('opacity-50');
+        }
+
+        function writeVarInt(value) {
+            let buffer = [value & 0x7F];
+            while (value >>= 7) buffer.push((value & 0x7F) | 0x80);
+            return buffer.reverse();
+        }
+
+        function exportMIDI() {
+            if (activeProgression.length === 0) return;
+            const keyOffset = parseInt(document.getElementById('key-selector').value);
+            const rhythmMult = parseFloat(document.getElementById('rhythm-selector').value);
+            const ppq = 128;
+            const ticks = Math.round((ppq * 4) * rhythmMult);
+
+            let track = [0x00, 0xFF, 0x51, 0x03, 0x07, 0xA1, 0x20];
+
+            activeProgression.forEach(chord => {
+                const notes = chord.intervals.map(n => 48 + chord.root + n + keyOffset);
+                notes.forEach((n, i) => track.push(...writeVarInt(i === 0 ? 0 : 0), 0x90, n, 0x50));
+                notes.forEach((n, i) => track.push(...writeVarInt(i === 0 ? ticks : 0), 0x80, n, 0x00));
+            });
+
+            track.push(0x00, 0xFF, 0x2F, 0x00);
+            const header = [0x4D, 0x54, 0x68, 0x64, 0x00, 0x00, 0x00, 0x06, 0x00, 0x00, 0x00, 0x01, 0x00, 0x80];
+            const tHeader = [0x4D, 0x54, 0x72, 0x6B, (track.length >> 24) & 0xFF, (track.length >> 16) & 0xFF, (track.length >> 8) & 0xFF, track.length & 0xFF];
+
+            const blob = new Blob([new Uint8Array([...header, ...tHeader, ...track])], { type: 'audio/midi' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            const keyName = NOTE_NAMES[keyOffset].replace("#", "sharp");
+            a.download = `progression_${keyName}.mid`;
+            a.click();
+        }
+
+        const svg = d3.select("#visualizer").append("svg").attr("width", "100%").attr("height", "100%");
+        const gLines = svg.append("g");
+        const gNodes = svg.append("g");
+
+        function renderVisualization() {
+            const w = window.innerWidth, h = window.innerHeight;
+            const data = activeProgression.map((d, i) => ({
+                ...d,
+                x: activeProgression.length === 1 ? w / 2 : 120 + ((w - 240) / (activeProgression.length - 1)) * i,
+                y: h / 2 + (Math.sin(i * 0.8) * 60)
+            }));
+
+            gLines.selectAll("path").data([data]).join("path")
+                .attr("class", "tension-line")
+                .transition().duration(400)
+                .attr("d", d3.line().x(d => d.x).y(d => d.y).curve(d3.curveCardinal))
+                .attr("stroke", "#334155");
+
+            const nodes = gNodes.selectAll("g").data(data, (d, i) => i);
+            const enter = nodes.enter().append("g");
+
+            enter.append("circle").attr("class", "node-circle cadence-node").attr("r", 26)
+                .attr("stroke", "white").attr("stroke-opacity", 0.1);
+            enter.append("text").attr("class", "node-label harmony-input").attr("text-anchor", "middle").attr("dy", ".35em").attr("fill", "white");
+
+            const update = enter.merge(nodes);
+            update.select("circle").transition().duration(400)
+                .attr("cx", d => d.x).attr("cy", d => d.y).attr("fill", d => d.color);
+            update.select("text").transition().duration(400)
+                .attr("x", d => d.x).attr("y", d => d.y).text(d => d.original);
+
+            nodes.exit().remove();
+        }
+
+        window.addEventListener('resize', () => {
+            svg.attr("width", window.innerWidth).attr("height", window.innerHeight);
+            processProgression();
+        });
+
+        processProgression();
+    </script>
+</body>
+
+</html>
