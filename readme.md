@@ -78,7 +78,8 @@ generador_lorem_ipsum [generador_lorem_ipsum](https://bruveping.github.io/interf
 
 simple_explorador_de_ideas [/simple_explorador_de_ideas](https://bruveping.github.io/interfazMutante_2025/simple_explorador_de_idas/)
 
-Suite_de_Musica [Suite_de_Musica](https://bruveping.github.io/interfazMutante_2025/Suite_de_Musica/)
+Suite_de_Música [Suite_de_Musica](https://bruveping.github.io/interfazMutante_2025/Suite_de_Musica/)
+
 
 
 
