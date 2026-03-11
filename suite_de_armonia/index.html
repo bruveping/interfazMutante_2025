@@ -18,22 +18,34 @@
             overflow: hidden;
             background-color: #020408;
             color: white;
+            font-family: ui-sans-serif, system-ui, sans-serif;
         }
 
-        /* Contenedor del menú con Grid Flexible */
+        /* Contenedor del menú con animación de deslizamiento */
         #nav-bar {
             background: #0f172a;
             border-bottom: 1px solid #1e293b;
             padding: 12px;
             gap: 8px;
             display: grid;
-            /* Móvil por defecto: columnas automáticas de mínimo 140px */
             grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
             z-index: 100;
-            flex-shrink: 0; /* Evita que el nav se colapse */
+            flex-shrink: 0;
+            transition: transform 0.3s ease-in-out, margin-top 0.3s ease-in-out, opacity 0.3s ease-in-out;
+            transform-origin: top;
         }
 
-        /* Escritorio: Forzamos las 8 columnas si hay espacio suficiente */
+        /* Clase para ocultar el menú */
+        #nav-bar.hidden-nav {
+            transform: scaleY(0);
+            margin-top: -150px; /* Ajuste para que el iframe suba */
+            opacity: 0;
+            pointer-events: none;
+            height: 0;
+            padding: 0;
+            border: none;
+        }
+
         @media (min-width: 1024px) {
             #nav-bar {
                 grid-template-columns: repeat(8, 1fr);
@@ -50,7 +62,6 @@
         }
 
         .nav-link {
-            font-family: ui-sans-serif, system-ui, sans-serif;
             font-size: 10px;
             font-weight: 700;
             color: #94a3b8;
@@ -80,25 +91,55 @@
             border-color: rgba(56, 189, 248, 0.4);
         }
 
-        /* El Iframe ahora ocupa todo el espacio restante automáticamente */
+        /* Botón Flotante para ocultar/mostrar */
+        #toggle-nav {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            z-index: 1000;
+            background: #38bdf8;
+            color: #020408;
+            border: none;
+            width: 35px;
+            height: 35px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+            transition: all 0.2s;
+            font-weight: bold;
+        }
+
+        #toggle-nav:hover {
+            transform: scale(1.1);
+            background: #7dd3fc;
+        }
+
         #content-frame {
             flex-grow: 1;
             width: 100%;
             border: none;
-            background: white; /* Opcional: fondo blanco para el contenido del app */
+            background: #ffffff;
+            transition: height 0.3s ease-in-out;
         }
     </style>
 </head>
 
 <body>
 
+    <!-- Botón de control -->
+    <button id="toggle-nav" title="Mostrar/Ocultar Menú" onclick="toggleMenu()">
+        <svg id="icon-up" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg>
+        <svg id="icon-down" class="hidden" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+    </button>
+
     <nav id="nav-bar">
-        <!-- Logo/Título -->
         <div class="logo-container text-[10px] font-black text-sky-500 py-2">
             HARMONY SUITE
         </div>
 
-        <!-- Enlaces -->
         <a href="#" class="nav-link active" onclick="loadApp('visualizador_Mayores_menores_setimas.html', this)">Círculo 00</a>
         <a href="#" class="nav-link" onclick="loadApp('visualizador_acordes002.html', this)">Acordes 002</a>
         <a href="#" class="nav-link" onclick="loadApp('visualizador_cadencias0001.html', this)">Cadencias 001</a>
@@ -118,10 +159,25 @@
     <iframe id="content-frame" src="visualizador_Mayores_menores_setimas.html"></iframe>
 
     <script>
+        function toggleMenu() {
+            const nav = document.getElementById('nav-bar');
+            const iconUp = document.getElementById('icon-up');
+            const iconDown = document.getElementById('icon-down');
+            
+            nav.classList.toggle('hidden-nav');
+            
+            // Alternar iconos
+            if (nav.classList.contains('hidden-nav')) {
+                iconUp.classList.add('hidden');
+                iconDown.classList.remove('hidden');
+            } else {
+                iconUp.classList.remove('hidden');
+                iconDown.classList.add('hidden');
+            }
+        }
+
         function loadApp(url, element) {
             const iframe = document.getElementById('content-frame');
-            
-            // Efecto de carga suave
             iframe.style.opacity = '0.5';
             iframe.src = url;
             
@@ -129,13 +185,11 @@
                 iframe.style.opacity = '1';
             };
 
-            // Actualizar estados visuales de los links
             document.querySelectorAll('.nav-link').forEach(link => {
                 link.classList.remove('active');
             });
             element.classList.add('active');
 
-            // Evitar recarga de página
             if (event) event.preventDefault();
         }
     </script>
