@@ -12,81 +12,80 @@
         html {
             margin: 0;
             padding: 0;
-            height: 100%;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
             overflow: hidden;
             background-color: #020408;
+            color: white;
         }
 
-        /* Franja de navegación de 30px */
-
-
+        /* Contenedor del menú con Grid Flexible */
         #nav-bar {
-            /* Quitamos el height fijo de 30px para que quepan las 2 filas */
-            min-height: 30px;
             background: #0f172a;
             border-bottom: 1px solid #1e293b;
-            padding: 10px;
-            gap: 10px;
+            padding: 12px;
+            gap: 8px;
             display: grid;
-            align-items: center;
-            justify-items: center;
-            /* Centra el contenido horizontalmente en la celda */
-
-            /* Definimos las 8 columnas de igual tamaño */
-            grid-template-columns: repeat(8, 1fr);
-
-            /* Definimos las 2 filas */
-            grid-template-rows: repeat(2, 1fr);
-
+            /* Móvil por defecto: columnas automáticas de mínimo 140px */
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
             z-index: 100;
-            color: white;
-            /* Color de texto para que sea visible */
+            flex-shrink: 0; /* Evita que el nav se colapse */
         }
-        @media (min-width: 768px) {
+
+        /* Escritorio: Forzamos las 8 columnas si hay espacio suficiente */
+        @media (min-width: 1024px) {
             #nav-bar {
-                /* Aquí recuperamos tus 8 columnas y 2 filas */
                 grid-template-columns: repeat(8, 1fr);
-                grid-template-rows: repeat(2, 1fr);
             }
         }
+
+        .logo-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(56, 189, 248, 0.1);
+            border-radius: 4px;
+            border: 1px solid rgba(56, 189, 248, 0.2);
+        }
+
         .nav-link {
-            font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            font-family: ui-sans-serif, system-ui, sans-serif;
             font-size: 10px;
             font-weight: 700;
             color: #94a3b8;
             text-transform: uppercase;
             letter-spacing: 0.05em;
             text-decoration: none;
-            padding: 2px 8px;
+            padding: 8px 4px;
             border-radius: 4px;
             transition: all 0.2s;
-            white-space: nowrap;
+            text-align: center;
+            border: 1px solid transparent;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
         }
 
         .nav-link:hover {
             color: #f1f5f9;
             background: #1e293b;
+            border-color: #334155;
         }
 
         .nav-link.active {
             color: #38bdf8;
             background: rgba(56, 189, 248, 0.1);
+            border-color: rgba(56, 189, 248, 0.4);
         }
 
-        /* Contenedor del Iframe */
+        /* El Iframe ahora ocupa todo el espacio restante automáticamente */
         #content-frame {
+            flex-grow: 1;
             width: 100%;
-            height: calc(100vh - 30px);
             border: none;
-        }
-
-        /* Custom Scrollbar para la barra (si hay muchos links) */
-        #nav-bar::-webkit-scrollbar {
-            height: 2px;
-        }
-
-        #nav-bar::-webkit-scrollbar-thumb {
-            background: #334155;
+            background: white; /* Opcional: fondo blanco para el contenido del app */
         }
     </style>
 </head>
@@ -94,35 +93,41 @@
 <body>
 
     <nav id="nav-bar">
-        <div class="text-[10px] font-black text-sky-500 mr-4 border-r border-slate-700 pr-4">HARMONY SUITE</div>
+        <!-- Logo/Título -->
+        <div class="logo-container text-[10px] font-black text-sky-500 py-2">
+            HARMONY SUITE
+        </div>
 
-        <a href="#" class="nav-link active"
-            onclick="loadApp('visualizador_Mayores_menores_setimas.html', this)">Círculo00</a>
+        <!-- Enlaces -->
+        <a href="#" class="nav-link active" onclick="loadApp('visualizador_Mayores_menores_setimas.html', this)">Círculo 00</a>
         <a href="#" class="nav-link" onclick="loadApp('visualizador_acordes002.html', this)">Acordes 002</a>
         <a href="#" class="nav-link" onclick="loadApp('visualizador_cadencias0001.html', this)">Cadencias 001</a>
         <a href="#" class="nav-link" onclick="loadApp('visualizador_cadencias0002.html', this)">Cadencias 002</a>
         <a href="#" class="nav-link" onclick="loadApp('visualizador_circulo_quintas01.html', this)">Círculo 01</a>
         <a href="#" class="nav-link" onclick="loadApp('visualizador_circulo_quintas02.html', this)">Círculo 02</a>
         <a href="#" class="nav-link" onclick="loadApp('visualizador_acordes001.html', this)">Acordes 001</a>
-        <a href="#" class="nav-link"
-            onclick="loadApp('visualizar_bIII7_bVI_bII_I.html', this)">visualizar_bIII7_bVI_bII_I</a>
-        <a href="#" class="nav-link" onclick="loadApp('tonnez_v1.html', this)">visualizar_tonnez</a>
-        <a href="#" class="nav-link"
-            onclick="loadApp('escribir_acordes_a_mano.html', this)">escribir_acordes_a_mano</a>
-        <a href="#" class="nav-link" onclick="loadApp('visualizador_de_adsr.html', this)">visualizador_de_adsr</a>
-        <a href="#" class="nav-link"
-            onclick="loadApp('Calculadora_de_Tiempo_Musical.html', this)">Calculadora_de_Tiempo_Musical</a>
-        <a href="#" class="nav-link" onclick="loadApp('desarrollo_motivico.html', this)">desarrollo_motivico</a>
-        <a href="#" class="nav-link" onclick="loadApp('reproducir_partituraABC.html', this)">Leer escribir
-            notaciónABC</a>
+        <a href="#" class="nav-link" onclick="loadApp('visualizar_bIII7_bVI_bII_I.html', this)">Modulación bIII7</a>
+        <a href="#" class="nav-link" onclick="loadApp('tonnez_v1.html', this)">Tonnez V1</a>
+        <a href="#" class="nav-link" onclick="loadApp('escribir_acordes_a_mano.html', this)">Escribir Acordes</a>
+        <a href="#" class="nav-link" onclick="loadApp('visualizador_de_adsr.html', this)">ADSR Visual</a>
+        <a href="#" class="nav-link" onclick="loadApp('Calculadora_de_Tiempo_Musical.html', this)">Calculadora Tiempos</a>
+        <a href="#" class="nav-link" onclick="loadApp('desarrollo_motivico.html', this)">Motívico</a>
+        <a href="#" class="nav-link" onclick="loadApp('reproducir_partituraABC.html', this)">Notación ABC</a>
     </nav>
 
     <iframe id="content-frame" src="visualizador_Mayores_menores_setimas.html"></iframe>
 
     <script>
         function loadApp(url, element) {
-            // Cambiar el src del iframe
-            document.getElementById('content-frame').src = url;
+            const iframe = document.getElementById('content-frame');
+            
+            // Efecto de carga suave
+            iframe.style.opacity = '0.5';
+            iframe.src = url;
+            
+            iframe.onload = () => {
+                iframe.style.opacity = '1';
+            };
 
             // Actualizar estados visuales de los links
             document.querySelectorAll('.nav-link').forEach(link => {
@@ -130,17 +135,11 @@
             });
             element.classList.add('active');
 
-            // Evitar recarga de página por el href="#"
-            event.preventDefault();
+            // Evitar recarga de página
+            if (event) event.preventDefault();
         }
-
-        // Manejo básico de errores si el archivo no existe
-        document.getElementById('content-frame').onerror = function () {
-            console.error("No se pudo cargar la aplicación especificada.");
-        };
     </script>
 
 </body>
 
 </html>
-
