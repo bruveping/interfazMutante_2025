@@ -1,13 +1,15 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Suite de Armonía Avanzada</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="icon" type="image/jpeg" href="favicon.jpg">    
+    <link rel="icon" type="image/jpeg" href="favicon.jpg">
     <style>
-        body, html {
+        body,
+        html {
             margin: 0;
             padding: 0;
             height: 100%;
@@ -16,15 +18,29 @@
         }
 
         /* Franja de navegación de 30px */
+
+
         #nav-bar {
-           height: 30px;
+            /* Quitamos el height fijo de 30px para que quepan las 2 filas */
+            min-height: 30px;
             background: #0f172a;
             border-bottom: 1px solid #1e293b;
-            display: flex;
-            align-items: center;
-            padding: 0 10px;
+            padding: 10px;
             gap: 10px;
+            display: grid;
+            align-items: center;
+            justify-items: center;
+            /* Centra el contenido horizontalmente en la celda */
+
+            /* Definimos las 8 columnas de igual tamaño */
+            grid-template-columns: repeat(8, 1fr);
+
+            /* Definimos las 2 filas */
+            grid-template-rows: repeat(2, 1fr);
+
             z-index: 100;
+            color: white;
+            /* Color de texto para que sea visible */
         }
 
         .nav-link {
@@ -62,59 +78,62 @@
         #nav-bar::-webkit-scrollbar {
             height: 2px;
         }
+
         #nav-bar::-webkit-scrollbar-thumb {
             background: #334155;
         }
     </style>
 </head>
+
 <body>
 
-<nav id="nav-bar">
-    <div class="text-[10px] font-black text-sky-500 mr-4 border-r border-slate-700 pr-4">HARMONY SUITE</div>
-    
-    <a href="#" class="nav-link active" onclick="loadApp('visualizador_Mayores_menores_setimas.html', this)">Círculo 00</a>
-    <a href="#" class="nav-link" onclick="loadApp('visualizador_acordes002.html', this)">Acordes 002</a>
-    <a href="#" class="nav-link" onclick="loadApp('visualizador_cadencias0001.html', this)">Cadencias 001</a>
-    <a href="#" class="nav-link" onclick="loadApp('visualizador_cadencias0002.html', this)">Cadencias 002</a>
-    <a href="#" class="nav-link" onclick="loadApp('visualizador_circulo_quintas01.html', this)">Círculo 01</a>
-    <a href="#" class="nav-link" onclick="loadApp('visualizador_circulo_quintas02.html', this)">Círculo 02</a>
-    <a href="#" class="nav-link" onclick="loadApp('visualizador_acordes001.html', this)">Acordes 001</a>
-    <a href="#" class="nav-link" onclick="loadApp('visualizar_bIII7_bVI_bII_I.html', this)">visualizar_bIII7_bVI_bII_I</a>
+    <nav id="nav-bar">
+        <div class="text-[10px] font-black text-sky-500 mr-4 border-r border-slate-700 pr-4">HARMONY SUITE</div>
 
-    <a href="#" class="nav-link" onclick="loadApp('tonnez_v1.html', this)">visualizar_tonnez</a>
+        <a href="#" class="nav-link active"
+            onclick="loadApp('visualizador_Mayores_menores_setimas.html', this)">Círculo00</a>
+        <a href="#" class="nav-link" onclick="loadApp('visualizador_acordes002.html', this)">Acordes 002</a>
+        <a href="#" class="nav-link" onclick="loadApp('visualizador_cadencias0001.html', this)">Cadencias 001</a>
+        <a href="#" class="nav-link" onclick="loadApp('visualizador_cadencias0002.html', this)">Cadencias 002</a>
+        <a href="#" class="nav-link" onclick="loadApp('visualizador_circulo_quintas01.html', this)">Círculo 01</a>
+        <a href="#" class="nav-link" onclick="loadApp('visualizador_circulo_quintas02.html', this)">Círculo 02</a>
+        <a href="#" class="nav-link" onclick="loadApp('visualizador_acordes001.html', this)">Acordes 001</a>
+        <a href="#" class="nav-link"
+            onclick="loadApp('visualizar_bIII7_bVI_bII_I.html', this)">visualizar_bIII7_bVI_bII_I</a>
+        <a href="#" class="nav-link" onclick="loadApp('tonnez_v1.html', this)">visualizar_tonnez</a>
+        <a href="#" class="nav-link"
+            onclick="loadApp('escribir_acordes_a_mano.html', this)">visualizar_escribir_acordes_a_mano</a>
+        <a href="#" class="nav-link" onclick="loadApp('visualizador_de_adsr.html', this)">visualizador_de_adsr</a>
+        <a href="#" class="nav-link"
+            onclick="loadApp('Calculadora_de_Tiempo_Musical.html', this)">Calculadora_de_Tiempo_Musical</a>
+        <a href="#" class="nav-link" onclick="loadApp('desarrollo_motivico.html', this)">desarrollo_motivico</a>
+        <a href="#" class="nav-link" onclick="loadApp('reproducir_partituraABC.html', this)">Leer escribir
+            notaciónABC</a>
+    </nav>
 
-    <a href="#" class="nav-link" onclick="loadApp('escribir_acordes_a_mano.html', this)">visualizar_escribir_acordes_a_mano</a>
+    <iframe id="content-frame" src="visualizador_Mayores_menores_setimas.html"></iframe>
 
-    <a href="#" class="nav-link" onclick="loadApp('visualizador_de_adsr.html', this)">visualizador_de_adsr</a>
+    <script>
+        function loadApp(url, element) {
+            // Cambiar el src del iframe
+            document.getElementById('content-frame').src = url;
 
-    <a href="#" class="nav-link" onclick="loadApp('Calculadora_de_Tiempo_Musical.html', this)">Calculadora_de_Tiempo_Musical</a>
+            // Actualizar estados visuales de los links
+            document.querySelectorAll('.nav-link').forEach(link => {
+                link.classList.remove('active');
+            });
+            element.classList.add('active');
 
-    <a href="#" class="nav-link" onclick="loadApp('desarrollo_motivico.html', this)">desarrollo_motivico</a>
-    <a href="#" class="nav-link" onclick="loadApp('reproducir_partituraABC.html', this)">Leer escribir notación ABC</a>
-</nav>
+            // Evitar recarga de página por el href="#"
+            event.preventDefault();
+        }
 
-<iframe id="content-frame" src="visualizador_Mayores_menores_setimas.html"></iframe>
-
-<script>
-    function loadApp(url, element) {
-        // Cambiar el src del iframe
-        document.getElementById('content-frame').src = url;
-
-        // Actualizar estados visuales de los links
-        document.querySelectorAll('.nav-link').forEach(link => {
-            link.classList.remove('active');
-        });
-        element.classList.add('active');
-
-        // Evitar recarga de página por el href="#"
-        event.preventDefault();
-    }
-
-    // Manejo básico de errores si el archivo no existe
-    document.getElementById('content-frame').onerror = function() {
-        console.error("No se pudo cargar la aplicación especificada.");
-    };
-</script>
+        // Manejo básico de errores si el archivo no existe
+        document.getElementById('content-frame').onerror = function () {
+            console.error("No se pudo cargar la aplicación especificada.");
+        };
+    </script>
 
 </body>
+
 </html>
