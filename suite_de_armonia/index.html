@@ -34,7 +34,7 @@
             transition: opacity 0.2s ease-in-out;
         }
 
-        /* Clase para ocultar el menú totalmente del flujo */
+        /* Clase para ocultar el menú */
         #nav-bar.hidden-nav {
             display: none;
         }
@@ -84,12 +84,12 @@
             border-color: rgba(56, 189, 248, 0.4);
         }
 
-        /* Botón Flotante con Z-INDEX ULTRA ALTO */
+        /* Botón Flotante ULTRA SEGURO */
         #toggle-nav {
             position: fixed;
             bottom: 25px; 
             right: 25px;
-            z-index: 9999; /* Por encima de absolutamente todo */
+            z-index: 10000; /* Incrementado para seguridad absoluta */
             background: #38bdf8;
             color: #020408;
             border: none;
@@ -100,36 +100,50 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.8), 0 0 10px rgba(56, 189, 248, 0.4);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.8), 0 0 15px rgba(56, 189, 248, 0.3);
             transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            /* Evita que el iframe capture el evento inicial */
+            pointer-events: auto !important;
         }
 
         #toggle-nav:hover {
-            transform: scale(1.15);
+            transform: scale(1.1);
             background: #7dd3fc;
         }
 
-        /* Estado cuando el menú está oculto */
         #toggle-nav.is-hidden {
             background: #0f172a;
             color: #38bdf8;
             border: 2px solid #38bdf8;
+            opacity: 0.8; /* Un poco transparente para no tapar contenido */
         }
 
-        /* El Iframe ocupa el resto */
+        #toggle-nav.is-hidden:hover {
+            opacity: 1;
+        }
+
+        /* Iframe con control de eventos */
         #content-frame {
             flex-grow: 1;
             width: 100%;
             border: none;
             background: #ffffff;
+            /* Si el nav bar está abierto, el iframe no debe recibir clics */
+            pointer-events: auto;
+        }
+
+        /* Cuando el menú es visible y estamos en móvil, el iframe se vuelve intocable */
+        body.menu-open #content-frame {
+            pointer-events: none;
+            filter: blur(1px) grayscale(0.5);
+            opacity: 0.6;
         }
     </style>
 </head>
 
-<body>
+<body class="menu-open"> <!-- Iniciamos con el menú abierto -->
 
-    <!-- Botón de control -->
-    <button id="toggle-nav" title="Mostrar/Ocultar Menú" onclick="toggleMenu()">
+    <button id="toggle-nav" title="Mostrar/Ocultar Menú" onclick="toggleMenu(event)">
         <svg id="icon-menu" xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
     </button>
 
@@ -145,8 +159,8 @@
         <a href="#" class="nav-link" onclick="loadApp('visualizador_circulo_quintas01.html', this)">Círculo 01</a>
         <a href="#" class="nav-link" onclick="loadApp('visualizador_circulo_quintas02.html', this)">Círculo 02</a>
         <a href="#" class="nav-link" onclick="loadApp('visualizador_acordes001.html', this)">Acordes 001</a>
-        <a href="#" class="nav-link" onclick="loadApp('visualizar_bIII7_bVI_bII_I.html', this)">Modulación bIII7</a>
-        <a href="#" class="nav-link" onclick="loadApp('tonnez_v1.html', this)">Tonnez V1</a>
+        <a href="#" class="nav-link" onclick="loadApp('visualizar_bIII7_bVI_bII_I.html', this)">bIII7_bVI_bII_I</a>
+        <a href="#" class="nav-link" onclick="loadApp('tonnez_v1.html', this)">Tonne</a>
         <a href="#" class="nav-link" onclick="loadApp('escribir_acordes_a_mano.html', this)">Escribir Acordes</a>
         <a href="#" class="nav-link" onclick="loadApp('visualizador_de_adsr.html', this)">ADSR Visual</a>
         <a href="#" class="nav-link" onclick="loadApp('Calculadora_de_Tiempo_Musical.html', this)">Calculadora Tiempos</a>
@@ -157,12 +171,16 @@
     <iframe id="content-frame" src="visualizador_Mayores_menores_setimas.html"></iframe>
 
     <script>
-        function toggleMenu() {
+        function toggleMenu(e) {
+            if (e) e.stopPropagation();
+            
             const nav = document.getElementById('nav-bar');
             const btn = document.getElementById('toggle-nav');
+            const body = document.body;
             
             nav.classList.toggle('hidden-nav');
             btn.classList.toggle('is-hidden');
+            body.classList.toggle('menu-open');
         }
 
         function loadApp(url, element) {
@@ -179,12 +197,9 @@
             });
             element.classList.add('active');
 
-            // Auto-cerrar en pantallas pequeñas para dar espacio
+            // En móvil, cerramos el menú tras elegir
             if (window.innerWidth < 1024) {
-                const nav = document.getElementById('nav-bar');
-                if (!nav.classList.contains('hidden-nav')) {
-                    toggleMenu();
-                }
+                toggleMenu();
             }
 
             if (event) event.preventDefault();
