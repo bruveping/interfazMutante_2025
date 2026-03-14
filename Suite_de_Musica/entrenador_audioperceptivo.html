@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Entrenador de Audio Perceptiva</title>
+    <style>
+        :root {
+            --primary: #4f46e5;
+            --primary-hover: #4338ca;
+            --bg: #f8fafc;
+            --card-bg: #ffffff;
+            --text: #1e293b;
+            --accent: #10b981;
+            --scale-hint: #f59e0b; /* Naranja para la escala */
+            --key-white: #ffffff;
+            --key-black: #1e293b;
+            --key-pressed: #e2e8f0;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            user-select: none;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 1.5rem 1rem;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 900px;
+            width: 100%;
+            background: var(--card-bg);
+            padding: 2rem;
+            border-radius: 1rem;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 2rem;
+            color: var(--primary);
+            font-weight: 800;
+        }
+
+        .menu-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 1.2rem;
+            margin-bottom: 2rem;
+        }
+
+        .option-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        label {
+            font-weight: 600;
+            font-size: 0.85rem;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        select, input {
+            padding: 0.7rem;
+            border: 2px solid #f1f5f9;
+            border-radius: 0.6rem;
+            background: #f8fafc;
+            font-size: 1rem;
+            outline: none;
+            transition: all 0.2s;
+        }
+
+        select:focus, input:focus {
+            border-color: var(--primary);
+            background: white;
+        }
+
+        .piano-container {
+            position: relative;
+            height: 220px;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            margin: 2rem 0;
+            background: #1e293b;
+            padding: 10px 5px 5px 5px;
+            border-radius: 12px;
+            box-shadow: inset 0 4px 10px rgba(0,0,0,0.3);
+            touch-action: none;
+        }
+
+        .key {
+            flex: 1;
+            border: 1px solid rgba(0,0,0,0.1);
+            border-radius: 0 0 6px 6px;
+            cursor: pointer;
+            position: relative;
+            transition: transform 0.05s, background 0.1s;
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            padding-bottom: 10px;
+            font-size: 0.75rem;
+            font-weight: bold;
+        }
+
+        .white-key {
+            background: var(--key-white);
+            height: 100%;
+            z-index: 1;
+            box-shadow: inset 0 -5px 0 #cbd5e1;
+            color: #64748b;
+        }
+
+        .white-key.manual-press {
+            background: #f1f5f9;
+            box-shadow: inset 0 -2px 0 #cbd5e1;
+            transform: translateY(2px);
+        }
+
+        .black-key {
+            background: var(--key-black);
+            height: 60%;
+            margin-left: -2.8%;
+            margin-right: -2.8%;
+            z-index: 2;
+            width: 5.6%;
+            border-radius: 0 0 4px 4px;
+            box-shadow: inset 0 -4px 0 #000;
+            color: #ffffff;
+            font-size: 0.65rem;
+        }
+
+        .black-key.manual-press {
+            background: #334155;
+            box-shadow: inset 0 -2px 0 #000;
+            transform: translateY(2px);
+        }
+
+        /* Iluminación RESPUESTA (Verde) */
+        .key.reveal-active {
+            background: var(--accent) !important;
+            box-shadow: 0 0 15px var(--accent);
+            z-index: 3;
+            transform: translateY(2px);
+            color: white;
+        }
+
+        /* Iluminación ESCALA (Naranja) */
+        .key.scale-active {
+            background: var(--scale-hint) !important;
+            box-shadow: 0 0 15px var(--scale-hint);
+            z-index: 3;
+            transform: translateY(2px);
+            color: white;
+        }
+
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            justify-content: center;
+            margin-bottom: 2rem;
+        }
+
+        button {
+            padding: 0.9rem 1.5rem;
+            border: none;
+            border-radius: 0.7rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            font-size: 0.95rem;
+        }
+
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover { transform: translateY(-2px); opacity: 0.9; }
+
+        .btn-secondary { background: #f1f5f9; color: var(--text); border: 1px solid #e2e8f0; }
+        .btn-secondary:hover { background: #e2e8f0; }
+
+        .btn-warning { background: #fff7ed; color: #9a3412; border: 1px solid #ffedd5; }
+        .btn-warning:hover { background: #ffedd5; }
+
+        .answer-area {
+            text-align: center;
+            padding: 1.5rem;
+            background: #f8fafc;
+            border: 2px dashed #e2e8f0;
+            border-radius: 1rem;
+            min-height: 100px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        #status-indicator {
+            font-weight: 600;
+            color: var(--primary);
+            margin-bottom: 0.5rem;
+            height: 1.2rem;
+        }
+
+        #answer-text {
+            font-size: 1.3rem;
+            font-weight: 800;
+            color: var(--accent);
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        #answer-text.visible {
+            opacity: 1;
+        }
+
+        .instructions {
+            margin-top: 2rem;
+            font-size: 0.9rem;
+            color: #64748b;
+            text-align: center;
+        }
+
+        @media (max-width: 600px) {
+            .piano-container { height: 180px; }
+            button { width: 100%; justify-content: center; }
+            .key { font-size: 0.6rem; padding-bottom: 5px; }
+            .black-key { font-size: 0.5rem; }
+        }
+
+    /* Estilo base para el botón de Menú */
+    .menu-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 10px 24px;
+      font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+      font-size: 14px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: #f8fafc;
+      text-decoration: none;
+      background: rgba(30, 41, 59, 0.7);
+      /* Fondo semi-transparente */
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      border-radius: 8px;
+      backdrop-filter: blur(8px);
+      /* Efecto cristalizado */
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Efecto de Brillo (Hover) */
+    .menu-btn:hover {
+      color: #ffffff;
+      background: rgba(56, 189, 248, 0.15);
+      border-color: #38bdf8;
+      box-shadow: 0 0 15px rgba(56, 189, 248, 0.4);
+      transform: translateY(-2px);
+    }
+
+    /* Efecto de clic (Active) */
+    .menu-btn:active {
+      transform: translateY(0);
+      box-shadow: 0 0 5px rgba(56, 189, 248, 0.2);
+    }
+
+    /* Indicador sutil inferior */
+    .menu-btn::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 50%;
+      width: 0;
+      height: 2px;
+      background: #38bdf8;
+      transition: all 0.3s ease;
+      transform: translateX(-50%);
+    }
+
+    .menu-btn:hover::after {
+      width: 60%;
+    }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Entrenador Auditivo</h1>
+    <a href="index.html" class="menu-btn">Menu</a>
+        <div class="menu-grid">
+            <div class="option-group">
+                <label>Escala</label>
+                <select id="scale-type">
+                    <option value="major">Mayor Natural</option>
+                    <option value="minor">Menor Natural</option>
+                    <option value="pentatonicMajor">Pentatónica Mayor</option>
+                    <option value="pentatonicMinor">Pentatónica Menor</option>
+                    <option value="chromatic">Cromática</option>
+                </select>
+            </div>
+
+            <div class="option-group">
+                <label>Clave (Tónica)</label>
+                <select id="key-root">
+                    <option value="C">C (Do)</option>
+                    <option value="C#">C# / Db</option>
+                    <option value="D">D (Re)</option>
+                    <option value="D#">D# / Eb</option>
+                    <option value="E">E (Mi)</option>
+                    <option value="F">F (Fa)</option>
+                    <option value="F#">F# / Gb</option>
+                    <option value="G">G (Sol)</option>
+                    <option value="G#">G# / Ab</option>
+                    <option value="A">A (La)</option>
+                    <option value="A#">A# / Bb</option>
+                    <option value="B">B (Si)</option>
+                </select>
+            </div>
+
+            <div class="option-group">
+                <label>Octava</label>
+                <input type="number" id="octave-select" value="4" min="0" max="8">
+            </div>
+
+            <div class="option-group">
+                <label>Secuencia</label>
+                <select id="note-count">
+                    <option value="1">1 Nota</option>
+                    <option value="2">2 Notas</option>
+                    <option value="3" selected>3 Notas</option>
+                    <option value="4">4 Notas</option>
+                    <option value="5">5 Notas</option>
+                    <option value="6">6 Notas</option>
+                    <option value="7">7 Notas</option>
+                    <option value="8">8 Notas</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="piano-container" id="piano"></div>
+
+        <div class="controls">
+            <button class="btn-primary" id="btn-play" title="Genera un desafío nuevo">
+                <span>🎵</span> Nuevo Aleatorio
+            </button>
+            <button class="btn-warning" id="btn-scale" title="Escucha la escala configurada">
+                <span>🎹</span> Oír Escala
+            </button>
+            <button class="btn-secondary" id="btn-repeat" title="Repite el desafío actual">
+                <span>🔄</span> Reescuchar
+            </button>
+            <button class="btn-secondary" id="btn-reveal" title="Muestra las notas correctas">
+                <span>👁️</span> Respuesta
+            </button>
+        </div>
+
+        <div class="answer-area">
+            <div id="status-indicator"></div>
+            <div id="answer-text">Notas: <span id="notes-display">...</span></div>
+        </div>
+
+        <p class="instructions">
+            ¡Usa "Oír Escala" para familiarizarte con las notas que ves en el teclado!
+        </p>
+    </div>
+
+    <script>
+        let audioCtx;
+        
+        function initAudio() {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+        }
+
+        function playNote(frequency, duration = 1.2) {
+            initAudio();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            
+            osc.type = 'triangle'; 
+            osc.frequency.setValueAtTime(frequency, audioCtx.currentTime);
+            
+            gain.gain.setValueAtTime(0, audioCtx.currentTime);
+            gain.gain.linearRampToValueAtTime(0.3, audioCtx.currentTime + 0.05);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+            
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            
+            osc.start();
+            osc.stop(audioCtx.currentTime + duration);
+        }
+
+        const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+        const SCALES = {
+            major: [0, 2, 4, 5, 7, 9, 11, 12],
+            minor: [0, 2, 3, 5, 7, 8, 10, 12],
+            pentatonicMajor: [0, 2, 4, 7, 9, 12],
+            pentatonicMinor: [0, 3, 5, 7, 10, 12],
+            chromatic: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+        };
+
+        function getFrequency(noteName, octave) {
+            const midi = (octave + 1) * 12 + NOTE_NAMES.indexOf(noteName);
+            return 440 * Math.pow(2, (midi - 69) / 12);
+        }
+
+        let currentSequence = [];
+        let isPlayingAuto = false;
+
+        const piano = document.getElementById('piano');
+        const btnPlay = document.getElementById('btn-play');
+        const btnScale = document.getElementById('btn-scale');
+        const btnRepeat = document.getElementById('btn-repeat');
+        const btnReveal = document.getElementById('btn-reveal');
+        const answerText = document.getElementById('answer-text');
+        const notesDisplay = document.getElementById('notes-display');
+        const statusIndicator = document.getElementById('status-indicator');
+        
+        const scaleSelect = document.getElementById('scale-type');
+        const keySelect = document.getElementById('key-root');
+        const octaveInput = document.getElementById('octave-select');
+        const countSelect = document.getElementById('note-count');
+
+        function renderPiano() {
+            piano.innerHTML = '';
+            const root = keySelect.value;
+            const startIndex = NOTE_NAMES.indexOf(root);
+            const baseOctave = parseInt(octaveInput.value);
+            
+            for(let i = 0; i < 14; i++) {
+                const globalIndex = startIndex + i;
+                const noteName = NOTE_NAMES[globalIndex % 12];
+                const currentOctave = baseOctave + Math.floor(globalIndex / 12);
+                
+                const isBlack = noteName.includes('#');
+                const key = document.createElement('div');
+                key.className = `key ${isBlack ? 'black-key' : 'white-key'}`;
+                key.dataset.note = noteName;
+                key.dataset.freq = getFrequency(noteName, currentOctave);
+                
+                // Agregamos el texto del nombre de la nota
+                const label = document.createElement('span');
+                label.textContent = noteName;
+                key.appendChild(label);
+
+                key.addEventListener('mousedown', () => handleManualPress(key));
+                key.addEventListener('touchstart', (e) => { e.preventDefault(); handleManualPress(key); });
+                piano.appendChild(key);
+            }
+        }
+
+        function handleManualPress(keyElement) {
+            if (isPlayingAuto) return;
+            const freq = parseFloat(keyElement.dataset.freq);
+            playNote(freq, 1.5);
+            keyElement.classList.add('manual-press');
+            setTimeout(() => keyElement.classList.remove('manual-press'), 200);
+        }
+
+        function generateSequence() {
+            const scalePattern = SCALES[scaleSelect.value];
+            const rootIndex = NOTE_NAMES.indexOf(keySelect.value);
+            const baseOctave = parseInt(octaveInput.value);
+            const count = parseInt(countSelect.value);
+            
+            const sequence = [];
+            for(let i = 0; i < count; i++) {
+                const interval = scalePattern[Math.floor(Math.random() * (scalePattern.length))];
+                const noteIdx = (rootIndex + interval) % 12;
+                const finalOctave = baseOctave + Math.floor((rootIndex + interval) / 12);
+                sequence.push({ name: NOTE_NAMES[noteIdx], freq: getFrequency(NOTE_NAMES[noteIdx], finalOctave) });
+            }
+            return sequence;
+        }
+
+        async function playSequence(sequence, mode = 'silent') {
+            if (isPlayingAuto) return;
+            isPlayingAuto = true;
+            
+            if(mode === 'silent') statusIndicator.textContent = "Escuchando secuencia...";
+            else if(mode === 'reveal') statusIndicator.textContent = "Mostrando respuesta...";
+            else if(mode === 'scale') statusIndicator.textContent = "Escuchando escala...";
+            
+            for(const note of sequence) {
+                let targetKey = null;
+                if (mode === 'reveal' || mode === 'scale') {
+                    const keys = Array.from(document.querySelectorAll('.key'));
+                    targetKey = keys.find(k => k.dataset.note === note.name && Math.abs(parseFloat(k.dataset.freq) - note.freq) < 0.1);
+                    if(targetKey) {
+                        targetKey.classList.add(mode === 'scale' ? 'scale-active' : 'reveal-active');
+                    }
+                }
+
+                playNote(note.freq, 1.5);
+                await new Promise(r => setTimeout(r, 700));
+                
+                if(targetKey) {
+                    targetKey.classList.remove('scale-active', 'reveal-active');
+                }
+                await new Promise(r => setTimeout(r, 100));
+            }
+            
+            statusIndicator.textContent = "";
+            isPlayingAuto = false;
+        }
+
+        btnPlay.addEventListener('click', () => {
+            answerText.classList.remove('visible');
+            currentSequence = generateSequence();
+            notesDisplay.textContent = currentSequence.map(n => n.name).join(' - ');
+            playSequence(currentSequence, 'silent');
+        });
+
+        btnRepeat.addEventListener('click', () => {
+            if (currentSequence.length > 0) playSequence(currentSequence, 'silent');
+        });
+
+        btnReveal.addEventListener('click', () => {
+            if (currentSequence.length > 0) {
+                answerText.classList.add('visible');
+                playSequence(currentSequence, 'reveal');
+            }
+        });
+
+        btnScale.addEventListener('click', () => {
+            const scalePattern = SCALES[scaleSelect.value];
+            const rootIndex = NOTE_NAMES.indexOf(keySelect.value);
+            const baseOctave = parseInt(octaveInput.value);
+            
+            const scaleSequence = scalePattern.map(interval => {
+                const noteIdx = (rootIndex + interval) % 12;
+                const finalOctave = baseOctave + Math.floor((rootIndex + interval) / 12);
+                return { name: NOTE_NAMES[noteIdx], freq: getFrequency(NOTE_NAMES[noteIdx], finalOctave) };
+            });
+            
+            playSequence(scaleSequence, 'scale');
+        });
+
+        [keySelect, octaveInput, scaleSelect].forEach(el => el.addEventListener('change', renderPiano));
+        renderPiano();
+    </script>
+</body>
+</html>
