@@ -3,7 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Piano Virtual 3</title>
+    <title>Piano Virtual Pro</title>
+    
+    <!-- Favicon dinámico con Emoji de Piano -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎹</text></svg>">
+    
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         :root {
@@ -11,7 +15,7 @@
             --black-key-height: 150px;
         }
         body {
-            touch-action: none; /* Previene scroll y gestos del sistema durante la ejecución */
+            touch-action: none; 
             background-color: #121212;
             color: #e4e4e7;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -19,6 +23,16 @@
             display: flex;
             flex-direction: column;
             height: 100vh;
+            margin: 0;
+        }
+        .controls-panel {
+            background: #1f1f23;
+            border-bottom: 1px solid #333;
+            padding: 12px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            z-index: 10;
         }
         .piano-wrapper {
             flex-grow: 1;
@@ -35,7 +49,7 @@
             position: relative;
         }
         .key {
-            flex: 1; /* Hace que las teclas se ajusten al ancho disponible */
+            flex: 1; 
             border: 1px solid #1a1a1a;
             cursor: pointer;
             user-select: none;
@@ -46,6 +60,7 @@
             padding-bottom: 10px;
             font-size: 0.7rem;
             font-weight: bold;
+            transition: transform 0.05s, background 0.05s;
         }
         .white-key {
             background: linear-gradient(to bottom, #eee 0%, #fff 100%);
@@ -58,7 +73,7 @@
             color: #fff;
             height: var(--black-key-height);
             z-index: 2;
-            margin-left: -2.5%; /* Posicionamiento relativo al ancho flexible */
+            margin-left: -2.5%; 
             margin-right: -2.5%;
             width: 5%; 
             min-width: 20px;
@@ -68,15 +83,6 @@
             background: #10b981 !important;
             color: white;
             transform: translateY(2px);
-        }
-        .controls-panel {
-            background: #1f1f23;
-            border-bottom: 1px solid #333;
-            padding: 12px;
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 15px;
-            z-index: 10;
         }
         .octave-selector {
             display: flex;
@@ -105,7 +111,8 @@
             padding: 4px;
             border-radius: 4px;
         }
-        input[type="range"] { accent-color: #10b981; }
+        input[type="range"] { accent-color: #10b981; width: 100%; }
+        label { pointer-events: none; }
     </style>
 </head>
 <body>
@@ -148,19 +155,19 @@
     <!-- Panel ADSR -->
     <div class="controls-panel text-[10px]">
         <div class="flex flex-col">
-            <label>Ataque</label>
+            <label class="text-zinc-500 uppercase">Ataque</label>
             <input type="range" id="attack" min="0.01" max="1" step="0.01" value="0.02">
         </div>
         <div class="flex flex-col">
-            <label>Decaimiento</label>
+            <label class="text-zinc-500 uppercase">Decaimiento</label>
             <input type="range" id="decay" min="0.05" max="1" step="0.01" value="0.15">
         </div>
         <div class="flex flex-col">
-            <label>Sostenido</label>
+            <label class="text-zinc-500 uppercase">Sostenido</label>
             <input type="range" id="sustain" min="0" max="1" step="0.01" value="0.4">
         </div>
         <div class="flex flex-col">
-            <label>Relajación</label>
+            <label class="text-zinc-500 uppercase">Relajación</label>
             <input type="range" id="release" min="0.1" max="3" step="0.01" value="0.6">
         </div>
     </div>
@@ -188,6 +195,12 @@
             release: document.getElementById('release')
         };
 
+        // Forzar valor inicial de volumen al cargar
+        window.addEventListener('DOMContentLoaded', () => {
+            masterVolInput.value = 0.2;
+            renderPiano();
+        });
+
         function changeOctave(val) {
             let current = parseInt(octaveInput.value);
             let next = current + val;
@@ -202,11 +215,11 @@
         function createKey(noteName, octave, isBlack) {
             const key = document.createElement('div');
             key.className = `key ${isBlack ? 'black-key' : 'white-key'}`;
-            // Solo mostramos nombres en teclas blancas para limpiar la UI
             if (!isBlack) key.innerText = `${noteName}${octave}`;
 
             const handleStart = (e) => {
                 e.preventDefault();
+                if (audioCtx.state === 'suspended') audioCtx.resume();
                 const freq = getFrequency(noteName, octave);
                 playNote(freq, noteName + octave);
                 key.classList.add('active');
@@ -218,12 +231,12 @@
                 key.classList.remove('active');
             };
 
-            // Soporte para Mouse y Touch
+            // Eventos Mouse
             key.addEventListener('mousedown', handleStart);
-            window.addEventListener('mouseup', (e) => {
-                if(key.classList.contains('active')) handleEnd(e);
-            });
+            key.addEventListener('mouseup', handleEnd);
+            key.addEventListener('mouseleave', handleEnd);
             
+            // Eventos Touch (Multitouch soportado)
             key.addEventListener('touchstart', handleStart, {passive: false});
             key.addEventListener('touchend', handleEnd, {passive: false});
 
@@ -235,7 +248,6 @@
             const baseOct = parseInt(octaveInput.value);
             const startIdx = parseInt(startNoteSelect.value);
             
-            // Renderizamos 2 octavas (25 notas para cerrar el ciclo)
             for (let i = 0; i < 25; i++) {
                 const absoluteIdx = startIdx + i;
                 const noteIdx = absoluteIdx % 12;
@@ -254,11 +266,8 @@
         }
 
         function playNote(frequency, keyId) {
-            if (audioCtx.state === 'suspended') audioCtx.resume();
-            
-            // Estructura de osciladores para mayor cuerpo (Imitación piano)
             const osc = audioCtx.createOscillator();
-            const subOsc = audioCtx.createOscillator(); // Armónico
+            const subOsc = audioCtx.createOscillator(); 
             const gainNode = audioCtx.createGain();
             const filter = audioCtx.createBiquadFilter();
 
@@ -269,7 +278,6 @@
             subOsc.frequency.setValueAtTime(frequency * 2, audioCtx.currentTime);
 
             filter.type = 'lowpass';
-            // El filtro empieza abierto y se cierra para simular el decaimiento de brillo del piano
             filter.frequency.setValueAtTime(frequency * 4, audioCtx.currentTime);
             filter.frequency.exponentialRampToValueAtTime(frequency * 1.5, audioCtx.currentTime + 0.5);
 
@@ -277,7 +285,7 @@
             const atk = parseFloat(adsr.attack.value);
             const dec = parseFloat(adsr.decay.value);
             const sus = parseFloat(adsr.sustain.value);
-            const master = parseFloat(masterVolInput.value); // Ganancia aumentada
+            const master = parseFloat(masterVolInput.value);
 
             gainNode.gain.setValueAtTime(0, now);
             gainNode.gain.linearRampToValueAtTime(master, now + atk);
@@ -310,10 +318,7 @@
             }
         }
 
-        // Inicializar renderizado
         window.addEventListener('resize', renderPiano);
-        renderPiano();
-
     </script>
 </body>
 </html>
