@@ -1,123 +1,320 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
-<title>Piano Touch – Sawtooth Low Latency</title>
-<style>
-*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-body{margin:0;background:#000;color:#fff;font-family:system-ui;display:flex;flex-direction:column;height:100vh;overflow:hidden;user-select:none}
-#top{padding:8px 12px;display:flex;gap:12px;align-items:center;background:#000;border-bottom:1px solid #222}
-button{background:#222;color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:14px}
-#octave{font-weight:bold;color:#4caf50}
-#volume{
-    width: 70%;      /* Ocupa el 70% del ancho */
-  /*  margin: 0 auto;*/  /* Esto lo centra horizontalmente */
- }
-#piano{flex:1;display:flex;padding:6px 4px;touch-action:none;background:#000}
-.key{flex:1;display:flex;align-items:flex-end;justify-content:center;padding-bottom:10px;border-radius:0 0 6px 6px;transition:background .03s}
-.white{background:#fff;color:#222;margin:1px;z-index:1}
-.white.active{background:#ccc}
-.black{background:#000;color:#fff;margin-left:-2%;margin-right:-2%;z-index:2;flex:.65;height:60%}
-.black.active{background:#333}
-.key span{font-size:9px;pointer-events:none;opacity:.5}
-input[type=range]{width:90px}
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Piano Virtual Pro</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        :root {
+            --white-key-height: 250px;
+            --black-key-height: 150px;
+        }
+        body {
+            touch-action: none; /* Previene scroll y gestos del sistema durante la ejecución */
+            background-color: #121212;
+            color: #e4e4e7;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+        .piano-wrapper {
+            flex-grow: 1;
+            display: flex;
+            align-items: flex-end;
+            padding-bottom: 20px;
+            width: 100%;
+            overflow: hidden;
+        }
+        .piano-container {
+            display: flex;
+            width: 100%;
+            height: var(--white-key-height);
+            position: relative;
+        }
+        .key {
+            flex: 1; /* Hace que las teclas se ajusten al ancho disponible */
+            border: 1px solid #1a1a1a;
+            cursor: pointer;
+            user-select: none;
+            position: relative;
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            padding-bottom: 10px;
+            font-size: 0.7rem;
+            font-weight: bold;
+        }
+        .white-key {
+            background: linear-gradient(to bottom, #eee 0%, #fff 100%);
+            color: #555;
+            z-index: 1;
+            border-radius: 0 0 5px 5px;
+        }
+        .black-key {
+            background: linear-gradient(to bottom, #444 0%, #000 100%);
+            color: #fff;
+            height: var(--black-key-height);
+            z-index: 2;
+            margin-left: -2.5%; /* Posicionamiento relativo al ancho flexible */
+            margin-right: -2.5%;
+            width: 5%; 
+            min-width: 20px;
+            border-radius: 0 0 3px 3px;
+        }
+        .key.active {
+            background: #10b981 !important;
+            color: white;
+            transform: translateY(2px);
+        }
+        .controls-panel {
+            background: #1f1f23;
+            border-bottom: 1px solid #333;
+            padding: 12px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            z-index: 10;
+        }
+        .octave-selector {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .btn-nav {
+            background: #3f3f46;
+            color: white;
+            width: 32px;
+            height: 32px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            transition: background 0.2s;
+        }
+        .btn-nav:active { background: #10b981; }
+        input[type="number"] {
+            background: #27272a;
+            border: 1px solid #3f3f46;
+            color: white;
+            text-align: center;
+            width: 50px;
+            padding: 4px;
+            border-radius: 4px;
+        }
+        input[type="range"] { accent-color: #10b981; }
+    </style>
 </head>
 <body>
-<div id="top">
-<button id="down">◀</button>
-Oct <span id="octave">3</span>
-<button id="up">▶</button>
-Vol <input type="range" id="volume" min="0" max="100" value="30">
-</div>
-<div id="piano"></div>
-<script>
-'use strict';
 
-// CONFIG MINIMA
-const attack=.0085;
-const release=.25;
+    <!-- Panel de Controles Superior -->
+    <div class="controls-panel">
+        <div class="flex flex-col gap-1">
+            <label class="text-xs uppercase tracking-wider text-zinc-400">Volumen</label>
+            <input type="range" id="masterVolume" min="0" max="2" step="0.05" value="1.2">
+        </div>
 
-const state={baseOctave:3,vol:.3,active:new Map()};
+        <div class="flex flex-col gap-1">
+            <label class="text-xs uppercase tracking-wider text-zinc-400">Octava (C0 - C10)</label>
+            <div class="octave-selector">
+                <button class="btn-nav" onclick="changeOctave(-1)">-</button>
+                <input type="number" id="octaveInput" value="4" min="0" max="10" readonly>
+                <button class="btn-nav" onclick="changeOctave(1)">+</button>
+            </div>
+        </div>
 
-let ctx;
-function audio(){
- if(!ctx) ctx=new (window.AudioContext||webkitAudioContext)({latencyHint:'interactive'});
- if(ctx.state==='suspended') ctx.resume();
- return ctx;
-}
+        <div class="flex flex-col gap-1">
+            <label class="text-xs uppercase tracking-wider text-zinc-400">Primera Nota</label>
+            <select id="startNote" class="bg-zinc-800 border border-zinc-700 text-white text-xs p-2 rounded">
+                <option value="0">C (Do)</option>
+                <option value="1">C#</option>
+                <option value="2">D (Re)</option>
+                <option value="3">D#</option>
+                <option value="4">E (Mi)</option>
+                <option value="5">F (Fa)</option>
+                <option value="6">F#</option>
+                <option value="7">G (Sol)</option>
+                <option value="8">G#</option>
+                <option value="9">A (La)</option>
+                <option value="10">A#</option>
+                <option value="11">B (Si)</option>
+            </select>
+        </div>
+    </div>
 
-const notes=[0,1,2,3,4,5,6,7,8,9,10,11];
-const names=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
-const freq=m=>440*Math.pow(2,(m-69)/12);
+    <!-- Panel ADSR -->
+    <div class="controls-panel text-[10px]">
+        <div class="flex flex-col">
+            <label>Ataque</label>
+            <input type="range" id="attack" min="0.01" max="1" step="0.01" value="0.02">
+        </div>
+        <div class="flex flex-col">
+            <label>Decaimiento</label>
+            <input type="range" id="decay" min="0.05" max="1" step="0.01" value="0.15">
+        </div>
+        <div class="flex flex-col">
+            <label>Sostenido</label>
+            <input type="range" id="sustain" min="0" max="1" step="0.01" value="0.4">
+        </div>
+        <div class="flex flex-col">
+            <label>Relajación</label>
+            <input type="range" id="release" min="0.1" max="3" step="0.01" value="0.6">
+        </div>
+    </div>
 
-class Voice{
- constructor(m){
-  const c=audio();
-  this.o=c.createOscillator();
-  this.g=c.createGain();
-  this.o.type='sawtooth';
-  this.o.frequency.value=freq(m);
-  this.g.gain.setValueAtTime(0,c.currentTime);
-  this.g.gain.linearRampToValueAtTime(state.vol,c.currentTime+attack);
-  this.o.connect(this.g).connect(c.destination);
-  this.o.start();
- }
- stop(){
-  const c=audio();
-  const t=c.currentTime+release;
-  this.g.gain.cancelScheduledValues(c.currentTime);
-  this.g.gain.setValueAtTime(this.g.gain.value,c.currentTime);
-  this.g.gain.exponentialRampToValueAtTime(.001,t);
-  this.o.stop(t);
- }
-}
+    <!-- Contenedor del Teclado -->
+    <div class="piano-wrapper">
+        <div id="piano" class="piano-container"></div>
+    </div>
 
-const piano=document.getElementById('piano');
+    <script>
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const activeVoices = new Map();
 
-function build(){
- let h='';
- for(let o=0;o<2;o++){
-  notes.forEach(n=>{
-   const m=(state.baseOctave+o)*12+n;
-   const b=names[n].includes('#');
-   h+=`<div class="key ${b?'black':'white'}" data-m="${m}"><span>${names[n]}</span></div>`;
-  });
- }
- piano.innerHTML=h;
-}
+        const notesMap = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+        const pianoElement = document.getElementById('piano');
 
-function start(e){
- e.preventDefault();
- const k=e.target.closest('.key');
- if(!k) return;
- const m=k.dataset.m;
- if(!state.active.has(m)){
-  k.classList.add('active');
-  state.active.set(m,new Voice(m));
- }
-}
+        const octaveInput = document.getElementById('octaveInput');
+        const startNoteSelect = document.getElementById('startNote');
+        const masterVolInput = document.getElementById('masterVolume');
+        
+        const adsr = {
+            attack: document.getElementById('attack'),
+            decay: document.getElementById('decay'),
+            sustain: document.getElementById('sustain'),
+            release: document.getElementById('release')
+        };
 
-function end(e){
- const k=e.target.closest('.key');
- if(!k) return;
- const m=k.dataset.m;
- const v=state.active.get(m);
- if(v){v.stop();state.active.delete(m);k.classList.remove('active');}
-}
+        function changeOctave(val) {
+            let current = parseInt(octaveInput.value);
+            let next = current + val;
+            if (next >= 0 && next <= 10) {
+                octaveInput.value = next;
+                renderPiano();
+            }
+        }
 
-piano.addEventListener('touchstart',start,{passive:false});
-piano.addEventListener('touchend',end,{passive:false});
-piano.addEventListener('touchcancel',end,{passive:false});
-piano.addEventListener('mousedown',start);
-window.addEventListener('mouseup',()=>{state.active.forEach(v=>v.stop());state.active.clear();document.querySelectorAll('.active').forEach(k=>k.classList.remove('active'))});
+        startNoteSelect.onchange = () => renderPiano();
 
-volume.oninput=e=>state.vol=e.target.value/100;
-up.onclick=()=>{if(state.baseOctave<7){state.baseOctave++;octave.textContent=state.baseOctave;build();}};
-down.onclick=()=>{if(state.baseOctave>0){state.baseOctave--;octave.textContent=state.baseOctave;build();}};
+        function createKey(noteName, octave, isBlack) {
+            const key = document.createElement('div');
+            key.className = `key ${isBlack ? 'black-key' : 'white-key'}`;
+            // Solo mostramos nombres en teclas blancas para limpiar la UI
+            if (!isBlack) key.innerText = `${noteName}${octave}`;
 
-build();
-</script>
+            const handleStart = (e) => {
+                e.preventDefault();
+                const freq = getFrequency(noteName, octave);
+                playNote(freq, noteName + octave);
+                key.classList.add('active');
+            };
+
+            const handleEnd = (e) => {
+                e.preventDefault();
+                stopNote(noteName + octave);
+                key.classList.remove('active');
+            };
+
+            // Soporte para Mouse y Touch
+            key.addEventListener('mousedown', handleStart);
+            window.addEventListener('mouseup', (e) => {
+                if(key.classList.contains('active')) handleEnd(e);
+            });
+            
+            key.addEventListener('touchstart', handleStart, {passive: false});
+            key.addEventListener('touchend', handleEnd, {passive: false});
+
+            return key;
+        }
+
+        function renderPiano() {
+            pianoElement.innerHTML = '';
+            const baseOct = parseInt(octaveInput.value);
+            const startIdx = parseInt(startNoteSelect.value);
+            
+            // Renderizamos 2 octavas (25 notas para cerrar el ciclo)
+            for (let i = 0; i < 25; i++) {
+                const absoluteIdx = startIdx + i;
+                const noteIdx = absoluteIdx % 12;
+                const octaveOffset = Math.floor(absoluteIdx / 12);
+                const noteName = notesMap[noteIdx];
+                const isBlack = noteName.includes('#');
+                
+                pianoElement.appendChild(createKey(noteName, baseOct + octaveOffset, isBlack));
+            }
+        }
+
+        function getFrequency(note, octave) {
+            const notes = {'C': 0, 'C#': 1, 'D': 2, 'D#': 3, 'E': 4, 'F': 5, 'F#': 6, 'G': 7, 'G#': 8, 'A': 9, 'A#': 10, 'B': 11};
+            const h = notes[note] + (octave - 4) * 12;
+            return 440 * Math.pow(2, (h - 9) / 12);
+        }
+
+        function playNote(frequency, keyId) {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            
+            // Estructura de osciladores para mayor cuerpo (Imitación piano)
+            const osc = audioCtx.createOscillator();
+            const subOsc = audioCtx.createOscillator(); // Armónico
+            const gainNode = audioCtx.createGain();
+            const filter = audioCtx.createBiquadFilter();
+
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(frequency, audioCtx.currentTime);
+            
+            subOsc.type = 'sine';
+            subOsc.frequency.setValueAtTime(frequency * 2, audioCtx.currentTime);
+
+            filter.type = 'lowpass';
+            // El filtro empieza abierto y se cierra para simular el decaimiento de brillo del piano
+            filter.frequency.setValueAtTime(frequency * 4, audioCtx.currentTime);
+            filter.frequency.exponentialRampToValueAtTime(frequency * 1.5, audioCtx.currentTime + 0.5);
+
+            const now = audioCtx.currentTime;
+            const atk = parseFloat(adsr.attack.value);
+            const dec = parseFloat(adsr.decay.value);
+            const sus = parseFloat(adsr.sustain.value);
+            const master = parseFloat(masterVolInput.value); // Ganancia aumentada
+
+            gainNode.gain.setValueAtTime(0, now);
+            gainNode.gain.linearRampToValueAtTime(master, now + atk);
+            gainNode.gain.exponentialRampToValueAtTime(master * sus + 0.001, now + atk + dec);
+
+            osc.connect(filter);
+            subOsc.connect(filter);
+            filter.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+
+            osc.start();
+            subOsc.start();
+
+            activeVoices.set(keyId, { osc, subOsc, gainNode });
+        }
+
+        function stopNote(keyId) {
+            const voice = activeVoices.get(keyId);
+            if (voice) {
+                const now = audioCtx.currentTime;
+                const rel = parseFloat(adsr.release.value);
+                
+                voice.gainNode.gain.cancelScheduledValues(now);
+                voice.gainNode.gain.setValueAtTime(voice.gainNode.gain.value, now);
+                voice.gainNode.gain.exponentialRampToValueAtTime(0.0001, now + rel);
+                
+                voice.osc.stop(now + rel + 0.1);
+                voice.subOsc.stop(now + rel + 0.1);
+                activeVoices.delete(keyId);
+            }
+        }
+
+        // Inicializar renderizado
+        window.addEventListener('resize', renderPiano);
+        renderPiano();
+
+    </script>
 </body>
 </html>
+
