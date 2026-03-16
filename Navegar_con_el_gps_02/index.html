@@ -271,7 +271,7 @@
                     }).addTo(routesLayer);
 
                     map.fitBounds(polyline.getBounds(), { padding: [100, 100] });
-                    document.getElementById('destDist').textContent = `${(route.distance / 1000).toFixed(2)} km - ${Math.round(route.duration / 60)} min caminando`;
+                    document.getElementById('destDist').textContent = `${(route.distance / 1000).toFixed(2)} km - ${Math.round((route.distance / 1000).toFixed(2) / 5)} horas caminando`;
                 }
             } catch (err) {
                 alert("Error al calcular la ruta.");
