@@ -42,7 +42,7 @@ navegar con el GPS [navegar con el GPS](https://bruveping.github.io/interfazMuta
 
 navegar con el GPS 02 [navegar con el GPS 02](https://bruveping.github.io/interfazMutante_2025/Navegar_con_el_gps_02)
 
-
+navegar con el GPS 03 [navegar con el GPS 03](https://bruveping.github.io/interfazMutante_2025/Navegar_con_el_GPS_03)
 
 Mapear_con_clics [Mapear_con_clics](https://bruveping.github.io/interfazMutante_2025/Mapear_con_clics)
 
