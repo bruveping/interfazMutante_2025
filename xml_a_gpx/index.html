@@ -66,7 +66,12 @@
 
         <div id="infoAlert" class="mt-6 p-4 bg-blue-900/30 border border-blue-500/50 rounded-xl text-blue-200 text-sm flex items-start gap-3">
             <span class="text-xl">💡</span>
-            <p><strong>Tip:</strong> Si el Torreón aparecía en el mar, era por un error de redondeo en la longitud. Al usar la <b>Vista Previa Mapa</b> aquí mismo, puedes verificar la posición sobre OpenStreetMap antes de ir a Google My Maps.</p>
+            <p><strong>Tip:</strong>
+                :
+Normalización de Separadores: Asegurar que las latitudes y longitudes siempre usen puntos y no comas (un error común en usuarios de habla hispana que rompe el GPS).
+Eliminación de Caracteres Especiales: Los nombres en los GPX a veces fallan por tildes o eñes mal codificadas. La herramienta ahora limpia el texto para maximizar la compatibilidad con dispositivos viejos.
+Control de Precisión: Forzar el redondeo a 6 decimales, que es el estándar de oro para la precisión urbana (aproximadamente 10cm de margen de error).
+            </p>
         </div>
     </div>
 
