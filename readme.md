@@ -42,6 +42,8 @@ navegar con el GPS [navegar con el GPS](https://bruveping.github.io/interfazMuta
 
 Mapear_con_clics [Mapear_con_clics](https://bruveping.github.io/interfazMutante_2025/Mapear_con_clics)
 
+xml_a_gpx [xml_a_gpx](https://bruveping.github.io/interfazMutante_2025/xml_a_gpx/)
+
 
 Medidor de ruido [medidor de ruido](https://bruveping.github.io/interfazMutante_2025/medidor_de_ruido)
 
