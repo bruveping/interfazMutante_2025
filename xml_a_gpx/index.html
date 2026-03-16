@@ -3,57 +3,160 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GPX to Map Converter</title>
+    <title>GeoPreview - Arte y Tecnología MDP</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Leaflet CSS & JS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        #map { height: 500px; width: 100%; border-radius: 1rem; z-index: 1; }
+        .hidden-panel { display: none; }
+        .glass-card { background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(8px); }
+    </style>
 </head>
-<body class="bg-gray-900 text-gray-100 min-h-screen flex flex-col items-center p-4">
+<body class="bg-slate-900 text-slate-100 min-h-screen">
 
-    <div class="w-full max-w-3xl bg-gray-800 rounded-3xl shadow-2xl p-6 md:p-10 border border-gray-700">
-        <h1 class="text-3xl font-extrabold mb-2 bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-emerald-400">
-            Exportador de Mapas
-        </h1>
-        <p class="text-gray-400 mb-8">Pega el código XML del GPX para generar tus archivos de navegación.</p>
+    <div class="max-w-5xl mx-auto p-4 md:p-8">
+        <header class="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
+            <div>
+                <h1 class="text-3xl font-black bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-cyan-400">
+                    GEOPREVIEW MDP
+                </h1>
+                <p class="text-slate-400 text-sm">Arte, Tecnología y Arquitectura en el mapa</p>
+            </div>
+            <div class="flex gap-2 bg-slate-800 p-1 rounded-xl border border-slate-700">
+                <button id="btnEditor" onclick="showPanel('editor')" class="px-4 py-2 rounded-lg bg-blue-600 text-white transition-all">Editor XML</button>
+                <button id="btnMapa" onclick="showPanel('mapa')" class="px-4 py-2 rounded-lg hover:bg-slate-700 transition-all text-slate-300">Vista Previa Mapa</button>
+            </div>
+        </header>
 
-        <textarea 
-            id="xmlInput" 
-            class="w-full h-80 bg-gray-950 text-emerald-500 font-mono text-sm p-4 rounded-2xl border border-gray-700 focus:ring-2 focus:ring-blue-500 focus:outline-none mb-6 resize-none"
-            placeholder="Pega aquí el contenido del GPX..."
-        ></textarea>
-
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <button onclick="download('gpx')" class="bg-blue-600 hover:bg-blue-500 py-3 rounded-xl font-bold transition-all transform active:scale-95">Descargar GPX</button>
-            <button onclick="download('kml')" class="bg-emerald-600 hover:bg-emerald-500 py-3 rounded-xl font-bold transition-all transform active:scale-95">Descargar KML</button>
-            <button onclick="download('json')" class="bg-amber-600 hover:bg-amber-500 py-3 rounded-xl font-bold transition-all transform active:scale-95">Descargar GeoJSON</button>
+        <!-- PANEL EDITOR -->
+        <div id="panelEditor" class="space-y-4">
+            <div class="bg-slate-800 rounded-2xl p-4 border border-slate-700 shadow-2xl">
+                <textarea 
+                    id="gpxInput" 
+                    class="w-full h-[500px] bg-slate-950 text-emerald-400 font-mono text-xs p-4 rounded-xl border border-slate-700 focus:ring-2 focus:ring-blue-500 outline-none resize-none"
+                    placeholder="Pega aquí tu código GPX..."
+                ></textarea>
+            </div>
         </div>
 
-        <div id="msg" class="mt-6 text-center text-sm font-medium hidden"></div>
+        <!-- PANEL MAPA -->
+        <div id="panelMapa" class="hidden-panel space-y-4">
+            <div class="bg-slate-800 rounded-2xl p-2 border border-slate-700 shadow-2xl relative">
+                <div id="map"></div>
+                <div class="absolute bottom-4 left-4 z-[1000] glass-card p-3 rounded-lg border border-white/20 text-slate-900 text-xs font-bold shadow-xl">
+                    OpenStreetMap + Leaflet
+                </div>
+            </div>
+        </div>
+
+        <!-- ACCIONES -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-8">
+            <button onclick="downloadFile('gpx')" class="bg-slate-800 hover:bg-slate-700 border border-slate-600 py-4 rounded-xl font-bold transition-all flex items-center justify-center gap-2">
+                <span>📄</span> Descargar .GPX
+            </button>
+            <button onclick="downloadFile('kml')" class="bg-slate-800 hover:bg-slate-700 border border-slate-600 py-4 rounded-xl font-bold transition-all flex items-center justify-center gap-2">
+                <span>🌍</span> Descargar .KML (Recomendado)
+            </button>
+            <button onclick="downloadFile('json')" class="bg-blue-600 hover:bg-blue-500 py-4 rounded-xl font-bold transition-all shadow-lg shadow-blue-900/40 flex items-center justify-center gap-2">
+                <span>🚀</span> Exportar GeoJSON
+            </button>
+        </div>
+
+        <div id="infoAlert" class="mt-6 p-4 bg-blue-900/30 border border-blue-500/50 rounded-xl text-blue-200 text-sm flex items-start gap-3">
+            <span class="text-xl">💡</span>
+            <p><strong>Tip:</strong> Si el Torreón aparecía en el mar, era por un error de redondeo en la longitud. Al usar la <b>Vista Previa Mapa</b> aquí mismo, puedes verificar la posición sobre OpenStreetMap antes de ir a Google My Maps.</p>
+        </div>
     </div>
 
     <script>
-        function download(type) {
-            const content = document.getElementById('xmlInput').value.trim();
-            if(!content) {
-                alert("El campo está vacío");
+        let map;
+        let markersGroup;
+
+        // Inicializar Mapa
+        function initMap() {
+            if (map) return;
+            map = L.map('map').setView([-38.005, -57.545], 13);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; OpenStreetMap contributors'
+            }).addTo(map);
+            markersGroup = L.layerGroup().addTo(map);
+        }
+
+        function showPanel(panel) {
+            const editor = document.getElementById('panelEditor');
+            const mapa = document.getElementById('panelMapa');
+            const btnEditor = document.getElementById('btnEditor');
+            const btnMapa = document.getElementById('btnMapa');
+
+            if (panel === 'editor') {
+                editor.classList.remove('hidden-panel');
+                mapa.classList.add('hidden-panel');
+                btnEditor.classList.add('bg-blue-600', 'text-white');
+                btnMapa.classList.remove('bg-blue-600', 'text-white');
+            } else {
+                editor.classList.add('hidden-panel');
+                mapa.classList.remove('hidden-panel');
+                btnMapa.classList.add('bg-blue-600', 'text-white');
+                btnEditor.classList.remove('bg-blue-600', 'text-white');
+                initMap();
+                parseAndShowOnMap();
+            }
+        }
+
+        function parseAndShowOnMap() {
+            const xmlText = document.getElementById('gpxInput').value;
+            if (!xmlText) return;
+
+            const parser = new DOMParser();
+            const xmlDoc = parser.parseFromString(xmlText, "text/xml");
+            const wpts = xmlDoc.getElementsByTagName("wpt");
+
+            markersGroup.clearLayers();
+            const bounds = [];
+
+            for (let wpt of wpts) {
+                const lat = parseFloat(wpt.getAttribute("lat"));
+                const lon = parseFloat(wpt.getAttribute("lon"));
+                const name = wpt.getElementsByTagName("name")[0]?.textContent || "Punto";
+                const desc = wpt.getElementsByTagName("desc")[0]?.textContent || "";
+
+                const marker = L.marker([lat, lon])
+                    .bindPopup(`<div class="text-slate-900"><strong>${name}</strong><br><small>${desc}</small></div>`);
+                markersGroup.addLayer(marker);
+                bounds.push([lat, lon]);
+            }
+
+            if (bounds.length > 0) {
+                map.fitBounds(bounds, { padding: [50, 50] });
+            }
+        }
+
+        function downloadFile(format) {
+            const xmlText = document.getElementById('gpxInput').value;
+            if (!xmlText) {
+                alert("Primero pega el código XML en el editor.");
                 return;
             }
 
-            let finalContent = content;
-            let mimeType = "application/xml";
-            let fileName = `mapa_mdp.${type}`;
+            let content = xmlText;
+            let type = "application/xml";
+            let filename = `recorrido_mardel.${format}`;
 
-            if (type === 'kml') {
-                finalContent = convertToKML(content);
-                mimeType = "application/vnd.google-earth.kml+xml";
-            } else if (type === 'json') {
-                finalContent = convertToGeoJSON(content);
-                mimeType = "application/json";
+            if (format === 'kml') {
+                content = convertToKML(xmlText);
+                type = "application/vnd.google-earth.kml+xml";
+            } else if (format === 'json') {
+                content = convertToGeoJSON(xmlText);
+                type = "application/json";
             }
 
-            const blob = new Blob([finalContent], { type: mimeType });
+            const blob = new Blob([content], { type: type });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = fileName;
+            a.download = filename;
             a.click();
             URL.revokeObjectURL(url);
         }
@@ -62,7 +165,7 @@
             const parser = new DOMParser();
             const doc = parser.parseFromString(xml, "text/xml");
             const wpts = doc.getElementsByTagName("wpt");
-            let kml = `<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Puntos Mar del Plata</name>`;
+            let kml = `<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Puntos Interés MDP</name>`;
             for (let w of wpts) {
                 kml += `<Placemark><name>${w.querySelector("name")?.textContent}</name><description>${w.querySelector("desc")?.textContent}</description><Point><coordinates>${w.getAttribute("lon")},${w.getAttribute("lat")},0</coordinates></Point></Placemark>`;
             }
@@ -80,6 +183,17 @@
             }));
             return JSON.stringify({ type: "FeatureCollection", features }, null, 2);
         }
+
+        // Cargar por defecto el GPX de Mar del Plata para facilitar la prueba
+        window.onload = () => {
+            document.getElementById('gpxInput').value = `<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="Gemini" xmlns="http://www.topografix.com/GPX/1/1">
+  <wpt lat="-37.975510" lon="-57.545745"><name>Museo MAR</name><desc>Arte Contemporáneo</desc></wpt>
+  <wpt lat="-38.003920" lon="-57.536640"><name>Torreon del Monje</name><desc>Arquitectura costera</desc></wpt>
+  <wpt lat="-38.016390" lon="-57.568450"><name>Casa sobre el Arroyo</name><desc>Tecnología y arquitectura</desc></wpt>
+  <wpt lat="-38.012580" lon="-57.555850"><name>Torre Tanque</name><desc>Ingeniería hídrica</desc></wpt>
+</gpx>`;
+        };
     </script>
 </body>
 </html>
