@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Geo_Navegador_Pro</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
+    
+    <style>
+        body, html { height: 100%; margin: 0; overflow: hidden; }
+        #map { height: 100vh; width: 100vw; z-index: 1; }
+        .ui-overlay { z-index: 1000; position: absolute; pointer-events: none; }
+        .ui-overlay * { pointer-events: auto; }
+        
+        .user-location-icon { position: relative; }
+        .direction-arrow {
+            width: 0; height: 0;
+            border-left: 10px solid transparent;
+            border-right: 10px solid transparent;
+            border-bottom: 20px solid #3b82f6;
+            position: absolute;
+            top: -25px; left: -10px;
+            transition: transform 0.1s ease-out;
+        }
+        .user-dot {
+            width: 15px; height: 15px;
+            background: #3b82f6;
+            border: 2px solid white;
+            border-radius: 50%;
+            box-shadow: 0 0 10px rgba(0,0,0,0.3);
+        }
+
+        #loader {
+            display: none;
+            position: fixed;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 2000;
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+        }
+    </style>
+</head>
+<body class="bg-slate-50">
+
+    <!-- Cargador -->
+    <div id="loader" class="text-center">
+        <div class="animate-spin rounded-full h-10 w-10 border-b-4 border-blue-600 mx-auto mb-2"></div>
+        <p class="text-slate-700 font-bold">Calculando ruta...</p>
+    </div>
+
+    <!-- Panel Superior -->
+    <div class="ui-overlay top-4 left-4 right-4 flex flex-col gap-2">
+        <div class="bg-white/90 backdrop-blur shadow-xl rounded-2xl p-4 flex items-center justify-between border border-white/20">
+            <h1 class="text-lg font-black text-slate-800 tracking-tight">Geo_Navegador <span class="text-blue-600">_GPX</span></h1>
+            <button onclick="requestPermission()" id="compassBtn" class="bg-amber-100 text-amber-700 px-3 py-1 rounded-full text-xs font-bold border border-amber-200">Activar Brújula</button>
+        </div>
+    </div>
+
+    <!-- Botones Flotantes -->
+    <div class="ui-overlay bottom-8 left-4 right-4 flex flex-col gap-4">
+        <div class="flex justify-between items-end">
+            <div class="flex flex-col gap-2">
+                <label class="bg-white w-12 h-12 rounded-full shadow-xl border border-slate-200 flex items-center justify-center cursor-pointer hover:bg-slate-50 transition-all">
+                    <i class="fa-solid fa-file-import text-blue-600 text-xl"></i>
+                    <input type="file" id="fileInput" class="hidden" accept=".gpx,.kml,.json,.geojson">
+                </label>
+                <button onclick="centerOnUser()" class="bg-white w-12 h-12 rounded-full shadow-xl border border-slate-200 flex items-center justify-center hover:bg-slate-50 transition-all">
+                    <i class="fa-solid fa-location-crosshairs text-blue-600 text-xl"></i>
+                </button>
+            </div>
+            <button onclick="exportMapData()" class="bg-blue-600 text-white w-14 h-14 rounded-2xl shadow-2xl flex items-center justify-center hover:bg-blue-700 transition-all active:scale-95">
+                <i class="fa-solid fa-download text-2xl"></i>
+            </button>
+        </div>
+
+        <!-- Tarjeta de Información -->
+        <div id="destinationCard" class="hidden bg-white rounded-3xl p-5 shadow-2xl border border-slate-100">
+            <div class="flex justify-between items-start mb-3">
+                <div>
+                    <h3 id="destTitle" class="text-xl font-bold text-slate-900">Punto de interés</h3>
+                    <p id="destDist" class="text-blue-600 font-bold text-sm">-- km</p>
+                </div>
+                <button onclick="closeDestination()" class="text-slate-300 hover:text-slate-500"><i class="fa-solid fa-circle-xmark text-xl"></i></button>
+            </div>
+            <p id="destDesc" class="text-slate-600 text-sm mb-4 line-clamp-2">Cálculo estimado a 5 km/h.</p>
+            <button id="routeBtn" class="w-full bg-blue-600 text-white font-bold py-4 rounded-2xl shadow-lg shadow-blue-200 flex items-center justify-center gap-2">
+                <i class="fa-solid fa-person-walking"></i> Trazar Ruta Caminando
+            </button>
+        </div>
+    </div>
+
+    <div id="map"></div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/togeojson/0.16.0/togeojson.min.js"></script>
+    
+    <script>
+        let map, userMarker, userCircle, heading = 0, userPos = null;
+        let pointsLayer = L.layerGroup(), routesLayer = L.layerGroup(), selectedTarget = null;
+
+        function init() {
+            map = L.map('map', { zoomControl: false }).setView([-38.005, -57.545], 14);
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(map);
+            pointsLayer.addTo(map);
+            routesLayer.addTo(map);
+            startTracking();
+            setupFileImport();
+        }
+
+        function startTracking() {
+            if (!navigator.geolocation) return;
+            navigator.geolocation.watchPosition((pos) => {
+                const { latitude, longitude, accuracy } = pos.coords;
+                userPos = [latitude, longitude];
+                const icon = L.divIcon({
+                    className: 'user-location-icon',
+                    html: `<div class="direction-arrow" id="arrow"></div><div class="user-dot"></div>`,
+                    iconSize: [15, 15]
+                });
+                if (!userMarker) {
+                    userMarker = L.marker(userPos, { icon }).addTo(map);
+                    userCircle = L.circle(userPos, { radius: accuracy, weight: 1, opacity: 0.3, fillOpacity: 0.1 }).addTo(map);
+                    centerOnUser();
+                } else {
+                    userMarker.setLatLng(userPos);
+                    userCircle.setLatLng(userPos).setRadius(accuracy);
+                }
+            }, null, { enableHighAccuracy: true });
+        }
+
+        function requestPermission() {
+            if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+                DeviceOrientationEvent.requestPermission().then(r => { if (r == 'granted') window.addEventListener('deviceorientation', handleOrientation); });
+            } else { window.addEventListener('deviceorientation', handleOrientation); }
+            document.getElementById('compassBtn').classList.add('hidden');
+        }
+
+        function handleOrientation(e) {
+            heading = e.webkitCompassHeading || (360 - e.alpha) || 0;
+            const arrow = document.getElementById('arrow');
+            if (arrow) arrow.style.transform = `rotate(${heading}deg)`;
+        }
+
+        function setupFileImport() {
+            document.getElementById('fileInput').onchange = (e) => {
+                const file = e.target.files[0];
+                const reader = new FileReader();
+                reader.onload = (ev) => {
+                    const text = ev.target.result;
+                    let data;
+                    const parser = new DOMParser();
+                    if (file.name.endsWith('.gpx')) data = toGeoJSON.gpx(parser.parseFromString(text, "text/xml"));
+                    else if (file.name.endsWith('.kml')) data = toGeoJSON.kml(parser.parseFromString(text, "text/xml"));
+                    else data = JSON.parse(text);
+                    processGeoJSON(data);
+                };
+                reader.readAsText(file);
+            };
+        }
+
+        function processGeoJSON(data) {
+            pointsLayer.clearLayers();
+            const bounds = [];
+            L.geoJSON(data, {
+                onEachFeature: (feature, layer) => {
+                    layer.on('click', () => showDestination(feature.properties.name || "Punto", feature.properties.desc || "Sin descripción", layer.getLatLng()));
+                    if (layer.getLatLng) bounds.push(layer.getLatLng());
+                }
+            }).addTo(pointsLayer);
+            if (bounds.length > 0) map.fitBounds(bounds);
+        }
+
+        async function calculateRoute() {
+            if (!userPos || !selectedTarget) return;
+            document.getElementById('loader').style.display = 'block';
+            routesLayer.clearLayers();
+            const url = `https://router.project-osrm.org/route/v1/foot/${userPos[1]},${userPos[0]};${selectedTarget.lng},${selectedTarget.lat}?overview=full&geometries=geojson`;
+            try {
+                const response = await fetch(url);
+                const data = await response.json();
+                if (data.routes && data.routes[0]) {
+                    const route = data.routes[0];
+                    L.polyline(route.geometry.coordinates.map(c => [c[1], c[0]]), { color: '#3b82f6', weight: 6, opacity: 0.8, dashArray: '1, 10' }).addTo(routesLayer);
+                    
+                    // LÓGICA PREPARADA PARA HORAS, MINUTOS Y SEGUNDOS
+                    const distKm = route.distance / 1000;
+                    const totalSeconds = (distKm / 5) * 3600; // 5km/h a segundos
+                    
+                    const hours = Math.floor(totalSeconds / 3600);
+                    const minutes = Math.floor((totalSeconds % 3600) / 60);
+                    const seconds = Math.round(totalSeconds % 60);
+
+                    // Formateo con ceros (HH:MM:SS si hay horas, si no MM:SS)
+                    const hStr = hours > 0 ? `${hours}:` : "";
+                    const mStr = (hours > 0 && minutes < 10 ? "0" : "") + minutes;
+                    const sStr = seconds < 10 ? "0" + seconds : seconds;
+
+                    document.getElementById('destDist').textContent = `${distKm.toFixed(3)} km - ${hStr}${mStr}:${sStr} tiempo estimado`;
+                }
+            } catch (err) { alert("Error al calcular ruta"); }
+            finally { document.getElementById('loader').style.display = 'none'; }
+        }
+
+        function showDestination(name, desc, latlng) {
+            selectedTarget = latlng;
+            document.getElementById('destTitle').textContent = name;
+            document.getElementById('destDesc').textContent = desc;
+            document.getElementById('destDist').textContent = "-- km";
+            document.getElementById('destinationCard').classList.remove('hidden');
+            document.getElementById('routeBtn').onclick = calculateRoute;
+        }
+
+        function closeDestination() { document.getElementById('destinationCard').classList.add('hidden'); routesLayer.clearLayers(); selectedTarget = null; }
+        function centerOnUser() { if (userPos) map.flyTo(userPos, 16); }
+        function exportMapData() {
+            const data = pointsLayer.toGeoJSON();
+            routesLayer.eachLayer(l => data.features.push(l.toGeoJSON()));
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(new Blob([JSON.stringify(data)], { type: 'application/json' }));
+            a.download = 'recorrido.geojson';
+            a.click();
+        }
+        window.onload = init;
+    </script>
+</body>
+</html>
+
