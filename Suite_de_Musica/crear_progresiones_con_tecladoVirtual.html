@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Piano Diagram & Cadence Generator</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0c0c0e;
+            --panel: #16161a;
+            --panel2: #1e1e24;
+            --border: #2c2c38;
+            --text: #e8e8f0;
+            --muted: #5a5a72;
+            --accent: #e8a020;
+            --accent2: #c4841a;
+            --danger: #ff5566;
+            --success: #33cc88;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'DM Mono', monospace;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 36px 20px 60px;
+            gap: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 8px;
+        }
+
+        h1 {
+            font-family: 'Syne', sans-serif;
+            font-weight: 800;
+            font-size: 2rem;
+            letter-spacing: -0.03em;
+            background: linear-gradient(135deg, #fff 30%, var(--accent));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .subtitle {
+            color: var(--muted);
+            font-size: 0.7rem;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            margin-top: 4px;
+        }
+
+        .workspace {
+            width: 100%;
+            max-width: 1050px;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        /* ── Toolbar ── */
+        .toolbar {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 14px 18px;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .section-label {
+            font-size: 0.62rem;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: var(--muted);
+            margin-right: 2px;
+        }
+
+        .roles-row { display: flex; gap: 6px; align-items: center; }
+
+        .role-chip {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            padding: 7px 12px 7px 9px;
+            border-radius: 8px;
+            border: 1.5px solid var(--border);
+            background: var(--panel2);
+            cursor: pointer;
+            transition: border-color 0.15s, background 0.15s;
+            user-select: none;
+        }
+
+        .role-chip:hover { border-color: #44446a; }
+
+        .role-chip.active {
+            border-color: var(--accent);
+            background: rgba(232,160,32,0.1);
+        }
+
+        .role-swatch-wrap {
+            position: relative; width: 14px; height: 14px; flex-shrink: 0;
+        }
+
+        .role-swatch {
+            width: 14px; height: 14px; border-radius: 50%;
+            border: 1.5px solid rgba(255,255,255,0.18);
+            display: block; cursor: pointer; transition: transform 0.1s;
+        }
+        .role-swatch:hover { transform: scale(1.25); }
+
+        .role-color-input {
+            position: absolute; inset: 0; opacity: 0; width: 14px;
+            height: 14px; cursor: pointer; border: none; padding: 0;
+        }
+
+        .role-name { font-size: 0.73rem; white-space: nowrap; }
+
+        .divider {
+            width: 1px; height: 30px; background: var(--border);
+            margin: 0 6px; flex-shrink: 0;
+        }
+
+        .mode-btn {
+            padding: 7px 13px; border-radius: 8px;
+            border: 1.5px solid var(--border); background: var(--panel2);
+            color: var(--muted); font-family: 'DM Mono', monospace;
+            font-size: 0.72rem; cursor: pointer; letter-spacing: 0.04em;
+            transition: all 0.15s; white-space: nowrap;
+        }
+
+        .mode-btn:hover { border-color: #44446a; color: var(--text); }
+        .mode-btn.erase-active { border-color: var(--danger); color: var(--danger); background: rgba(255,85,102,0.1); }
+        .mode-btn.clear:hover { border-color: var(--danger); color: var(--danger); }
+
+        .oct-group { display: flex; align-items: center; gap: 6px; margin-left: auto; }
+        .oct-btns { display: flex; gap: 3px; }
+        .oct-btn {
+            width: 30px; height: 30px; border-radius: 7px;
+            border: 1.5px solid var(--border); background: var(--panel2);
+            color: var(--muted); font-family: 'DM Mono', monospace;
+            font-size: 0.82rem; cursor: pointer; transition: all 0.12s;
+        }
+        .oct-btn:hover { border-color: #44446a; color: var(--text); }
+        .oct-btn.active {
+            background: var(--accent); border-color: var(--accent);
+            color: #000; font-weight: 700;
+        }
+
+        /* Canvas */
+        .canvas-outer {
+            background: var(--panel); border: 1px solid var(--border);
+            border-radius: 14px; padding: 24px; display: flex;
+            justify-content: center; overflow-x: auto;
+        }
+        canvas { display: block; border-radius: 6px; cursor: crosshair; max-width: 100%; }
+
+        .bottom-bar { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+        .hint { font-size: 0.68rem; color: var(--muted); }
+        .hint span { color: var(--accent); }
+
+        .btn-primary {
+            padding: 10px 20px; background: var(--accent); border: none;
+            border-radius: 9px; color: #1a0d00; font-family: 'Syne', sans-serif;
+            font-weight: 700; font-size: 0.85rem; cursor: pointer;
+            letter-spacing: 0.01em; transition: all 0.15s; display: inline-flex;
+            align-items: center; justify-content: center; gap: 6px; white-space: nowrap;
+        }
+        .btn-primary:hover {
+            background: #f5b840; transform: translateY(-1px);
+            box-shadow: 0 6px 20px rgba(232,160,32,0.35);
+        }
+        .btn-primary:active { transform: translateY(0); }
+
+        /* ── Cadence Generator ── */
+        .cadence-panel {
+            background: var(--panel); border: 1px solid var(--border);
+            border-radius: 14px; padding: 20px; display: flex;
+            flex-direction: column; gap: 16px; margin-top: 10px;
+        }
+
+        .cadence-header {
+            display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;
+        }
+        .cadence-header h3 { font-family: 'Syne', sans-serif; font-size: 1.1rem; color: #fff; }
+
+        .add-chord-form { display: flex; gap: 8px; }
+        .text-input {
+            background: var(--panel2); border: 1.5px solid var(--border);
+            border-radius: 8px; padding: 8px 14px; color: var(--text);
+            font-family: 'DM Mono', monospace; font-size: 0.8rem; outline: none;
+            width: 200px; transition: border-color 0.2s;
+        }
+        .text-input:focus { border-color: var(--accent); }
+
+        .timeline-container {
+            background: var(--bg); border: 1px solid var(--border); border-radius: 10px;
+            padding: 14px; display: flex; gap: 10px; overflow-x: auto; min-height: 100px;
+            align-items: center;
+        }
+
+        .empty-timeline {
+            color: var(--muted); font-size: 0.8rem; margin: auto; font-style: italic;
+        }
+
+        .chord-block {
+            background: var(--panel2); border: 1.5px solid var(--border);
+            border-radius: 8px; padding: 10px; min-width: 130px;
+            display: flex; flex-direction: column; align-items: center; gap: 10px;
+            flex-shrink: 0; box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+        }
+        .chord-block-name { font-weight: 700; font-family: 'Syne', sans-serif; color: var(--accent); font-size: 1rem; }
+        .chord-block-actions { display: flex; gap: 4px; }
+        .action-btn {
+            background: var(--bg); border: 1px solid var(--border); border-radius: 4px;
+            color: var(--text); width: 26px; height: 26px; display: flex; align-items: center;
+            justify-content: center; cursor: pointer; transition: all 0.15s; font-size: 0.7rem;
+        }
+        .action-btn:hover { background: #333344; border-color: var(--muted); }
+        .action-btn.del:hover { background: rgba(255,85,102,0.2); border-color: var(--danger); color: var(--danger); }
+        .action-btn.load:hover { background: rgba(51,204,136,0.2); border-color: var(--success); color: var(--success); }
+
+        .export-bar {
+            display: flex; justify-content: space-between; align-items: center;
+            border-top: 1px dashed var(--border); padding-top: 16px; flex-wrap: wrap; gap: 12px;
+        }
+        .export-settings { display: flex; gap: 16px; align-items: center; }
+        .export-settings label {
+            font-size: 0.75rem; color: var(--muted); display: flex; align-items: center; gap: 8px;
+        }
+        select {
+            background: var(--panel2); border: 1.5px solid var(--border);
+            color: var(--text); padding: 6px 10px; border-radius: 6px;
+            font-family: 'DM Mono', monospace; font-size: 0.75rem; outline: none; cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h1>Piano Diagram</h1>
+    <p class="subtitle">Generador de Esquemas Armónicos y MIDI</p>
+</div>
+
+<div class="workspace">
+    <div class="toolbar" id="toolbar"></div>
+
+    <div class="canvas-outer">
+        <canvas id="piano-canvas"></canvas>
+    </div>
+
+    <div class="bottom-bar">
+        <p class="hint">Click en tecla para marcar · <span>Click nuevamente</span> para borrar</p>
+        <button class="mode-btn" onclick="downloadPNG()">↓ Descargar PNG</button>
+    </div>
+
+    <!-- Generador de Cadencias (Secuenciador) -->
+    <div class="cadence-panel">
+        <div class="cadence-header">
+            <h3>Progresión / Cadencia</h3>
+            <div class="add-chord-form">
+                <input type="text" id="chord-input" class="text-input" placeholder="Ej: Cmaj7 9 13">
+                <button class="btn-primary" onclick="addChord()">➕ Añadir Acorde</button>
+            </div>
+        </div>
+
+        <div class="timeline-container" id="timeline">
+            <!-- Chord Blocks se inyectan aquí -->
+            <div class="empty-timeline">Arma un acorde en el piano y añádelo a la cola.</div>
+        </div>
+
+        <div class="export-bar">
+            <div class="export-settings">
+                <label>Tono Base:
+                    <select id="key-selector">
+                        <option value="0">C</option>
+                        <option value="1">C#</option>
+                        <option value="2">D</option>
+                        <option value="3">D#</option>
+                        <option value="4">E</option>
+                        <option value="5">F</option>
+                        <option value="6">F#</option>
+                        <option value="7">G</option>
+                        <option value="8">G#</option>
+                        <option value="9">A</option>
+                        <option value="10">A#</option>
+                        <option value="11">B</option>
+                    </select>
+                </label>
+                <label>Duración:
+                    <select id="rhythm-selector">
+                        <option value="1">Redonda (4 tiempos)</option>
+                        <option value="0.5">Blanca (2 tiempos)</option>
+                        <option value="0.25">Negra (1 tiempo)</option>
+                    </select>
+                </label>
+            </div>
+            <button class="btn-primary" onclick="exportMIDI()">🎵 Exportar MIDI</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const canvas = document.getElementById('piano-canvas');
+    const ctx    = canvas.getContext('2d');
+
+    // ── State ──────────────────────────────────────────────────────────────
+    let numOctaves = 3;
+    let activeRole = 'tonic';
+    let eraseMode  = false;
+    let keyColors  = {};  // keyId → color string
+    let activeProgression = []; // Cadence queue
+
+    const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+    const BASE_MIDI = 36; // C2
+
+    const roles = [
+        { id: 'tonic',   label: 'Tónica',  color: '#ff4455' },
+        { id: 'third',   label: '3ra',      color: '#3399ff' },
+        { id: 'fifth',   label: '5ta',      color: '#33cc88' },
+        { id: 'seventh', label: '7ma',      color: '#bb44ff' },
+        { id: 'tension', label: 'Tensión',  color: '#ffcc00' },
+    ];
+
+    // ── Geometry ───────────────────────────────────────────────────────────
+    const WKW  = 38;   const WKH  = 140;
+    const BKW  = 24;   const BKH  = 90;
+    const PAD  = 18;   const RAD  = 5;
+
+    // C(0) C#(1) D(1) D#(3) E(2) F(3) F#(6) G(4) G#(8) A(5) A#(10) B(6)
+    const blackPositions = [1, 2, 4, 5, 6];
+    const bpToMidi = { 1: 1, 2: 3, 4: 6, 5: 8, 6: 10 }; 
+
+    let keys = [];
+
+    function buildKeys() {
+        keys = [];
+        const cw = numOctaves * 7 * WKW + PAD * 2;
+        const ch = WKH + PAD * 2;
+        canvas.width  = cw;
+        canvas.height = ch;
+
+        // White keys
+        const whiteOffsets = [0, 2, 4, 5, 7, 9, 11];
+        for (let i = 0; i < numOctaves * 7; i++) {
+            const oct = Math.floor(i / 7);
+            const midiNote = BASE_MIDI + (oct * 12) + whiteOffsets[i % 7];
+            keys.push({ id: 'w' + i, type: 'white',
+                x: PAD + i * WKW, y: PAD, w: WKW, h: WKH, midiNote });
+        }
+
+        // Black keys
+        for (let oct = 0; oct < numOctaves; oct++) {
+            blackPositions.forEach((pos, idx) => {
+                const cx = PAD + (oct * 7 + pos) * WKW - BKW / 2;
+                const midiNote = BASE_MIDI + (oct * 12) + bpToMidi[pos];
+                keys.push({ id: 'b' + (oct * 5 + idx), type: 'black',
+                    x: cx, y: PAD, w: BKW, h: BKH, midiNote });
+            });
+        }
+    }
+
+    // ── Drawing ────────────────────────────────────────────────────────────
+    function rr(x, y, w, h, tl, tr, br, bl) {
+        ctx.beginPath();
+        ctx.moveTo(x + tl, y);
+        ctx.lineTo(x + w - tr, y);
+        ctx.quadraticCurveTo(x + w, y, x + w, y + tr);
+        ctx.lineTo(x + w, y + h - br);
+        ctx.quadraticCurveTo(x + w, y + h, x + w - br, y + h);
+        ctx.lineTo(x + bl, y + h);
+        ctx.quadraticCurveTo(x, y + h, x, y + h - bl);
+        ctx.lineTo(x, y + tl);
+        ctx.quadraticCurveTo(x, y, x + tl, y);
+        ctx.closePath();
+    }
+
+    function hexToRgba(hex, a) {
+        const r = parseInt(hex.slice(1,3),16);
+        const g = parseInt(hex.slice(3,5),16);
+        const b = parseInt(hex.slice(5,7),16);
+        return `rgba(${r},${g},${b},${a})`;
+    }
+
+    function drawPiano() {
+        ctx.fillStyle = '#111118';
+        ctx.beginPath();
+        ctx.roundRect(0, 0, canvas.width, canvas.height, 6);
+        ctx.fill();
+
+        const woodGrad = ctx.createLinearGradient(0, 0, 0, PAD);
+        woodGrad.addColorStop(0, '#2a1e12'); woodGrad.addColorStop(1, '#1a1410');
+        ctx.fillStyle = woodGrad; ctx.fillRect(0, 0, canvas.width, PAD);
+
+        const whiteKeys = keys.filter(k => k.type === 'white');
+        whiteKeys.forEach((k, i) => {
+            const col = keyColors[k.id];
+            if (i < whiteKeys.length - 1) {
+                ctx.fillStyle = 'rgba(0,0,0,0.35)';
+                ctx.fillRect(k.x + k.w - 1, k.y, 1, k.h);
+            }
+            if (col) { ctx.fillStyle = col; } else {
+                const g = ctx.createLinearGradient(k.x, k.y, k.x, k.y + k.h);
+                g.addColorStop(0, '#f8f4ee'); g.addColorStop(0.7, '#ede8e0'); g.addColorStop(1, '#d4cfc8');
+                ctx.fillStyle = g;
+            }
+            rr(k.x + 1, k.y, k.w - 2, k.h, 0, 0, RAD, RAD); ctx.fill();
+
+            if (col) {
+                const sg = ctx.createLinearGradient(k.x, k.y, k.x, k.y + k.h * 0.5);
+                sg.addColorStop(0, 'rgba(255,255,255,0.30)'); sg.addColorStop(1, 'rgba(255,255,255,0)');
+                ctx.fillStyle = sg; rr(k.x + 1, k.y, k.w - 2, k.h, 0, 0, RAD, RAD); ctx.fill();
+            }
+            ctx.strokeStyle = col ? hexToRgba(col, 0.7) : '#bbb8b0'; ctx.lineWidth = 1;
+            rr(k.x + 1, k.y, k.w - 2, k.h, 0, 0, RAD, RAD); ctx.stroke();
+        });
+
+        keys.filter(k => k.type === 'black').forEach(k => {
+            const col = keyColors[k.id];
+            ctx.fillStyle = 'rgba(0,0,0,0.5)'; rr(k.x + 2, k.y + 2, k.w, k.h + 3, 0, 0, 5, 5); ctx.fill();
+
+            if (col) { ctx.fillStyle = col; } else {
+                const g = ctx.createLinearGradient(k.x, k.y, k.x, k.y + k.h);
+                g.addColorStop(0, '#2c2c36'); g.addColorStop(0.4, '#1e1e26'); g.addColorStop(1, '#0e0e14');
+                ctx.fillStyle = g;
+            }
+            rr(k.x, k.y, k.w, k.h, 0, 0, 4, 4); ctx.fill();
+
+            if (col) {
+                const sg = ctx.createLinearGradient(k.x, k.y, k.x, k.y + k.h * 0.55);
+                sg.addColorStop(0, 'rgba(255,255,255,0.28)'); sg.addColorStop(1, 'rgba(255,255,255,0)');
+                ctx.fillStyle = sg; rr(k.x + 2, k.y + 2, k.w - 4, k.h - 2, 2, 2, 0, 0); ctx.fill();
+            } else {
+                ctx.fillStyle = 'rgba(255,255,255,0.055)';
+                rr(k.x + 3, k.y + 3, k.w - 6, k.h * 0.28, 2, 2, 0, 0); ctx.fill();
+            }
+            ctx.strokeStyle = col ? hexToRgba(col, 0.5) : '#111'; ctx.lineWidth = 0.8;
+            rr(k.x, k.y, k.w, k.h, 0, 0, 4, 4); ctx.stroke();
+        });
+    }
+
+    // ── Hit detection ──────────────────────────────────────────────────────
+    function getKeyAt(mx, my) {
+        for (let i = keys.length - 1; i >= 0; i--) {
+            const k = keys[i];
+            if (k.type === 'black' && mx >= k.x && mx <= k.x + k.w && my >= k.y && my <= k.y + k.h) return k;
+        }
+        for (const k of keys) {
+            if (k.type === 'white' && mx >= k.x && mx <= k.x + k.w && my >= k.y && my <= k.y + k.h) return k;
+        }
+        return null;
+    }
+
+    canvas.addEventListener('click', e => {
+        const rect   = canvas.getBoundingClientRect();
+        const scaleX = canvas.width  / rect.width;
+        const scaleY = canvas.height / rect.height;
+        const mx = (e.clientX - rect.left) * scaleX;
+        const my = (e.clientY - rect.top)  * scaleY;
+
+        const key = getKeyAt(mx, my);
+        if (!key) return;
+
+        if (eraseMode) {
+            delete keyColors[key.id];
+        } else {
+            const col = roles.find(r => r.id === activeRole).color;
+            if (keyColors[key.id] === col) delete keyColors[key.id];
+            else keyColors[key.id] = col;
+        }
+        drawPiano();
+    });
+
+    // ── Toolbar ────────────────────────────────────────────────────────────
+    function buildToolbar() {
+        const tb = document.getElementById('toolbar');
+        tb.innerHTML = '';
+
+        const rolesLabel = document.createElement('span');
+        rolesLabel.className = 'section-label'; rolesLabel.textContent = 'Notas';
+        tb.appendChild(rolesLabel);
+
+        const rolesRow = document.createElement('div');
+        rolesRow.className = 'roles-row';
+
+        roles.forEach(role => {
+            const chip = document.createElement('div');
+            chip.className = 'role-chip' + (!eraseMode && activeRole === role.id ? ' active' : '');
+
+            const swatchWrap = document.createElement('div');
+            swatchWrap.className = 'role-swatch-wrap';
+            const swatch = document.createElement('div');
+            swatch.className = 'role-swatch'; swatch.style.background = role.color;
+
+            const colorIn = document.createElement('input');
+            colorIn.type = 'color'; colorIn.value = role.color; colorIn.className = 'role-color-input';
+            colorIn.addEventListener('input', e => {
+                e.stopPropagation(); role.color = e.target.value; swatch.style.background = role.color; drawPiano();
+            });
+            colorIn.addEventListener('click', e => e.stopPropagation());
+
+            swatchWrap.appendChild(swatch); swatchWrap.appendChild(colorIn);
+
+            const name = document.createElement('span');
+            name.className = 'role-name'; name.textContent = role.label;
+            chip.appendChild(swatchWrap); chip.appendChild(name);
+
+            chip.addEventListener('click', () => { activeRole = role.id; eraseMode = false; buildToolbar(); });
+            rolesRow.appendChild(chip);
+        });
+
+        tb.appendChild(rolesRow);
+
+        const d1 = document.createElement('div'); d1.className = 'divider'; tb.appendChild(d1);
+
+        const eraseBtn = document.createElement('button');
+        eraseBtn.className = 'mode-btn' + (eraseMode ? ' erase-active' : '');
+        eraseBtn.textContent = eraseMode ? '✕ Borrando' : '✕ Borrar';
+        eraseBtn.addEventListener('click', () => { eraseMode = !eraseMode; buildToolbar(); });
+        tb.appendChild(eraseBtn);
+
+        const clearBtn = document.createElement('button');
+        clearBtn.className = 'mode-btn clear'; clearBtn.textContent = 'Limpiar todo';
+        clearBtn.addEventListener('click', () => { keyColors = {}; drawPiano(); });
+        tb.appendChild(clearBtn);
+
+        const d2 = document.createElement('div'); d2.className = 'divider'; tb.appendChild(d2);
+
+        const octGrp = document.createElement('div'); octGrp.className = 'oct-group';
+        const octLabel = document.createElement('span'); octLabel.className = 'section-label'; octLabel.textContent = 'octavas';
+        const octBtns = document.createElement('div'); octBtns.className = 'oct-btns';
+
+        // Actualizado a 6 octavas
+        [1, 2, 3, 4, 5, 6].forEach(n => {
+            const btn = document.createElement('button');
+            btn.className = 'oct-btn' + (numOctaves === n ? ' active' : '');
+            btn.textContent = n;
+            btn.addEventListener('click', () => {
+                numOctaves = n; keyColors = {}; buildKeys(); drawPiano(); buildToolbar();
+            });
+            octBtns.appendChild(btn);
+        });
+
+        octGrp.appendChild(octLabel); octGrp.appendChild(octBtns); tb.appendChild(octGrp);
+    }
+
+    function downloadPNG() {
+        drawPiano();
+        const link = document.createElement('a'); link.download = 'piano_diagram.png';
+        link.href = canvas.toDataURL('image/png'); link.click();
+    }
+
+    // ── Cadence logic ──────────────────────────────────────────────────────
+    function renderTimeline() {
+        const tl = document.getElementById('timeline');
+        tl.innerHTML = '';
+        if (activeProgression.length === 0) {
+            tl.innerHTML = '<div class="empty-timeline">Arma un acorde en el piano y añádelo a la cola para generar una cadencia.</div>';
+            return;
+        }
+
+        activeProgression.forEach((chord, i) => {
+            const block = document.createElement('div');
+            block.className = 'chord-block';
+            
+            const nameEl = document.createElement('div');
+            nameEl.className = 'chord-block-name';
+            nameEl.textContent = chord.name;
+            block.appendChild(nameEl);
+
+            const actions = document.createElement('div');
+            actions.className = 'chord-block-actions';
+
+            const btnLeft = document.createElement('button');
+            btnLeft.className = 'action-btn'; btnLeft.innerHTML = '←';
+            btnLeft.onclick = () => moveChord(i, -1);
+            btnLeft.disabled = i === 0;
+
+            const btnRight = document.createElement('button');
+            btnRight.className = 'action-btn'; btnRight.innerHTML = '→';
+            btnRight.onclick = () => moveChord(i, 1);
+            btnRight.disabled = i === activeProgression.length - 1;
+
+            const btnLoad = document.createElement('button');
+            btnLoad.className = 'action-btn load'; btnLoad.innerHTML = '✎';
+            btnLoad.title = "Cargar al piano";
+            btnLoad.onclick = () => loadChord(i);
+
+            const btnDel = document.createElement('button');
+            btnDel.className = 'action-btn del'; btnDel.innerHTML = '✕';
+            btnDel.onclick = () => { activeProgression.splice(i, 1); renderTimeline(); };
+
+            actions.appendChild(btnLeft);
+            actions.appendChild(btnLoad);
+            actions.appendChild(btnDel);
+            actions.appendChild(btnRight);
+            
+            block.appendChild(actions);
+            tl.appendChild(block);
+        });
+    }
+
+    function addChord() {
+        const selectedIds = Object.keys(keyColors);
+        if (selectedIds.length === 0) return;
+
+        const input = document.getElementById('chord-input');
+        const chordName = input.value.trim() || `Acorde ${activeProgression.length + 1}`;
+
+        // Get MIDI notes
+        let midiNotes = selectedIds.map(id => {
+            const key = keys.find(k => k.id === id);
+            return key ? key.midiNote : null;
+        }).filter(n => n !== null);
+
+        midiNotes.sort((a, b) => a - b);
+        
+        // Root relative offset
+        const minNote = midiNotes[0];
+        const root = minNote - 48; // Base 48 for MIDI logic to work properly
+        const intervals = midiNotes.map(n => n - minNote);
+
+        activeProgression.push({
+            id: Date.now(),
+            name: chordName,
+            root: root,
+            intervals: intervals,
+            state: { ...keyColors }
+        });
+
+        input.value = ''; // clear input
+        renderTimeline();
+        
+        // Auto-scroll timeline to end
+        const tl = document.getElementById('timeline');
+        setTimeout(() => tl.scrollLeft = tl.scrollWidth, 50);
+    }
+
+    function moveChord(index, dir) {
+        if (index + dir < 0 || index + dir >= activeProgression.length) return;
+        const temp = activeProgression[index];
+        activeProgression[index] = activeProgression[index + dir];
+        activeProgression[index + dir] = temp;
+        renderTimeline();
+    }
+
+    function loadChord(index) {
+        keyColors = { ...activeProgression[index].state };
+        document.getElementById('chord-input').value = activeProgression[index].name;
+        drawPiano();
+    }
+
+    // ── MIDI Export ────────────────────────────────────────────────────────
+    function writeVarInt(value) {
+        let buffer = [value & 0x7F];
+        while (value >>= 7) {
+            buffer.unshift((value & 0x7F) | 0x80);
+        }
+        return buffer;
+    }
+
+    function exportMIDI() {
+        if (activeProgression.length === 0) {
+            alert("Añade al menos un acorde a la cadencia para exportar.");
+            return;
+        }
+        
+        const keyOffset = parseInt(document.getElementById('key-selector').value);
+        const rhythmMult = parseFloat(document.getElementById('rhythm-selector').value);
+        const ppq = 128;
+        const ticks = Math.round((ppq * 4) * rhythmMult);
+
+        // Tempo event (120 BPM)
+        let track = [0x00, 0xFF, 0x51, 0x03, 0x07, 0xA1, 0x20];
+
+        activeProgression.forEach(chord => {
+            // Reconstruimos la nota usando la fórmula
+            const notes = chord.intervals.map(n => 48 + chord.root + n + keyOffset);
+            
+            // Note On
+            notes.forEach((n, i) => track.push(...writeVarInt(i === 0 ? 0 : 0), 0x90, n, 0x50));
+            // Note Off
+            notes.forEach((n, i) => track.push(...writeVarInt(i === 0 ? ticks : 0), 0x80, n, 0x00));
+        });
+
+        track.push(0x00, 0xFF, 0x2F, 0x00); // End of track
+        
+        const header = [0x4D, 0x54, 0x68, 0x64, 0x00, 0x00, 0x00, 0x06, 0x00, 0x00, 0x00, 0x01, 0x00, 0x80];
+        const tHeader = [0x4D, 0x54, 0x72, 0x6B, (track.length >> 24) & 0xFF, (track.length >> 16) & 0xFF, (track.length >> 8) & 0xFF, track.length & 0xFF];
+
+        const blob = new Blob([new Uint8Array([...header, ...tHeader, ...track])], { type: 'audio/midi' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        const keyName = NOTE_NAMES[keyOffset].replace("#", "sharp");
+        a.download = `progression_${keyName}.mid`;
+        a.click();
+    }
+
+    // ── Init ───────────────────────────────────────────────────────────────
+    buildKeys();
+    drawPiano();
+    buildToolbar();
+    renderTimeline();
+</script>
+</body>
+</html>
