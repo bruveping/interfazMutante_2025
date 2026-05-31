@@ -86,6 +86,7 @@ simple_explorador_de_ideas [/simple_explorador_de_ideas](https://bruveping.githu
 
 Suite_de_Música [Suite_de_Musica](https://bruveping.github.io/interfazMutante_2025/Suite_de_Musica/)
 
+simulacion_sistema_solar [simulacion_sistema_solar](https://bruveping.github.io/interfazMutante_2025/simulacion_sistema_solar/)
 
 
 
