@@ -1,0 +1,985 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Presentación con Anotaciones en Vivo</title>
+    <style>
+        :root {
+            --bg: #1a1a2e;
+            --surface: #16213e;
+            --primary: #e94560;
+            --accent: #0f3460;
+            --text: #eee;
+            --text-secondary: #aaa;
+            --border: #2a2a4a;
+            --toolbar-bg: #1f1f35;
+            --shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+            --radius: 12px;
+            --transition: 0.2s ease;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', 'Inter', system-ui, -apple-system, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        /* ========== HEADER / TOOLBAR ========== */
+        #toolbar {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 18px;
+            background: var(--toolbar-bg);
+            border-bottom: 1px solid var(--border);
+            flex-wrap: wrap;
+            z-index: 100;
+            min-height: 56px;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
+        }
+
+        #toolbar .brand {
+            font-weight: 700;
+            font-size: 1.1rem;
+            color: #fff;
+            margin-right: 6px;
+            white-space: nowrap;
+            letter-spacing: -0.3px;
+        }
+        #toolbar .brand span {
+            color: var(--primary);
+        }
+
+        .sep {
+            width: 1px;
+            height: 28px;
+            background: var(--border);
+            border-radius: 1px;
+            margin: 0 4px;
+        }
+
+        /* Botones */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 14px;
+            border-radius: 20px;
+            border: 1px solid transparent;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: all var(--transition);
+            white-space: nowrap;
+            background: var(--accent);
+            color: #fff;
+            outline: none;
+            letter-spacing: 0.1px;
+        }
+        .btn:hover {
+            filter: brightness(1.25);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+        .btn:active {
+            transform: scale(0.96);
+            transition: 0.08s;
+        }
+        .btn.primary {
+            background: var(--primary);
+            font-weight: 600;
+            border: none;
+            box-shadow: 0 4px 14px rgba(233, 68, 96, 0.35);
+        }
+        .btn.outline {
+            background: transparent;
+            border: 1.5px solid #555;
+            color: #ccc;
+        }
+        .btn.outline:hover {
+            border-color: #888;
+            background: rgba(255, 255, 255, 0.04);
+        }
+        .btn.danger {
+            background: #c0392b;
+            border: none;
+        }
+        .btn.small {
+            padding: 5px 10px;
+            font-size: 0.8rem;
+            border-radius: 14px;
+        }
+        .btn.tool {
+            width: 38px;
+            height: 38px;
+            padding: 0;
+            border-radius: 50%;
+            justify-content: center;
+            font-size: 1.1rem;
+            background: var(--accent);
+            border: 2px solid transparent;
+            position: relative;
+        }
+        .btn.tool.active {
+            border-color: var(--primary);
+            background: #1a1a40;
+            box-shadow: 0 0 0 3px rgba(233, 68, 96, 0.25);
+        }
+
+        /* Color dots */
+        .color-dot {
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            cursor: pointer;
+            border: 2.5px solid transparent;
+            transition: all var(--transition);
+            flex-shrink: 0;
+        }
+        .color-dot:hover {
+            transform: scale(1.25);
+            border-color: #fff;
+            box-shadow: 0 0 10px currentColor;
+        }
+        .color-dot.active {
+            border-color: #fff;
+            box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.3);
+            transform: scale(1.15);
+        }
+
+        #colorPicker {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            border: 2px solid #666;
+            cursor: pointer;
+            padding: 0;
+            background: transparent;
+            flex-shrink: 0;
+        }
+        #colorPicker::-webkit-color-swatch-wrapper {
+            padding: 0;
+        }
+        #colorPicker::-webkit-color-swatch {
+            border-radius: 50%;
+            border: none;
+        }
+
+        /* Grosor */
+        #thicknessSlider {
+            width: 70px;
+            accent-color: var(--primary);
+            cursor: pointer;
+        }
+        #thicknessValue {
+            font-size: 0.8rem;
+            color: #ccc;
+            min-width: 20px;
+            text-align: center;
+            font-weight: 600;
+        }
+
+        /* ========== VIEWPORT ========== */
+        #viewport {
+            flex: 1;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #0d0d1a;
+            background-image:
+                radial-gradient(ellipse at center, #1a1a35 0%, #0d0d1a 70%),
+                repeating-linear-gradient(0deg,
+                    transparent,
+                    transparent 40px,
+                    rgba(255, 255, 255, 0.008) 40px,
+                    rgba(255, 255, 255, 0.008) 41px),
+                repeating-linear-gradient(90deg,
+                    transparent,
+                    transparent 40px,
+                    rgba(255, 255, 255, 0.008) 40px,
+                    rgba(255, 255, 255, 0.008) 41px);
+            overflow: hidden;
+            cursor: default;
+        }
+
+        #mediaContainer {
+            position: relative;
+            display: none;
+            /* se muestra cuando hay contenido */
+            box-shadow: var(--shadow);
+            border-radius: 6px;
+            overflow: hidden;
+            max-width: 95%;
+            max-height: 90%;
+        }
+        #mediaContainer.visible {
+            display: block;
+        }
+
+        #screenVideo {
+            display: block;
+            max-width: 100%;
+            max-height: 82vh;
+            object-fit: contain;
+            border-radius: 6px;
+            pointer-events: none;
+            /* el canvas captura los eventos */;
+        }
+
+        #drawCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            cursor: crosshair;
+            z-index: 10;
+            border-radius: 6px;
+        }
+        #drawCanvas.eraser {
+            cursor: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20'><circle cx='10' cy='10' r='8' fill='none' stroke='white' stroke-width='2' stroke-dasharray='3 2'/></svg>") 10 10, crosshair;
+        }
+
+        #placeholder {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            color: #555;
+            pointer-events: none;
+            transition: opacity 0.4s;
+            z-index: 0;
+        }
+        #placeholder .icon {
+            font-size: 4rem;
+            display: block;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+        #placeholder .text {
+            font-size: 1.1rem;
+            font-weight: 500;
+            letter-spacing: 0.3px;
+        }
+        #placeholder .sub {
+            font-size: 0.85rem;
+            color: #444;
+            margin-top: 4px;
+        }
+
+        /* ========== TOAST ========== */
+        #toast {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%) translateY(120px);
+            background: #222;
+            color: #fff;
+            padding: 12px 24px;
+            border-radius: 30px;
+            font-weight: 500;
+            z-index: 9999;
+            pointer-events: none;
+            transition: transform 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+            font-size: 0.9rem;
+        }
+        #toast.show {
+            transform: translateX(-50%) translateY(0);
+        }
+
+        /* ========== RESPONSIVE ========== */
+        @media (max-width: 768px) {
+            #toolbar {
+                padding: 8px 10px;
+                gap: 6px;
+                min-height: 48px;
+            }
+            .btn {
+                padding: 6px 10px;
+                font-size: 0.78rem;
+                border-radius: 16px;
+                gap: 4px;
+            }
+            .btn.tool {
+                width: 32px;
+                height: 32px;
+                font-size: 0.95rem;
+            }
+            .sep {
+                height: 20px;
+                margin: 0 2px;
+            }
+            #thicknessSlider {
+                width: 50px;
+            }
+            .color-dot {
+                width: 18px;
+                height: 18px;
+                border-width: 2px;
+            }
+            #toolbar .brand {
+                font-size: 0.9rem;
+            }
+            #placeholder .icon {
+                font-size: 2.5rem;
+            }
+            #placeholder .text {
+                font-size: 0.9rem;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- ==================== TOOLBAR ==================== -->
+    <div id="toolbar">
+        <span class="brand">🎯 <span>Live</span>Annotate</span>
+        <span class="sep"></span>
+
+        <!-- Botones de acción principal -->
+        <button class="btn primary" id="btnShare" title="Compartir pantalla o ventana (getDisplayMedia)">
+            📤 Compartir pantalla
+        </button>
+        <button class="btn outline" id="btnWhiteboard" title="Abrir una pizarra en blanco para dibujar">
+            📝 Pizarra
+        </button>
+        <button class="btn danger small" id="btnStop" title="Detener compartición o cerrar pizarra" style="display:none;">
+            ⏹ Detener
+        </button>
+        <span class="sep"></span>
+
+        <!-- Herramientas de dibujo -->
+        <button class="btn tool active" id="btnPen" title="Lápiz (P)">✏️</button>
+        <button class="btn tool" id="btnEraser" title="Borrador (E)">🧹</button>
+        <span class="sep"></span>
+
+        <!-- Colores predefinidos -->
+        <span style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;">
+            <span class="color-dot active" data-color="#e94560" style="background:#e94560;" title="Rojo"></span>
+            <span class="color-dot" data-color="#ff6b35" style="background:#ff6b35;" title="Naranja"></span>
+            <span class="color-dot" data-color="#f7c948" style="background:#f7c948;" title="Amarillo"></span>
+            <span class="color-dot" data-color="#2ecc71" style="background:#2ecc71;" title="Verde"></span>
+            <span class="color-dot" data-color="#3498db" style="background:#3498db;" title="Azul"></span>
+            <span class="color-dot" data-color="#9b59b6" style="background:#9b59b6;" title="Púrpura"></span>
+            <span class="color-dot" data-color="#ffffff" style="background:#ffffff;" title="Blanco"></span>
+            <span class="color-dot" data-color="#111111" style="background:#111111;" title="Negro"></span>
+            <input type="color" id="colorPicker" value="#e94560" title="Color personalizado">
+        </span>
+        <span class="sep"></span>
+
+        <!-- Grosor -->
+        <label for="thicknessSlider" style="font-size:0.8rem;color:#aaa;">Grosor:</label>
+        <input type="range" id="thicknessSlider" min="1" max="20" value="3" title="Grosor del trazo">
+        <span id="thicknessValue">3</span>
+        <span class="sep"></span>
+
+        <!-- Limpiar -->
+        <button class="btn outline small" id="btnClear" title="Limpiar todas las anotaciones (C)">
+            🗑️ Limpiar
+        </button>
+    </div>
+
+    <!-- ==================== VIEWPORT ==================== -->
+    <div id="viewport">
+        <div id="mediaContainer">
+            <video id="screenVideo" autoplay playsinline muted></video>
+            <canvas id="drawCanvas"></canvas>
+        </div>
+        <div id="placeholder">
+            <span class="icon">🖥️</span>
+            <span class="text">Comparte tu pantalla o abre una pizarra</span>
+            <span class="sub">Luego dibuja anotaciones en vivo</span>
+        </div>
+    </div>
+
+    <!-- ==================== TOAST ==================== -->
+    <div id="toast"></div>
+
+    <script>
+        (function() {
+            // ============ DOM ELEMENTS ============
+            const viewport = document.getElementById('viewport');
+            const mediaContainer = document.getElementById('mediaContainer');
+            const screenVideo = document.getElementById('screenVideo');
+            const drawCanvas = document.getElementById('drawCanvas');
+            const placeholder = document.getElementById('placeholder');
+            const toast = document.getElementById('toast');
+
+            const btnShare = document.getElementById('btnShare');
+            const btnWhiteboard = document.getElementById('btnWhiteboard');
+            const btnStop = document.getElementById('btnStop');
+            const btnPen = document.getElementById('btnPen');
+            const btnEraser = document.getElementById('btnEraser');
+            const btnClear = document.getElementById('btnClear');
+            const colorPicker = document.getElementById('colorPicker');
+            const thicknessSlider = document.getElementById('thicknessSlider');
+            const thicknessValue = document.getElementById('thicknessValue');
+            const colorDots = document.querySelectorAll('.color-dot');
+
+            // ============ STATE ============
+            const ctx = drawCanvas.getContext('2d');
+            let isDrawing = false;
+            let lastX = 0;
+            let lastY = 0;
+            let currentTool = 'pen'; // 'pen' | 'eraser'
+            let currentColor = '#e94560';
+            let currentThickness = 3;
+            let mediaStream = null;
+            let mode = null; // null | 'screenshare' | 'whiteboard'
+            let canvasImageData = null; // para restaurar al redimensionar
+
+            // ============ TOAST ============
+            let toastTimer;
+
+            function showToast(msg, duration = 2000) {
+                clearTimeout(toastTimer);
+                toast.textContent = msg;
+                toast.classList.add('show');
+                toastTimer = setTimeout(() => toast.classList.remove('show'), duration);
+            }
+
+            // ============ UPDATE UI ============
+            function updateToolUI() {
+                btnPen.classList.toggle('active', currentTool === 'pen');
+                btnEraser.classList.toggle('active', currentTool === 'eraser');
+                drawCanvas.classList.toggle('eraser', currentTool === 'eraser');
+                if (currentTool === 'eraser') {
+                    drawCanvas.style.cursor =
+                        'url("data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'24\' height=\'24\' viewBox=\'0 0 24 24\'><circle cx=\'12\' cy=\'12\' r=\'9\' fill=\'none\' stroke=\'white\' stroke-width=\'2.5\' stroke-dasharray=\'4 3\' opacity=\'0.9\'/></svg>") 12 12, crosshair';
+                } else {
+                    drawCanvas.style.cursor = 'crosshair';
+                }
+            }
+
+            function updateColorUI() {
+                colorDots.forEach(dot => {
+                    dot.classList.toggle('active', dot.dataset.color.toLowerCase() === currentColor
+                        .toLowerCase());
+                });
+                // Actualizar colorPicker si no coincide con ningún preset
+                const presetColors = Array.from(colorDots).map(d => d.dataset.color.toLowerCase());
+                if (!presetColors.includes(currentColor.toLowerCase())) {
+                    colorPicker.value = currentColor;
+                } else {
+                    colorPicker.value = currentColor;
+                }
+            }
+
+            function updateThicknessUI() {
+                thicknessValue.textContent = currentThickness;
+                thicknessSlider.value = currentThickness;
+            }
+
+            function setMode(newMode) {
+                mode = newMode;
+                if (mode === 'screenshare') {
+                    btnShare.style.display = 'none';
+                    btnWhiteboard.style.display = 'none';
+                    btnStop.style.display = 'inline-flex';
+                    placeholder.style.opacity = '0';
+                } else if (mode === 'whiteboard') {
+                    btnShare.style.display = 'none';
+                    btnWhiteboard.style.display = 'none';
+                    btnStop.style.display = 'inline-flex';
+                    placeholder.style.opacity = '0';
+                } else {
+                    btnShare.style.display = 'inline-flex';
+                    btnWhiteboard.style.display = 'inline-flex';
+                    btnStop.style.display = 'none';
+                    placeholder.style.opacity = '1';
+                    mediaContainer.classList.remove('visible');
+                    screenVideo.srcObject = null;
+                    drawCanvas.width = 0;
+                    drawCanvas.height = 0;
+                }
+            }
+
+            // ============ RESIZE CANVAS ============
+            function getVideoDisplayRect() {
+                if (!screenVideo.srcObject && mode !== 'whiteboard') return null;
+                if (mode === 'whiteboard') {
+                    // La pizarra ocupa el viewport
+                    const rect = viewport.getBoundingClientRect();
+                    const w = Math.min(rect.width * 0.9, 1600);
+                    const h = Math.min(rect.height * 0.88, 1000);
+                    return { width: w, height: h, left: 0, top: 0 };
+                }
+                const vRect = screenVideo.getBoundingClientRect();
+                const cRect = mediaContainer.getBoundingClientRect();
+                // Posición relativa del video dentro del container
+                const relLeft = vRect.left - cRect.left;
+                const relTop = vRect.top - cRect.top;
+                return {
+                    width: vRect.width,
+                    height: vRect.height,
+                    left: relLeft,
+                    top: relTop,
+                };
+            }
+
+            function syncCanvasSize() {
+                const info = getVideoDisplayRect();
+                if (!info || info.width <= 0 || info.height <= 0) return;
+
+                const newW = Math.round(info.width);
+                const newH = Math.round(info.height);
+
+                // Guardar anotaciones actuales si el canvas ya tiene contenido
+                if (drawCanvas.width > 0 && drawCanvas.height > 0 && (drawCanvas.width !== newW || drawCanvas
+                        .height !== newH)) {
+                    try {
+                        canvasImageData = drawCanvas.toDataURL();
+                    } catch (e) { /* canvas puede estar limpio */ }
+                }
+
+                if (drawCanvas.width !== newW || drawCanvas.height !== newH) {
+                    drawCanvas.width = newW;
+                    drawCanvas.height = newH;
+                    drawCanvas.style.width = newW + 'px';
+                    drawCanvas.style.height = newH + 'px';
+                    drawCanvas.style.left = (info.left || 0) + 'px';
+                    drawCanvas.style.top = (info.top || 0) + 'px';
+
+                    // Restaurar anotaciones previas
+                    if (canvasImageData) {
+                        const img = new Image();
+                        img.onload = () => {
+                            ctx.clearRect(0, 0, newW, newH);
+                            ctx.drawImage(img, 0, 0, newW, newH);
+                        };
+                        img.src = canvasImageData;
+                    } else if (mode === 'whiteboard') {
+                        // Fondo blanco para pizarra
+                        ctx.fillStyle = '#ffffff';
+                        ctx.fillRect(0, 0, newW, newH);
+                    } else {
+                        ctx.clearRect(0, 0, newW, newH);
+                    }
+                }
+            }
+
+            // ============ DRAWING ============
+            function getCanvasCoords(e) {
+                const rect = drawCanvas.getBoundingClientRect();
+                const scaleX = drawCanvas.width / rect.width;
+                const scaleY = drawCanvas.height / rect.height;
+                return {
+                    x: (e.clientX - rect.left) * scaleX,
+                    y: (e.clientY - rect.top) * scaleY,
+                };
+            }
+
+            function getTouchCoords(e) {
+                const touch = e.touches[0] || e.changedTouches[0];
+                const rect = drawCanvas.getBoundingClientRect();
+                const scaleX = drawCanvas.width / rect.width;
+                const scaleY = drawCanvas.height / rect.height;
+                return {
+                    x: (touch.clientX - rect.left) * scaleX,
+                    y: (touch.clientY - rect.top) * scaleY,
+                };
+            }
+
+            function startDrawing(e) {
+                if (mode === null) return;
+                e.preventDefault();
+                const coords = e.touches ? getTouchCoords(e) : getCanvasCoords(e);
+                isDrawing = true;
+                lastX = coords.x;
+                lastY = coords.y;
+                // Dibujar un punto inicial
+                drawDot(coords.x, coords.y);
+            }
+
+            function draw(e) {
+                if (!isDrawing || mode === null) return;
+                e.preventDefault();
+                const coords = e.touches ? getTouchCoords(e) : getCanvasCoords(e);
+                drawLine(lastX, lastY, coords.x, coords.y);
+                lastX = coords.x;
+                lastY = coords.y;
+            }
+
+            function stopDrawing(e) {
+                if (!isDrawing) return;
+                isDrawing = false;
+                // Guardar estado para posible restauración futura
+                try {
+                    canvasImageData = drawCanvas.toDataURL();
+                } catch (e) { /* ignore */ }
+            }
+
+            function drawLine(x1, y1, x2, y2) {
+                ctx.beginPath();
+                ctx.moveTo(x1, y1);
+                ctx.lineTo(x2, y2);
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                ctx.lineWidth = currentThickness;
+
+                if (currentTool === 'eraser') {
+                    if (mode === 'whiteboard') {
+                        // En pizarra, el borrador pinta blanco
+                        ctx.globalCompositeOperation = 'source-over';
+                        ctx.strokeStyle = '#ffffff';
+                    } else {
+                        // Sobre video, borra anotaciones (transparente)
+                        ctx.globalCompositeOperation = 'destination-out';
+                        ctx.strokeStyle = 'rgba(0,0,0,1)'; // cualquier color, se usa para borrar
+                        ctx.lineWidth = currentThickness * 2.5; // más grueso para borrar mejor
+                    }
+                } else {
+                    ctx.globalCompositeOperation = 'source-over';
+                    ctx.strokeStyle = currentColor;
+                }
+                ctx.stroke();
+
+                // Restaurar
+                ctx.globalCompositeOperation = 'source-over';
+            }
+
+            function drawDot(x, y) {
+                ctx.beginPath();
+                ctx.arc(x, y, currentThickness / 2, 0, Math.PI * 2);
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+
+                if (currentTool === 'eraser') {
+                    if (mode === 'whiteboard') {
+                        ctx.globalCompositeOperation = 'source-over';
+                        ctx.fillStyle = '#ffffff';
+                    } else {
+                        ctx.globalCompositeOperation = 'destination-out';
+                        ctx.fillStyle = 'rgba(0,0,0,1)';
+                    }
+                    // Para borrador, hacemos el punto más grande
+                    ctx.arc(x, y, (currentThickness * 2.5) / 2, 0, Math.PI * 2);
+                } else {
+                    ctx.globalCompositeOperation = 'source-over';
+                    ctx.fillStyle = currentColor;
+                }
+                ctx.fill();
+                ctx.globalCompositeOperation = 'source-over';
+            }
+
+            function clearCanvas() {
+                if (!drawCanvas.width || !drawCanvas.height) return;
+                ctx.globalCompositeOperation = 'source-over';
+                ctx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+                if (mode === 'whiteboard') {
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillRect(0, 0, drawCanvas.width, drawCanvas.height);
+                }
+                canvasImageData = null;
+                showToast('✅ Anotaciones limpiadas');
+            }
+
+            // ============ EVENT LISTENERS (Canvas) ============
+            drawCanvas.addEventListener('mousedown', startDrawing);
+            drawCanvas.addEventListener('mousemove', draw);
+            drawCanvas.addEventListener('mouseup', stopDrawing);
+            drawCanvas.addEventListener('mouseleave', stopDrawing);
+            drawCanvas.addEventListener('touchstart', startDrawing, { passive: false });
+            drawCanvas.addEventListener('touchmove', draw, { passive: false });
+            drawCanvas.addEventListener('touchend', stopDrawing);
+            drawCanvas.addEventListener('touchcancel', stopDrawing);
+
+            // Prevenir gestos no deseados en el viewport
+            viewport.addEventListener('touchmove', function(e) {
+                if (isDrawing) e.preventDefault();
+            }, { passive: false });
+
+            // ============ SCREEN SHARING ============
+            async function startScreenShare() {
+                if (mediaStream) {
+                    stopMediaStream();
+                }
+                try {
+                    const stream = await navigator.mediaDevices.getDisplayMedia({
+                        video: {
+                            mediaSource: 'screen',
+                            width: { ideal: 1920 },
+                            height: { ideal: 1080 },
+                            frameRate: { ideal: 30 },
+                        },
+                        audio: false,
+                    });
+                    mediaStream = stream;
+                    screenVideo.srcObject = stream;
+
+                    // Escuchar cuando el stream termina (usuario detiene desde el navegador)
+                    stream.getVideoTracks()[0].addEventListener('ended', () => {
+                        stopSharing();
+                        showToast('ℹ️ Compartición detenida desde el sistema');
+                    });
+
+                    // Esperar a que el video esté listo
+                    await new Promise((resolve, reject) => {
+                        screenVideo.onloadedmetadata = () => {
+                            resolve();
+                        };
+                        screenVideo.onerror = () => reject(new Error('Error al cargar el video'));
+                        // Timeout de seguridad
+                        setTimeout(() => resolve(), 3000);
+                    });
+
+                    setMode('screenshare');
+                    mediaContainer.classList.add('visible');
+                    screenVideo.style.display = 'block';
+                    drawCanvas.style.display = 'block';
+                    canvasImageData = null;
+
+                    // Sincronizar tamaño del canvas
+                    await new Promise(r => setTimeout(r, 300)); // pequeño delay para layout
+                    syncCanvasSize();
+                    ctx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+
+                    showToast('📤 Compartiendo pantalla — ¡Dibuja tus anotaciones!');
+                } catch (err) {
+                    console.error('Error al compartir pantalla:', err);
+                    if (err.name === 'AbortError') {
+                        showToast('⚠️ Compartición cancelada');
+                    } else if (err.name === 'NotAllowedError') {
+                        showToast('⚠️ Permiso denegado para compartir pantalla');
+                    } else {
+                        showToast('❌ Error: ' + err.message);
+                    }
+                    stopSharing();
+                }
+            }
+
+            function startWhiteboard() {
+                if (mediaStream) {
+                    stopMediaStream();
+                }
+                setMode('whiteboard');
+                mediaContainer.classList.add('visible');
+                screenVideo.style.display = 'none';
+                drawCanvas.style.display = 'block';
+                canvasImageData = null;
+
+                // Tamaño de pizarra basado en viewport
+                const rect = viewport.getBoundingClientRect();
+                const w = Math.min(Math.round(rect.width * 0.9), 1600);
+                const h = Math.min(Math.round(rect.height * 0.88), 1000);
+
+                drawCanvas.width = w;
+                drawCanvas.height = h;
+                drawCanvas.style.width = w + 'px';
+                drawCanvas.style.height = h + 'px';
+                drawCanvas.style.left = '0px';
+                drawCanvas.style.top = '0px';
+                // Centrar el mediaContainer
+                mediaContainer.style.width = w + 'px';
+                mediaContainer.style.height = h + 'px';
+
+                // Fondo blanco
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, w, h);
+                canvasImageData = drawCanvas.toDataURL();
+
+                showToast('📝 Pizarra lista — ¡Dibuja libremente!');
+            }
+
+            function stopSharing() {
+                stopMediaStream();
+                setMode(null);
+                screenVideo.style.display = 'none';
+                drawCanvas.style.display = 'none';
+                mediaContainer.classList.remove('visible');
+                mediaContainer.style.width = '';
+                mediaContainer.style.height = '';
+                drawCanvas.width = 0;
+                drawCanvas.height = 0;
+                canvasImageData = null;
+                showToast('⏹ Detenido');
+            }
+
+            function stopMediaStream() {
+                if (mediaStream) {
+                    mediaStream.getTracks().forEach(track => track.stop());
+                    mediaStream = null;
+                }
+                screenVideo.srcObject = null;
+            }
+
+            // ============ BUTTON HANDLERS ============
+            btnShare.addEventListener('click', startScreenShare);
+            btnWhiteboard.addEventListener('click', startWhiteboard);
+            btnStop.addEventListener('click', stopSharing);
+            btnClear.addEventListener('click', clearCanvas);
+
+            btnPen.addEventListener('click', () => {
+                currentTool = 'pen';
+                updateToolUI();
+            });
+            btnEraser.addEventListener('click', () => {
+                currentTool = 'eraser';
+                updateToolUI();
+            });
+
+            colorDots.forEach(dot => {
+                dot.addEventListener('click', () => {
+                    currentColor = dot.dataset.color;
+                    updateColorUI();
+                    // Si estaba en borrador, volver a lápiz
+                    if (currentTool === 'eraser') {
+                        currentTool = 'pen';
+                        updateToolUI();
+                    }
+                });
+            });
+
+            colorPicker.addEventListener('input', (e) => {
+                currentColor = e.target.value;
+                updateColorUI();
+                if (currentTool === 'eraser') {
+                    currentTool = 'pen';
+                    updateToolUI();
+                }
+            });
+
+            thicknessSlider.addEventListener('input', (e) => {
+                currentThickness = parseInt(e.target.value);
+                updateThicknessUI();
+            });
+
+            // ============ KEYBOARD SHORTCUTS ============
+            document.addEventListener('keydown', (e) => {
+                // No activar si el usuario está en un input
+                if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target
+                    .isContentEditable) return;
+
+                switch (e.key.toLowerCase()) {
+                    case 'p':
+                        currentTool = 'pen';
+                        updateToolUI();
+                        showToast('✏️ Lápiz', 800);
+                        break;
+                    case 'e':
+                        currentTool = 'eraser';
+                        updateToolUI();
+                        showToast('🧹 Borrador', 800);
+                        break;
+                    case 'c':
+                        clearCanvas();
+                        break;
+                    case 'escape':
+                        if (mode !== null) {
+                            stopSharing();
+                        }
+                        break;
+                    case 's':
+                        if (e.ctrlKey || e.metaKey) {
+                            e.preventDefault();
+                            if (mode === null) {
+                                startScreenShare();
+                            }
+                        }
+                        break;
+                    case 'w':
+                        if (e.ctrlKey || e.metaKey) {
+                            e.preventDefault();
+                            if (mode === null) {
+                                startWhiteboard();
+                            }
+                        }
+                        break;
+                    default:
+                        break;
+                }
+            });
+
+            // ============ RESIZE OBSERVER ============
+            let resizeTimeout;
+            window.addEventListener('resize', () => {
+                clearTimeout(resizeTimeout);
+                resizeTimeout = setTimeout(() => {
+                    if (mode === 'whiteboard') {
+                        // Re-dimensionar pizarra
+                        const rect = viewport.getBoundingClientRect();
+                        const w = Math.min(Math.round(rect.width * 0.9), 1600);
+                        const h = Math.min(Math.round(rect.height * 0.88), 1000);
+                        if (Math.abs(drawCanvas.width - w) > 20 || Math.abs(drawCanvas.height - h) >
+                            20) {
+                            syncCanvasSizeForWhiteboard(w, h);
+                        }
+                    } else if (mode === 'screenshare') {
+                        syncCanvasSize();
+                    }
+                }, 350);
+            });
+
+            function syncCanvasSizeForWhiteboard(w, h) {
+                const oldData = canvasImageData;
+                drawCanvas.width = w;
+                drawCanvas.height = h;
+                drawCanvas.style.width = w + 'px';
+                drawCanvas.style.height = h + 'px';
+                mediaContainer.style.width = w + 'px';
+                mediaContainer.style.height = h + 'px';
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, w, h);
+                if (oldData) {
+                    const img = new Image();
+                    img.onload = () => {
+                        ctx.drawImage(img, 0, 0, w, h);
+                        canvasImageData = drawCanvas.toDataURL();
+                    };
+                    img.src = oldData;
+                } else {
+                    canvasImageData = drawCanvas.toDataURL();
+                }
+            }
+
+            // También observar cambios en el video
+            if (window.ResizeObserver) {
+                const videoObserver = new ResizeObserver(() => {
+                    if (mode === 'screenshare') {
+                        syncCanvasSize();
+                    }
+                });
+                videoObserver.observe(screenVideo);
+            }
+
+            // Sincronizar periódicamente en modo screenshare (por si acaso)
+            setInterval(() => {
+                if (mode === 'screenshare' && screenVideo.srcObject) {
+                    const vRect = screenVideo.getBoundingClientRect();
+                    if (Math.abs(drawCanvas.width - Math.round(vRect.width)) > 2 ||
+                        Math.abs(drawCanvas.height - Math.round(vRect.height)) > 2) {
+                        syncCanvasSize();
+                    }
+                }
+            }, 2000);
+
+            // ============ INIT ============
+            updateToolUI();
+            updateColorUI();
+            updateThicknessUI();
+            setMode(null);
+            drawCanvas.style.display = 'none';
+            screenVideo.style.display = 'none';
+
+            console.log('🎯 LiveAnnotate listo');
+            console.log('  ✏️ P = Lápiz | 🧹 E = Borrador | 🗑️ C = Limpiar | ⏹ Esc = Detener');
+            console.log('  📤 Ctrl+S = Compartir pantalla | 📝 Ctrl+W = Pizarra');
+        })();
+    </script>
+</body>
+</html>
